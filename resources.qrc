@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/">
+        <file>phong.frag</file>
+        <file>plain.frag</file>
+        <file>phong.vert</file>
+        <file>normals.geom</file>
+    </qresource>
+</RCC>
