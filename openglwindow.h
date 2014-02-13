@@ -36,8 +36,8 @@ protected:
   void wheelEvent(QWheelEvent *event);
   void keyPressEvent(QKeyEvent *event);
 
-  Projective3d &get_proj_mtx() { return m_P; }
-  Isometry3d &get_view_mtx() { return m_V; }
+  Projective3f &get_proj_mtx() { return m_P; }
+  AffineCompact3f &get_view_mtx() { return m_V; }
 
   void reset_view();
   void recompute_view();
@@ -54,8 +54,8 @@ private:
   float m_vra; // vertical rotation angle
   float m_zoom; // zoom level
 
-  Projective3d m_P; // perspective projection
-  AffineCompact3d m_V; // view transform
+  Projective3f m_P; // perspective projection
+  AffineCompact3f m_V; // view transform
 
   QOpenGLContext *m_context;
 };

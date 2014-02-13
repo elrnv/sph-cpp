@@ -4,6 +4,9 @@
 #include <QtGui/QMouseEvent>
 #include "openglwindow.h"
 
+// One radian measured in degrees
+#define RADIAN 0.017453292519943
+
 OpenGLWindow::OpenGLWindow(QWindow *parent)
 	: QWindow(parent)
 	, m_update_pending(false)
@@ -214,8 +217,8 @@ void OpenGLWindow::setAnimating(bool animating)
 void OpenGLWindow::reset_view()
 { 
   m_zoom = 0;
-  m_hra = 35.0f;
-  m_vra = 25.0f;
+  m_hra = 0.0f;//35.0f;
+  m_vra = 0.0f;//25.0f;
   recompute_view();
 }
 
@@ -224,7 +227,6 @@ void OpenGLWindow::recompute_view()
   m_V.setIdentity();
   m_V.translate(Vector3f(0,0,-5));
   m_V.scale(1 + 0.05*m_zoom);
-  m_V.rotate(AngleAxisd(m_vra, Vector3f::UnitX()));
-  m_V.rotate(AngleAxisd(m_hra, Vector3f::UnitY()));
+  m_V.rotate(AngleAxisf(m_vra*RADIAN, Vector3f::UnitX()));
+  m_V.rotate(AngleAxisf(m_hra*RADIAN, Vector3f::UnitY()));
 }
-

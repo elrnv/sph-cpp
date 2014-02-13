@@ -19,9 +19,14 @@ SimWindow::SimWindow()
 void SimWindow::init()
 {
 	m_program = new QOpenGLShaderProgram(this);
+#if 0
+	m_program->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/normals.vert");
+	m_program->addShaderFromSourceFile(QOpenGLShader::Geometry, ":/normals.geom");
+	m_program->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/plain.frag");
+#else
 	m_program->addShaderFromSourceFile(QOpenGLShader::Vertex, ":/phong.vert");
-	//m_program->addShaderFromSourceFile(QOpenGLShader::Geometry, ":/normals.geom");
 	m_program->addShaderFromSourceFile(QOpenGLShader::Fragment, ":/phong.frag");
+#endif
   qDebug() << "Shader Program Log:" << m_program->log();
 	m_program->link();
 
@@ -62,11 +67,10 @@ void SimWindow::init()
 	m_idxBuffer.bind();
 	m_idxBuffer.allocate( indices, sizeof( indices ) );
 
-	m_colUniform = m_program->uniformLocation("col");
-
 	m_mvpMtxUniform = m_program->uniformLocation("mvpMtx");
 	m_mvInvMtxUniform = m_program->uniformLocation("mvInvMtx");
 	m_nmlMtxUniform = m_program->uniformLocation("nmlMtx");
+	m_mvMtxUniform = m_program->uniformLocation("mvMtx");
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glEnable(GL_DEPTH_TEST);
@@ -81,20 +85,21 @@ void SimWindow::render()
 
 	m_vao1->bind();
 
-	QMatrix4x4 MV = get_view_mtx(); // view * model transformation
-	QMatrix4x4 MVinv = MV.invert(); // view * model transformation
+	AffineCompact3f MV = get_view_mtx(); // view * model transformation
+	AffineCompact3f MVinv = MV.inverse(Eigen::Affine); // view * model transformation
 
-	m_program->setUniformValue(m_mvInvMtxUniform, MVinv);
-	m_program->setUniformValue(m_mvpMtxUniform, get_proj_mtx() * MV);
-	m_program->setUniformValue(m_nmlMtxUniform, MVinv.transpose());
+	m_program->setUniformValue(m_mvInvMtxUniform, MVinv.toQMatrix4x4());
+	m_program->setUniformValue(m_mvpMtxUniform, (get_proj_mtx() * MV).toQMatrix4x4());
+	m_program->setUniformValue(m_nmlMtxUniform, QMatrix3x3(MVinv.linear().data())); // Eigen matrices are ColMajor
+	m_program->setUniformValue(m_mvMtxUniform, MV.toQMatrix4x4()); // Eigen matrices are ColMajor
 
-  m_program->setUniformValue("lights[0].pos", QVector3D(1.0, 1.0, 3.0));
-  m_program->setUniformValue("lights[0].col", QVector4D(1.0, 0.5, 0.5, 1.0));
+  m_program->setUniformValue("lights[0].pos", QVector4D(5.0, 5.0, 5.0, 0.0));
+  m_program->setUniformValue("lights[0].col", QVector4D(1.0, 0.5, 0.5, 0.5));
   m_program->setUniformValue("lights[0].camera", true);
   m_program->setUniformValue("ambientMat", QVector4D(0.01, 0.02, 0.01, 1.0));
   m_program->setUniformValue("diffuseMat", QVector4D(0.5, 1.0, 0.5, 1.0));
   m_program->setUniformValue("specMat", QVector4D(0.5, 1.0, 0.5, 1.0));
-  m_program->setUniformValue("specPow", 25);
+  m_program->setUniformValue("specPow", 25.0f);
 
 	//m_program->setUniformValue(m_colUniform, QVector3D(1.0f, 0.0f, 0.0f));
 

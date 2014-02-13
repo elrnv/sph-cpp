@@ -19,7 +19,7 @@ private:
     GLuint m_mvpMtxUniform;
     GLuint m_mvInvMtxUniform;
     GLuint m_nmlMtxUniform;
-    GLuint m_colUniform;
+    GLuint m_mvMtxUniform;
 
     GLuint m_num_vertices;
     GLuint m_num_indices;

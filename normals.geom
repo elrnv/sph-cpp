@@ -1,7 +1,7 @@
 #version 330 core
 
 layout (triangles) in;
-layout (line_strip, max_vertices=2) out;
+layout (line_strip, max_vertices=6) out;
 
 uniform mat4 mvpMtx;
 uniform mat4 mvMtx;
@@ -25,7 +25,7 @@ out fData
 
 void main()
 {
-  // Normals 
+  // wireframe
   int i;
   for (i=0; i < gl_in.length(); ++i)
   {
@@ -35,10 +35,26 @@ void main()
 
     gl_Position = mvpMtx * frag.pos;
     EmitVertex();
-
-    gl_Position = mvpMtx * vec4(frag.pos.xyz + frag.nml * normal_length, 1.0);
-    EmitVertex();
-
-    EndPrimitive();
   }
+  frag.pos = vtx[0].pos;
+  frag.nml = vtx[0].nml;
+  frag.col = vtx[0].col;
+
+  gl_Position = mvpMtx * frag.pos;
+  EmitVertex();
+
+  EndPrimitive();
+
+  // Normals 
+  frag.pos = vtx[0].pos;
+  frag.nml = vtx[0].nml;
+  frag.col = vtx[0].col;
+
+  gl_Position = mvpMtx * frag.pos;
+  EmitVertex();
+
+  gl_Position = mvpMtx * vec4(frag.pos.xyz + frag.nml * normal_length, 1.0);
+  EmitVertex();
+
+  EndPrimitive();
 }

@@ -16,6 +16,7 @@ HEADERS += \
   mesh.h \
   material.h \
   primitive.h \
+  eigen.h \
   util.h
 
 QT_CONFIG -= no-pkg-config
@@ -33,3 +34,4 @@ OTHER_FILES += \
   phong.vert \
   phong.frag \
   normals.geom
+
