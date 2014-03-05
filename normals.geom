@@ -3,57 +3,50 @@
 layout (triangles) in;
 layout (line_strip, max_vertices=6) out;
 
-uniform mat4 mvpMtx;
-uniform mat4 mvMtx;
-uniform mat3 nmlMtx;
-
-uniform float normal_length = 0.5;
-
-in vData
+layout(std140) uniform Globals
 {
-  vec4 pos;
-  vec3 nml;
-  vec4 col;
-} vtx[];
+  mat4 MVPMtx;
+  mat4 VPMtx;
+  mat4 ModelMtx;
+  mat4 NormalMtx;
+  mat4 ViewInvMtx;
+  vec4 eye;
+};
 
-out fData 
-{
-  vec4 pos;
-  vec3 nml;
-  vec4 col;
-} frag;
+uniform float normal_length = 0.1;
+uniform vec4  wirecolor = vec4(0.2, 0.5, 0.2, 1.0);
+
+in vec3 vtxnml[];
+
+out vec4 color;
 
 void main()
 {
   // wireframe
-  int i;
-  for (i=0; i < gl_in.length(); ++i)
+  for (int i = 0; i < 3; ++i)
   {
-    frag.pos = vtx[i].pos;
-    frag.nml = vtx[i].nml;
-    frag.col = vtx[i].col;
+    color = wirecolor;
 
-    gl_Position = mvpMtx * frag.pos;
+    gl_Position = VPMtx * gl_in[i].gl_Position;
     EmitVertex();
   }
-  frag.pos = vtx[0].pos;
-  frag.nml = vtx[0].nml;
-  frag.col = vtx[0].col;
 
-  gl_Position = mvpMtx * frag.pos;
+  color = wirecolor;
+
+  gl_Position = VPMtx * gl_in[0].gl_Position;
   EmitVertex();
 
   EndPrimitive();
 
   // Normals 
-  frag.pos = vtx[0].pos;
-  frag.nml = vtx[0].nml;
-  frag.col = vtx[0].col;
+  color = vec4(1.0, 0.0, 0.0, 1.0);
 
-  gl_Position = mvpMtx * frag.pos;
+  gl_Position = VPMtx * gl_in[0].gl_Position;
   EmitVertex();
 
-  gl_Position = mvpMtx * vec4(frag.pos.xyz + frag.nml * normal_length, 1.0);
+  color = vec4(1.0, 0.0, 0.0, 0.0);
+
+  gl_Position = VPMtx * vec4(gl_in[0].gl_Position.xyz + vtxnml[0] * normal_length, 1.0);
   EmitVertex();
 
   EndPrimitive();

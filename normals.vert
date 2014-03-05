@@ -1,24 +1,22 @@
 #version 330 core
 
-uniform mat4 mvpMtx;
+layout(std140) uniform Globals
+{
+  mat4 MVPMtx;
+  mat4 VPMtx;
+  mat4 ModelMtx;
+  mat4 NormalMtx;
+  mat4 ViewInvMtx;
+  vec4 eye;
+};
 
 in vec3 pos;
 in vec3 nml;
 
-// pass vertices to the geometry shader
-out vData
-{
-  vec4 pos;
-  vec3 nml;
-  vec4 col;
-} vtx;
+out vec3 vtxnml;
 
 void main() 
 {
-  // populate vertices for geometry shader
-  vtx.pos = vec4(pos, 1.0); // needed in fragment shader
-  vtx.nml = nml;
-  vtx.col = vec4(1.0, 1.0, 0.0, 1.0);
-  gl_Position = mvpMtx * vtx.pos;
-
+  vtxnml = normalize((NormalMtx * vec4(nml, 0.0f)).xyz);
+  gl_Position = ModelMtx * vec4(pos, 1.0);
 }

@@ -24,7 +24,7 @@ public:
   SceneNode(const SceneNode &orig);
 
   // virtual allocation routine to avoid using dynamic_casts
-  virtual SceneNode *clone() { return new SceneNode(*this); }
+  virtual SceneNode *clone() const { return new SceneNode(*this); }
 
   virtual ~SceneNode();
 
@@ -38,8 +38,11 @@ public:
     m_children.push_back(child);
   }
 
-  void rotate(char axis, double angle);
-  void scale(const Vector3d& amount);
+  // rotation in degrees
+  void rotate(float angle, const Vector3f &axis);
+
+  void scale(float amount); // uniform scale
+  void scale(const Vector3d& amount); // non-uniform scale
   void translate(const Vector3d& amount);
 
   // precompute the parent transformations into the children 
@@ -47,10 +50,30 @@ public:
 
   virtual void print(int depth = 0) const;
 
-  NodeList::const_iterator begin() { return m_children.begin(); }
-  NodeList::const_iterator end()   { return m_children.end(); }
+  const NodeList &get_children() const { return m_children; }
 
   virtual bool is_geometry() const { return false; }
+
+  unsigned int num_primitives() const;
+
+  virtual AlignedBox3f &compute_bbox();
+  AlignedBox3f &get_bbox() { return m_bbox; }
+
+  // translate and scale model to fit in a 2x2x2 box centered at the origin
+  void normalize_model();
+
+  // same as above but extend the bounding box according to given vectors
+  // in the form Vector2f( positive extension, negative extension )
+  void normalize_model(
+      const Vector2f &ext_x,
+      const Vector2f &ext_y,
+      const Vector2f &ext_z);
+
+  // same as normalize_model(void) but extending the bottom left floor corner
+  // and top right ceil corner by the given vectors
+  void normalize_model(
+      const Vector3f &ext_blf,
+      const Vector3f &ext_trc);
 
 protected:
   // Useful for picking
@@ -61,6 +84,8 @@ protected:
 
   // Hierarchy
   NodeList m_children;
+
+  AlignedBox3f m_bbox;
 };
 
 
@@ -78,19 +103,19 @@ public:
   GeometryNode(const GeometryNode &orig);
 
   // virtual allocation routine to avoid using dynamic_casts
-  virtual GeometryNode *clone() { return new GeometryNode(*this); }
+  virtual GeometryNode *clone() const { return new GeometryNode(*this); }
 
   virtual ~GeometryNode();
 
   virtual bool is_geometry() const { return true; }
 
-  const Primitive* get_primitive() const { return m_primitive; }
+        Primitive* get_primitive() const { return m_primitive; }
   const Material*  get_material()  const { return m_material; }
 
   // The following two routines return overwritten memebers
-  Material *set_material(Material* material)
+  const Material *set_material(const Material* material)
   {
-    Material *temp = m_material;
+    const Material *temp = m_material;
     m_material = material;
     return temp;
   }
@@ -104,9 +129,11 @@ public:
 
   void print(int depth = 0) const;
 
+  AlignedBox3f &compute_bbox();
+
 protected:
   Primitive *m_primitive;
-  Material  *m_material;
+  const Material *m_material;
 
 };
 

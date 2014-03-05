@@ -2,13 +2,13 @@
 #include <QtCore/QCoreApplication>
 #include <QtGui/QOpenGLContext>
 #include <QtGui/QMouseEvent>
+#include "eigen.h"
 #include "openglwindow.h"
-
-// One radian measured in degrees
-#define RADIAN 0.017453292519943
 
 OpenGLWindow::OpenGLWindow(QWindow *parent)
 	: QWindow(parent)
+  , m_near(0.1), m_far(100.0), m_fov(40.0)
+  , m_frame(0)
 	, m_update_pending(false)
 	, m_animating(false)
 	, m_rotation_control(false)
@@ -17,6 +17,7 @@ OpenGLWindow::OpenGLWindow(QWindow *parent)
 	, m_context(0)
 {
 	setSurfaceType(QWindow::OpenGLSurface);
+  m_time.start();
 }
 
 OpenGLWindow::~OpenGLWindow()
@@ -26,15 +27,19 @@ OpenGLWindow::~OpenGLWindow()
 
 void OpenGLWindow::init() { }
 
-void OpenGLWindow::reshape()
+
+Vector2f OpenGLWindow::window_dim()
 {
 	const qreal retinaScale = devicePixelRatio();
-	qreal realwidth  = width()  * retinaScale;
-	qreal realheight = height() * retinaScale;
+	return Vector2f(width(), height()) * retinaScale;
+}
 
-	glViewport(0, 0, realwidth, realheight);
+void OpenGLWindow::reshape()
+{
+  Vector2f dim = window_dim();
+	glViewport(0, 0, dim[0], dim[1]);
 	m_P.setIdentity();
-	m_P.perspective(40, realwidth/realheight, 0.1, 100.0);
+	m_P.perspective(m_fov, dim[0]/dim[1], m_near, m_far);
 }
 
 void OpenGLWindow::render() { }
@@ -80,6 +85,7 @@ void OpenGLWindow::showEvent(QShowEvent *event)
 	format.setStencilBufferSize(8);
 	format.setVersion( 3, 3 );
 	format.setSamples( 8 );
+  format.setSwapBehavior( QSurfaceFormat::DoubleBuffer );
 	format.setProfile( QSurfaceFormat::CoreProfile );
 
 	m_context->setFormat(format);
@@ -89,8 +95,6 @@ void OpenGLWindow::showEvent(QShowEvent *event)
 	initializeOpenGLFunctions();
 	init();
   reset_view();
-  //glEnable(GL_BLEND);
-  //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 }
 
 void OpenGLWindow::mousePressEvent(QMouseEvent *event)
@@ -127,6 +131,8 @@ void OpenGLWindow::mouseMoveEvent(QMouseEvent *event)
   if (event->modifiers() & Qt::ShiftModifier)
   {
     m_zoom += event->y() - m_prev_y;
+    m_zoom = std::max(m_zoom, -99.0f);
+    m_zoom = std::min(m_zoom, 1000.0f);
     recompute_view();
     renderLater();
   }
@@ -156,8 +162,8 @@ void OpenGLWindow::wheelEvent(QWheelEvent *event)
     m_zoom += 0.1*num_degrees.y();
   }
 
-  m_zoom = std::max(m_zoom, -19.0f);
-  m_zoom = std::min(m_zoom, 20.0f);
+  m_zoom = std::max(m_zoom, -99.0f);
+  m_zoom = std::min(m_zoom, 1000.0f);
 
   recompute_view();
 	renderLater();
@@ -192,7 +198,16 @@ void OpenGLWindow::renderNow()
 	m_context->swapBuffers(this);
 
 	if (m_animating)
+  {
+    ++m_frame;
+    if (m_frame == 100)
+    {
+      fprintf(stderr, "\r%d       ", 100000 / m_time.elapsed() );
+      m_time.restart();
+      m_frame = 0;
+    }
 		renderLater();
+  }
 }
 
 
@@ -205,20 +220,25 @@ void OpenGLWindow::renderLater()
 	}
 }
 
-void OpenGLWindow::setAnimating(bool animating)
+void OpenGLWindow::set_animating(bool animating)
 {
 	m_animating = animating;
 
 	if (animating)
+  {
+    m_time.restart();
+    m_frame = 0;
 		renderLater();
+  }
 }
 
 // view related functions
 void OpenGLWindow::reset_view()
 { 
   m_zoom = 0;
-  m_hra = 0.0f;//35.0f;
-  m_vra = 0.0f;//25.0f;
+  m_hra = 25.0f; // degrees
+  m_vra = 25.0f; // degrees
+  set_animating(false);
   recompute_view();
 }
 
@@ -226,7 +246,7 @@ void OpenGLWindow::recompute_view()
 {
   m_V.setIdentity();
   m_V.translate(Vector3f(0,0,-5));
-  m_V.scale(1 + 0.05*m_zoom);
+  m_V.scale(1 + 0.01*m_zoom);
   m_V.rotate(AngleAxisf(m_vra*RADIAN, Vector3f::UnitX()));
   m_V.rotate(AngleAxisf(m_hra*RADIAN, Vector3f::UnitY()));
 }

@@ -11,21 +11,16 @@ layout(std140) uniform Globals
 };
 
 in vec3 pos;
-in vec3 nml;
 
 // pass vertices to the geometry shader
-out fData
+out vData
 {
-  vec4 pos;
-  vec3 nml;
   vec4 col;
-} frag;
+} vtx;
 
 void main() 
 {
   // populate vertices for geometry shader
-  frag.pos = ModelMtx * vec4(pos, 1.0f); // needed in fragment shader
-  frag.nml = normalize((NormalMtx * vec4(nml, 0.0f)).xyz);
-  frag.col = vec4(1.0f, 1.0f, 0.0f, 1.0f);
-  gl_Position = MVPMtx * vec4(pos, 1.0f);
+  vtx.col = vec4(1.0f, 1.0f, 0.0f, 1.0f);
+  gl_Position = ModelMtx * vec4(pos, 1.0f);
 }

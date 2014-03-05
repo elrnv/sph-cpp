@@ -5,5 +5,8 @@
         <file>phong.vert</file>
         <file>normals.vert</file>
         <file>normals.geom</file>
+        <file>particle.vert</file>
+        <file>particle.geom</file>
+        <file>particle.frag</file>
     </qresource>
 </RCC>

@@ -6,18 +6,30 @@ SOURCES += \
   simwindow.cpp \
   scene.cpp \
   mesh.cpp \
+  pointcloud.cpp \
   material.cpp \
-  primitive.cpp
+  primitive.cpp \
+  uniformbuffer.cpp \
+  shadermanager.cpp \
+  dynamics.cpp
 
 HEADERS += \
   openglwindow.h \
   simwindow.h \
   scene.h \
   mesh.h \
-  material.h \
+  pointcloud.h \
   primitive.h \
+  material.h \
+  uniformbuffer.h \
+  shadermanager.h \
+  dynamics.h \
   eigen.h \
-  util.h
+  util.h \
+  kernel.h 
+
+# compile with latest c++ specs
+CONFIG += c++11
 
 QT_CONFIG -= no-pkg-config
 CONFIG += link_pkgconfig
@@ -26,12 +38,20 @@ PKGCONFIG += eigen3
 INCLUDEPATH += /opt/local/include
 LIBS += -L/opt/local/lib -lassimp
 
+# use the following to boost performance
+# QMAKE_CXXFLAGS += -DBOOST_DISABLE_ASSERTS
+
+# show warnings if a function is not inlined
+QMAKE_CXXFLAGS += -Winline
+
 RESOURCES += resources.qrc
 
 OTHER_FILES += \
-  shader.vert \
-	shader.frag \
   phong.vert \
   phong.frag \
-  normals.geom
+  normals.geom \
+  normals.vert \
+  particle.vert \
+  particle.geom \
+  particle.frag
 

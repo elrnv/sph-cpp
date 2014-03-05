@@ -2,54 +2,106 @@
 #define MESH_H
 
 #include <vector>
+#include <iostream>
 #include <assimp/mesh.h>
 #include "primitive.h"
-#include "eigen.h"
 
-typedef unsigned short SIZE_IDX;
+template<typename REAL, typename SIZE>
+class MeshRS;
 
-class Face {
+template<typename REAL, typename SIZE>
+std::ostream& operator<<(std::ostream& out, const MeshRS<REAL,SIZE>& mesh);
+
+template<typename REAL, typename SIZE>
+class FaceRS {
 public:
-  explicit Face() { }
-  explicit Face(SIZE_IDX v0, SIZE_IDX v1, SIZE_IDX v2) { v[0] = v0; v[1] = v1; v[2] = v2; }
-  SIZE_IDX  &operator[](SIZE_IDX i) { return v[i]; }
-  SIZE_IDX   operator[](SIZE_IDX i) const { return v[i]; }
+  explicit FaceRS() { }
+  explicit FaceRS(SIZE v0, SIZE v1, SIZE v2) { v[0] = v0; v[1] = v1; v[2] = v2; }
+  SIZE  &operator[](SIZE i) { return v[i]; }
+  SIZE   operator[](SIZE i) const { return v[i]; }
 
-  Vector3d nml; // face normal
+  Vector3R<REAL> nml; // face normal
 private:
-  SIZE_IDX v[3];
+  SIZE v[3];
 };
 
-struct Vertex
+template<typename REAL>
+class VertexR
 {
-  explicit Vertex() : pos(0.0f,0.0f,0.0f), nml(0.0f,0.0f,0.0f) { }
-  Vector3d pos; // vertex position
-  Vector3d nml; // vertex normal
+public:
+  explicit VertexR() : pos(0.0f,0.0f,0.0f), nml(0.0f,0.0f,0.0f) { }
+  Vector3R<REAL> pos; // vertex position
+  Vector3R<REAL> nml; // vertex normal
 };
 
-typedef std::vector<Vertex> VertexVec;
-typedef std::vector<Face>   FaceVec;
+template<typename REAL>
+using VertexVecR = std::vector< VertexR<REAL> >;
+
+template<typename REAL, typename SIZE>
+using FaceVecRS = std::vector< FaceRS<REAL, SIZE> >;
+
+template<typename SIZE>
+using FaceVecS = FaceVecRS<double, SIZE>;
+
+// defaults
+typedef VertexVecR<double> VertexVec;
+typedef FaceVecRS<double, unsigned int> FaceVec;
 
 // A triangular mesh.
-class Mesh : public Primitive 
+template<typename REAL, typename SIZE>
+class MeshRS : public Primitive 
 {
 public:
-  explicit Mesh(const aiMesh *mesh, bool compute_bbox = true);
+  explicit MeshRS(const aiMesh *mesh, bool compute_bbox = true);
+  ~MeshRS();
 
   void compute_bbox();
   void compute_face_normals();
 
-  const VertexVec &get_verts() const { return m_verts; }
-  const FaceVec   &get_faces() const { return m_faces; }
+  const VertexVecR<REAL>      &get_verts() const { return m_verts; }
+  const FaceVecRS<REAL, SIZE> &get_faces() const { return m_faces; }
 
   bool is_mesh() const { return true; }
 
-protected:
-  VertexVec    m_verts;
-  FaceVec      m_faces;
-  AlignedBox3f m_bbox;
+  friend std::ostream& operator<< <>(std::ostream& out, const MeshRS<REAL,SIZE>& mesh);
 
-  friend std::ostream& operator<<(std::ostream& out, const Mesh& mesh);
+protected:
+  VertexVecR<REAL>      m_verts;
+  FaceVecRS<REAL, SIZE> m_faces;
 };
+
+template<typename SIZE>
+using MeshS = MeshRS<double, SIZE>;
+
+// A triangular mesh representation for OpenGL applications
+template<typename SIZE>
+class GLMeshS : public GLPrimitiveS<SIZE>
+{
+public:
+  explicit GLMeshS(
+      MeshS<SIZE> *mesh,
+      const PhongMaterial *mat,
+      UniformBuffer &ubo,
+      ShaderManager &shaderman);
+  ~GLMeshS();
+
+  MeshS<SIZE> *get_mesh() { return m_mesh; }
+
+  bool is_mesh() const { return true; }
+
+  SIZE get_num_indices()  const { return m_mesh->get_faces().size()*3; }
+  SIZE get_num_vertices() const { return m_mesh->get_verts().size();   }
+
+  void update_shader(ShaderManager::ShaderType type);
+  
+  void print() const { std::cerr << *m_mesh << std::endl; }
+
+protected:
+  MeshS<SIZE> *m_mesh; // reference to the native mesh object
+};
+
+// defaults
+typedef MeshRS<double, unsigned int> Mesh;
+typedef GLMeshS<unsigned int> GLMesh;
 
 #endif // MESH_H

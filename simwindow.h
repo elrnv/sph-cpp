@@ -1,36 +1,51 @@
 #ifndef SIMWINDOW_H
 #define SIMWINDOW_H
 
-#include <QtGui/QOpenGLShaderProgram>
-#include <QtGui/QOpenGLVertexArrayObject>
-#include <QtGui/QOpenGLBuffer>
+#include <vector>
+#include <boost/shared_ptr.hpp>
 #include "mesh.h"
 #include "openglwindow.h"
+#include "uniformbuffer.h"
+#include "shadermanager.h"
+
+typedef boost::shared_ptr<GLPrimitive> GLPrimitivePtr;
+typedef std::vector< GLPrimitivePtr > GLPrimVec;
 
 class SimWindow : public OpenGLWindow
 {
 public:
-    SimWindow();
+  SimWindow();
 
-    void init();
-    void render();
+  void init();
+  void render();
+
+  void load_model(int i);
+
+  typedef ShaderManager::ShaderType ViewMode;
+  void update_viewmode(ViewMode vm);
+  void make_dynamic();
+
+protected:
+  void keyPressEvent(QKeyEvent *event);
 
 private:
-    GLuint m_mvpMtxUniform;
-    GLuint m_mvInvMtxUniform;
-    GLuint m_nmlMtxUniform;
-    GLuint m_mvMtxUniform;
+  UniformBuffer m_global_uniform;
 
-    GLuint m_num_vertices;
-    GLuint m_num_indices;
+  struct UBOGlobals
+  {
+    Matrix4f mvpmtx;
+    Matrix4f vpmtx;
+    Matrix4f modelmtx;
+    Matrix4f normalmtx;
+    Matrix4f vinvmtx;
+    Vector4f eyepos;
+  } m_ubo;
 
-		QOpenGLVertexArrayObject *m_vao1;
-		QOpenGLBuffer m_posBuffer;
-		QOpenGLBuffer m_nmlBuffer;
-		QOpenGLBuffer m_idxBuffer;
+  GLPrimVec m_glprims;
 
-    QOpenGLShaderProgram *m_program;
-    int m_frame;
+  ViewMode m_viewmode;
+
+  ShaderManager m_shaderman;
 };
 
 #endif // SIMWINDOW_H

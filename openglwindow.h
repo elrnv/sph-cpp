@@ -5,6 +5,7 @@
 #include <QtGui/QWindow>
 #include <QtGui/QOpenGLFunctions_3_3_Core>
 #include <QtGui/QMatrix4x4>
+#include <QTime>
 #include "eigen.h"
 
 class OpenGLWindow : public QWindow, protected QOpenGLFunctions_3_3_Core
@@ -17,13 +18,15 @@ public:
   virtual void init();
   virtual void reshape();
   virtual void render();
-  void setAnimating(bool animating);
+  void set_animating(bool animating);
 
 public slots:
   void renderLater();
   void renderNow();
 
 protected:
+  Vector2f window_dim();
+
   bool event(QEvent *event);
 
   void resizeEvent(QResizeEvent *event);
@@ -36,11 +39,18 @@ protected:
   void wheelEvent(QWheelEvent *event);
   void keyPressEvent(QKeyEvent *event);
 
-  Projective3f &get_proj_mtx() { return m_P; }
-  AffineCompact3f &get_view_mtx() { return m_V; }
+  Projective3f &get_proj_trans() { return m_P; }
+  AffineCompact3f &get_view_trans() { return m_V; }
 
   void reset_view();
   void recompute_view();
+
+  float m_near; // near plane
+  float m_far;  // far plane
+  float m_fov;  // field of view
+
+  unsigned int m_frame;
+  QTime        m_time;
 
 private:
 

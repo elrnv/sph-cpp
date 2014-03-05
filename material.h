@@ -37,6 +37,6 @@ private:
 
 // define a default material
 const PhongMaterial DEFAULT_MATERIAL =
-  PhongMaterial(Color(1,1,1), Color(0,0,0), 25, 0);
+  PhongMaterial(Color(0.6f,0.6f,0.6f,1.0f), Color(0.0f,0.0f,0.0f,1.0f), 25.0f, 0.0f);
 
 #endif
