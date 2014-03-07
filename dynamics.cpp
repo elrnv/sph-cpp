@@ -164,13 +164,15 @@ void UniformGridRS<REAL,SIZE>::compute_quantity(ProcessFunc process)
 template<typename REAL, typename SIZE>
 DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
     const aiMesh *mesh,
-    REAL mass)
+    REAL mass,
+    void (* update_data_callback)(void))
   : PointCloudRS<REAL,SIZE>(mesh)
   , m_num_vertices(this->get_num_vertices())
   , m_mass(mass)
   , m_constant(300.0f * 0.8f)
   , m_rest_density(0.0f)
   , m_grid(this, 0.1f)
+  , m_update_data_callback(update_data_callback)
 {
   m_accel.resizeLike(this->m_pos);
   m_vel.resizeLike(this->m_pos);
@@ -181,13 +183,15 @@ DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
 template<typename REAL, typename SIZE>
 DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
     const PointCloudRS<REAL, SIZE> &pc,
-    REAL mass)
+    REAL mass,
+    void (* update_data_callback)(void))
   : PointCloudRS<REAL,SIZE>(pc)
   , m_num_vertices(this->get_num_vertices())
   , m_mass(mass)
   , m_constant(300.0f * 0.8f)
   , m_rest_density(0.0f)
   , m_grid(this, 0.1f)
+  , m_update_data_callback(update_data_callback)
 {
   m_accel.resizeLike(this->m_pos);
   m_vel.resizeLike(this->m_pos);

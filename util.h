@@ -26,7 +26,9 @@ processScene( const aiScene *scene, const aiNode *node )
   unsigned int *meshidx = node->mMeshes;
   for (unsigned int i = 0; i < num_meshes; ++i)
   {
-    GeometryNode *geo_node = new GeometryNode(scene->mMeshes[meshidx[i]]);
+    aiMesh *aimesh = scene->mMeshes[meshidx[i]];
+    aiMaterial *aimat = scene->mMaterials[aimesh->mMaterialIndex];
+    GeometryNode *geo_node = new GeometryNode(aimesh, aimat);
     scene_node->add_child(geo_node);
   }
 
@@ -83,7 +85,7 @@ void loadGLData(
       {
         boost::shared_ptr<GLPrimitive> mesh(
             new GLMesh(static_cast<Mesh*>(prim),
-                       static_cast<const PhongMaterial*>(geonode->get_material()),
+                       static_cast<const Material*>(geonode->get_material()),
                        ubo, shaderman));
       
         gl_prims.push_back(mesh);
@@ -92,7 +94,7 @@ void loadGLData(
       {
         boost::shared_ptr<GLPrimitive> pc(
             new GLPointCloud(static_cast<PointCloud *>(prim),
-                             static_cast<const PhongMaterial*>(geonode->get_material()),
+                             static_cast<const Material*>(geonode->get_material()),
                              ubo, shaderman));
       
         gl_prims.push_back(pc);

@@ -97,7 +97,7 @@ public:
   GeometryNode(const std::string& name, Primitive* primitive);
 
   // Construct a geometry node and mesh from given assimp mesh
-  GeometryNode(const aiMesh *mesh);
+  GeometryNode(const aiMesh *mesh, const aiMaterial *mat);
 
   // copy constructor
   GeometryNode(const GeometryNode &orig);

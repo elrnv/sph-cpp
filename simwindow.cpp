@@ -5,26 +5,33 @@
 #include "util.h"
 #include "mesh.h"
 #include "simwindow.h"
+#include "dynamics.h"
 
 SimWindow::SimWindow()
   : m_viewmode(ShaderManager::PHONG)
+  , m_change_prog(true)
   , m_shaderman(this)
 {
 
+}
+
+SimWindow::~SimWindow()
+{
+  for ( auto & thread : m_sim_threads )
+    thread.join();
 }
 
 void SimWindow::init()
 {
   m_shaderman.init();
 
-	m_global_uniform.create();
-	m_global_uniform.setUsagePattern( UniformBuffer::StreamDraw );
-	m_global_uniform.bind();
-  m_global_uniform.allocate( sizeof(m_ubo) );
-  m_global_uniform.bindToIndex();
+	m_ubo.create();
+	m_ubo.setUsagePattern( UniformBuffer::StreamDraw );
+	m_ubo.bind();
+  m_ubo.allocate( sizeof(m_udata) );
+  m_ubo.bindToIndex();
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-  update_viewmode(m_viewmode);
   load_model(1);
 }
 
@@ -87,7 +94,7 @@ void SimWindow::load_model(int i)
   scene->rotate(angle_x, Vector3f::UnitX());
   scene->rotate(angle_y, Vector3f::UnitY());
   scene->normalize_model(ext_x, ext_y, ext_z);
-  m_ubo.modelmtx = Affine3d(scene->get_trans()).matrix().cast<float>();
+  m_udata.modelmtx = Affine3d(scene->get_trans()).matrix().cast<float>();
 
 #ifndef QT_NO_DEBUG
   scene->print();
@@ -95,13 +102,15 @@ void SimWindow::load_model(int i)
   
   m_glprims.clear();
   m_glprims.reserve( scene->num_primitives() );
-  Util::loadGLData( scene, m_glprims, m_global_uniform, m_shaderman );
+  Util::loadGLData( scene, m_glprims, m_ubo, m_shaderman );
   delete scene;
+  update_viewmode(m_viewmode);
 }
 
 void SimWindow::update_viewmode(ViewMode vm)
 {
   m_viewmode = vm;
+  m_change_prog = true;
 
   glEnable(GL_BLEND);
 
@@ -130,9 +139,11 @@ void SimWindow::make_dynamic()
       continue;
   
     GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
-    glpc->make_dynamic(/*particle mass = */1.0f);
+    DynamicPointCloud *dpc = glpc->make_dynamic(/*particle mass = */1.0f);
+
+    // run simulation
+    m_sim_threads.push_back(std::thread(&DynamicPointCloud::run, dpc));
   }
-  set_animating(true);
 }
 
 void SimWindow::render()
@@ -144,42 +155,52 @@ void SimWindow::render()
     GLPrimitive *glprim = prim_ptr.get();
 
     Affine3f vtrans(get_view_trans()); // view transformation
-    m_ubo.vpmtx = (get_proj_trans() * vtrans).matrix();
-    m_ubo.mvpmtx = m_ubo.vpmtx * m_ubo.modelmtx;
-    m_ubo.vinvmtx = vtrans.inverse().matrix();
-    m_ubo.eyepos = m_ubo.vinvmtx * Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
+    m_udata.vpmtx = (get_proj_trans() * vtrans).matrix();
+    m_udata.mvpmtx = m_udata.vpmtx * m_udata.modelmtx;
+    m_udata.vinvmtx = vtrans.inverse().matrix();
+    m_udata.eyepos = m_udata.vinvmtx * Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
 
-    m_ubo.normalmtx.block(0,0,3,3) = m_ubo.modelmtx.block(0,0,3,3).inverse().transpose();
+    m_udata.normalmtx.block(0,0,3,3) = m_udata.modelmtx.block(0,0,3,3).inverse().transpose();
 
-    glprim->update_shader(m_viewmode);
+    m_udata.ambient = glprim->get_ambient();
+    m_udata.diffuse = glprim->get_diffuse();
+    m_udata.specular = glprim->get_specular();
+    m_udata.options[0] = glprim->get_specpow();
+    m_udata.options[1] = glprim->get_opacity();
+
+    glprim->update_glbuf(); // in case data has changed
+
+    if (m_change_prog)
+      glprim->update_shader(m_viewmode);
 
     glprim->get_program()->bind();
-    m_global_uniform.bind();
+    m_ubo.bind();
 
     int offset = 0;
-    offset = m_global_uniform.write(offset, m_ubo.mvpmtx.data(), sizeof(Matrix4f));
-    offset = m_global_uniform.write(offset, m_ubo.vpmtx.data(), sizeof(Matrix4f));
-    offset = m_global_uniform.write(offset, m_ubo.modelmtx.data(), sizeof(Matrix4f));
-    offset = m_global_uniform.write(offset, m_ubo.normalmtx.data(), sizeof(Matrix4f));
-    offset = m_global_uniform.write(offset, m_ubo.vinvmtx.data(), sizeof(Matrix4f));
-    offset = m_global_uniform.write(offset, m_ubo.eyepos.data(), sizeof(Vector4f));
+    offset = m_ubo.write(offset, m_udata.mvpmtx.data(), sizeof(Matrix4f));
+    offset = m_ubo.write(offset, m_udata.vpmtx.data(), sizeof(Matrix4f));
+    offset = m_ubo.write(offset, m_udata.modelmtx.data(), sizeof(Matrix4f));
+    offset = m_ubo.write(offset, m_udata.normalmtx.data(), sizeof(Matrix4f));
+    offset = m_ubo.write(offset, m_udata.vinvmtx.data(), sizeof(Matrix4f));
+    offset = m_ubo.write(offset, m_udata.eyepos.data(), sizeof(Vector4f));
+
+    offset = m_ubo.write(offset, m_udata.ambient.data(), sizeof(Vector4f));
+    offset = m_ubo.write(offset, m_udata.diffuse.data(), sizeof(Vector4f));
+    offset = m_ubo.write(offset, m_udata.specular.data(), sizeof(Vector4f));
+    offset = m_ubo.write(offset, m_udata.options.data(), sizeof(Vector4f));
     
-    Vector4f l1 = m_ubo.vinvmtx * Vector4f(0.0, 0.0, 10.0, 1.0);
+    Vector4f l1 = m_udata.vinvmtx * Vector4f(0.0, 0.0, 10.0, 1.0);
     glprim->get_program()->setUniformValue("lights[0].pos", QVector4D(l1[0], l1[1], l1[2], l1[3]));
-    glprim->get_program()->setUniformValue("lights[0].col", QVector4D(0.8, 0.9, 0.9, 1.0));
+    glprim->get_program()->setUniformValue("lights[0].col", QVector4D(0.2, 0.9, 0.9, 1.0));
     glprim->get_program()->setUniformValue("lights[1].pos", QVector4D(0.0, 0.0, 0.0, 0.0));
     glprim->get_program()->setUniformValue("lights[1].col", QVector4D(0.0, 0.0, 0.0, 0.0));
-    glprim->get_program()->setUniformValue("ambientColor", QVector4D(0.01, 0.02, 0.01, 1.0));
-    glprim->get_program()->setUniformValue("diff", QVector4D(0.2, 0.5, 1.0, 1.0));
-    glprim->get_program()->setUniformValue("spec", QVector4D(0.5, 1.0, 1.0, 1.0));
-    glprim->get_program()->setUniformValue("specpow", 25.0f);
 
     glprim->get_vao().bind();
 
     if (m_viewmode == ShaderManager::PARTICLE)
     {
       glprim->get_program()->setUniformValue("pt_scale", float(14*window_dim()[1]*m_near));
-      glprim->get_program()->setUniformValue("pt_radius", 0.03f);
+      glprim->get_program()->setUniformValue("pt_radius", 0.01f);
       glDrawArrays(GL_POINTS, 0, glprim->get_num_vertices());
     }
     else
@@ -188,9 +209,10 @@ void SimWindow::render()
     }
 
     glprim->get_vao().release();
-    m_global_uniform.release();
+    m_ubo.release();
     glprim->get_program()->release();
   }
+  m_change_prog = false;
 }
 
 void SimWindow::keyPressEvent(QKeyEvent *event)

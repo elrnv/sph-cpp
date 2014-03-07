@@ -7,8 +7,8 @@ SOURCES += \
   scene.cpp \
   mesh.cpp \
   pointcloud.cpp \
-  material.cpp \
   primitive.cpp \
+  material.cpp \
   uniformbuffer.cpp \
   shadermanager.cpp \
   dynamics.cpp
@@ -24,6 +24,7 @@ HEADERS += \
   uniformbuffer.h \
   shadermanager.h \
   dynamics.h \
+  glprimitive.h \
   eigen.h \
   util.h \
   kernel.h 

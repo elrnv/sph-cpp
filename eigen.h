@@ -48,18 +48,4 @@ using Eigen::AngleAxisf;
 
 using Eigen::AlignedBox3f;
 
-// Other Eigen Extensions
-
-// Class to represent colors
-class Color : public Vector4f
-{
-public:
-  Color(float r, float g, float b, float a)
-    : Vector4f(r, g, b, a) { }
-  float r() { return (*this)[0]; }
-  float g() { return (*this)[1]; }
-  float b() { return (*this)[2]; }
-  float a() { return (*this)[3]; }
-};
-
 #endif // EIGEN_H

@@ -1,3 +1,6 @@
+mtllib sphere.mtl
+o Point Sphere
+usemtl Material
 v -0.900000 -0.400000 -0.100000
 v -0.900000 -0.400000 0.000000
 v -0.900000 -0.400000 0.100000

@@ -11,6 +11,7 @@
 class OpenGLWindow : public QWindow, protected QOpenGLFunctions_3_3_Core
 {
   Q_OBJECT
+
 public:
   explicit OpenGLWindow(QWindow *parent = 0);
   ~OpenGLWindow();

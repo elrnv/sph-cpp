@@ -1,6 +1,6 @@
 #include <iostream>
 #include <limits>
-#include <Eigen/Dense>
+#include "eigen.h"
 #include "scene.h"
 #include "mesh.h"
 #include "pointcloud.h"
@@ -139,7 +139,7 @@ GeometryNode::GeometryNode(const std::string& name, Primitive* primitive)
 {
 }
 
-GeometryNode::GeometryNode(const aiMesh *mesh)
+GeometryNode::GeometryNode(const aiMesh *mesh, const aiMaterial *mat)
   : SceneNode(mesh->mName.C_Str())
   , m_primitive(NULL)
   , m_material(&DEFAULT_MATERIAL)
@@ -153,6 +153,11 @@ GeometryNode::GeometryNode(const aiMesh *mesh)
     m_primitive = new Mesh(mesh); // interpret as triangular mesh
   }
   // otherwise m_primitive remains NULL
+
+  if (!mat)
+    return;
+
+  m_material = new Material(*mat);
 }
 
 GeometryNode::GeometryNode(const GeometryNode &orig)

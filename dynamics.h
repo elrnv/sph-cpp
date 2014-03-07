@@ -45,9 +45,12 @@ public:
     : m_dpc(dpc)
     , m_h(h)
     , m_hinv(1.0f/h)
+  { }
+  
+  void init()
   {
     // determine the number of voxels needed
-    AlignedBox3f &bbox = dpc->get_bbox();
+    AlignedBox3f &bbox = m_dpc->get_bbox();
 
     bmin = bbox.corner(Eigen::AlignedBox3f::BottomLeftFloor);
     bmax = bbox.corner(Eigen::AlignedBox3f::TopRightCeil);
@@ -112,10 +115,10 @@ class DynamicPointCloudRS : public PointCloudRS<REAL,SIZE>
 {
 public:
   // dynamic point cloud from a mesh
-  explicit DynamicPointCloudRS(const aiMesh *pc, REAL mass);
+  explicit DynamicPointCloudRS(const aiMesh *pc, REAL mass, void (* update_data_callback)(void));
 
   // dynamic point cloud from a regular point cloud
-  explicit DynamicPointCloudRS(const PointCloudRS<REAL, SIZE> &pc, REAL mass);
+  explicit DynamicPointCloudRS(const PointCloudRS<REAL, SIZE> &pc, REAL mass, void (* update_data_callback)(void));
   ~DynamicPointCloudRS();
 
   inline REAL get_mass(SIZE idx = -1) { Q_UNUSED(idx); return m_mass; }
@@ -129,7 +132,15 @@ public:
 
   inline void reset_accel() { m_accel.setZero(); }
 
+  void run() 
+  {
+    std::cerr << "HELLOW" << std::endl; 
+    if (m_update_data_callback)
+      m_update_data_callback();
+  }
+
   friend UniformGridRS<REAL,SIZE>;
+
 protected:
   SIZE m_num_vertices;
   REAL m_mass; // uniform constant mass for each particle
@@ -138,6 +149,9 @@ protected:
   Matrix3XR<REAL> m_vel; // velocities
   Matrix3XR<REAL> m_accel; // accelerations
   UniformGridRS<REAL, SIZE> m_grid;
+
+  // callback to GL class to update new positions
+  void (* m_update_data_callback)(void);
 }; // class DynamicPointCloudRS
 
 // defaults

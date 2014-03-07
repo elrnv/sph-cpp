@@ -3,10 +3,10 @@
 
 #include <vector>
 #include <boost/shared_ptr.hpp>
-#include "mesh.h"
 #include "openglwindow.h"
 #include "uniformbuffer.h"
 #include "shadermanager.h"
+#include "glprimitive.h"
 
 typedef boost::shared_ptr<GLPrimitive> GLPrimitivePtr;
 typedef std::vector< GLPrimitivePtr > GLPrimVec;
@@ -15,6 +15,7 @@ class SimWindow : public OpenGLWindow
 {
 public:
   SimWindow();
+  ~SimWindow();
 
   void init();
   void render();
@@ -29,23 +30,31 @@ protected:
   void keyPressEvent(QKeyEvent *event);
 
 private:
-  UniformBuffer m_global_uniform;
+  UniformBuffer m_ubo;
 
-  struct UBOGlobals
+  struct UBOData
   {
     Matrix4f mvpmtx;
     Matrix4f vpmtx;
     Matrix4f modelmtx;
-    Matrix4f normalmtx;
+    Matrix4f normalmtx; // only linear part is used
     Matrix4f vinvmtx;
     Vector4f eyepos;
-  } m_ubo;
+
+    Vector4f ambient;
+    Vector4f diffuse;
+    Vector4f specular;
+    Vector4f options; // only the first value is used
+  } m_udata;
 
   GLPrimVec m_glprims;
 
   ViewMode m_viewmode;
+  bool m_change_prog; // flag true if m_viewmode is recently changed
 
   ShaderManager m_shaderman;
+
+  std::vector<std::thread> m_sim_threads;
 };
 
 #endif // SIMWINDOW_H
