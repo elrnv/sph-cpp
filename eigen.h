@@ -23,16 +23,23 @@ using Eigen::Vector2f;
 
 template<typename REAL>
 using Vector3R = Eigen::Matrix<REAL, 3, 1>;
+template<typename REAL>
+using Vector4R = Eigen::Matrix<REAL, 3, 1>;
+
+using Eigen::Matrix;
+using Eigen::Dynamic;
+using Eigen::NoChange;
 
 using Eigen::Matrix3d;
 using Eigen::Matrix3f;
 using Eigen::Matrix4d;
 using Eigen::Matrix4f;
-
 using Eigen::Matrix3Xd;
-using Eigen::Matrix;
-using Eigen::Dynamic;
-using Eigen::NoChange;
+
+template<typename REAL>
+using Matrix3XR = Matrix<REAL, 3, Dynamic>;
+template<typename REAL>
+using Matrix4XR = Matrix<REAL, 3, Dynamic>;
 
 using Eigen::Affine3d;
 using Eigen::Affine3f;
@@ -45,6 +52,7 @@ using Eigen::Isometry3f;
 using Eigen::AlignedScaling3d;
 using Eigen::AlignedScaling3f;
 using Eigen::AngleAxisf;
+using Eigen::Translation3f;
 
 using Eigen::AlignedBox3f;
 

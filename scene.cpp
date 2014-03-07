@@ -19,7 +19,7 @@ SceneNode::SceneNode(const aiNode *node)
   if (trans.d1 != 0 || trans.d2 != 0 || trans.d3 != 0 || trans.d4 != 1)
     fprintf(stderr, "WARNING: Loaded file contains non-affine transforms!");
 
-  Matrix4d mat;
+  Matrix4f mat;
   mat << trans.a1, trans.a2, trans.a3, trans.a4,
          trans.b1, trans.b2, trans.b3, trans.b4,
          trans.c1, trans.c2, trans.c3, trans.c4,
@@ -47,7 +47,7 @@ SceneNode::~SceneNode()
 
 void SceneNode::rotate(float angle, const Vector3f &axis)
 {
-  m_trans.rotate(AngleAxisf(angle*RADIAN, axis).cast<double>());
+  m_trans.rotate(AngleAxisf(angle*RADIAN, axis));
 }
 
 void SceneNode::scale(float amount)
@@ -55,12 +55,12 @@ void SceneNode::scale(float amount)
   m_trans.scale(amount);
 }
 
-void SceneNode::scale(const Vector3d& amount)
+void SceneNode::scale(const Vector3f& amount)
 {
   m_trans.scale(amount);
 }
 
-void SceneNode::translate(const Vector3d& amount)
+void SceneNode::translate(const Vector3f& amount)
 {
   m_trans.translate(amount);
 }
@@ -72,6 +72,7 @@ void SceneNode::flatten()
     node->m_trans = m_trans * node->m_trans;
     node->flatten();
   }
+  m_trans.setIdentity();
 }
 
 void SceneNode::print(int depth) const
@@ -121,9 +122,9 @@ void SceneNode::normalize_model(const Vector3f &ext_blf, const Vector3f &ext_trc
   m_bbox.extend( blf - ext_blf );
   m_bbox.extend( trc + ext_trc );
 
-  Vector3d sizevec = m_bbox.sizes().cast<double>();
+  Vector3f sizevec = m_bbox.sizes();
   m_trans.scale(2.0f/sizevec.maxCoeff());
-  Vector3d box_center = m_bbox.center().cast<double>();
+  Vector3f box_center = m_bbox.center();
   m_trans.translate(-box_center);
 }
 
@@ -176,6 +177,14 @@ GeometryNode::~GeometryNode()
 
   if (m_primitive)
     delete m_primitive; 
+}
+
+void GeometryNode::flatten()
+{
+  if (m_primitive)
+    m_primitive->transform(m_trans);
+
+  SceneNode::flatten();
 }
 
 void GeometryNode::print(int depth) const

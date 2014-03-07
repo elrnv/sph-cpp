@@ -6,8 +6,6 @@
 #include "primitive.h"
 
 // Partially resolve matrix template for convenience
-template<typename REAL>
-using Matrix3XR = Matrix<REAL, 3, Dynamic>;
 
 template<typename REAL, typename SIZE>
 class PointCloudRS;
@@ -26,6 +24,8 @@ public:
   Matrix3XR<REAL> &get_pos() { return m_pos; }
   inline SIZE get_num_vertices() const { return m_pos.cols(); }
   inline bool is_pointcloud() const { return true; }
+
+  inline void transform(const AffineCompact3f &trans);
 
   friend std::ostream& operator<< <>(std::ostream& out, const PointCloudRS<REAL,SIZE>& pc);
 

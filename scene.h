@@ -30,7 +30,7 @@ public:
 
   const std::string &get_name() const { return m_name; } // for debugging
 
-  const AffineCompact3d& get_trans() const { return m_trans; }
+  const AffineCompact3f& get_trans() const { return m_trans; }
 
   // ownership of child is implicitly passed to this node
   void add_child(SceneNode* child)
@@ -42,11 +42,11 @@ public:
   void rotate(float angle, const Vector3f &axis);
 
   void scale(float amount); // uniform scale
-  void scale(const Vector3d& amount); // non-uniform scale
-  void translate(const Vector3d& amount);
+  void scale(const Vector3f& amount); // non-uniform scale
+  void translate(const Vector3f& amount);
 
-  // precompute the parent transformations into the children 
-  void flatten();
+  // compute the parent transformations into the children, reset m_trans
+  virtual void flatten();
 
   virtual void print(int depth = 0) const;
 
@@ -80,7 +80,7 @@ protected:
   std::string m_name;
 
   // Transformations
-  AffineCompact3d m_trans;
+  AffineCompact3f m_trans;
 
   // Hierarchy
   NodeList m_children;
@@ -126,6 +126,9 @@ public:
     m_primitive = primitive;
     return temp;
   }
+
+  // compute the transformations into the primitives
+  virtual void flatten();
 
   void print(int depth = 0) const;
 

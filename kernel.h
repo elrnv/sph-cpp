@@ -7,8 +7,8 @@
 class Kernel
 {
 public:
-  Kernel(float h, float coef) 
-    : coef(coef), h(h), h2(h*h), h3(h2*h), h4(h3*h) { } 
+  Kernel(float h) 
+    : h(h), h2(h*h), h3(h2*h), h4(h3*h) { } 
   ~Kernel() { }
 
   // main coefficient
@@ -25,7 +25,7 @@ protected:
 // two types of kernel functions ( scalar and vector ) for convenience
 struct KernelScalar : public Kernel
 {
-  KernelScalar(float h, float coef) : Kernel(h, coef) { }
+  KernelScalar(float h) : Kernel(h) { }
   ~KernelScalar() {}
   // by convention operator[] -> don't premultiply by coef
   virtual inline float operator[](const Vector3d &r) = 0;
@@ -34,7 +34,7 @@ struct KernelScalar : public Kernel
 
 struct KernelVector : public Kernel
 {
-  KernelVector(float h, float coef) : Kernel(h, coef) { }
+  KernelVector(float h) : Kernel(h) { }
   ~KernelVector() {}
   // by convention operator[] -> don't premultiply by coef
   virtual inline Vector3d operator[](const Vector3d &r) = 0;
@@ -45,7 +45,7 @@ struct KernelVector : public Kernel
 
 struct Poly6Kernel : public KernelScalar
 {
-  Poly6Kernel(float h) : KernelScalar(h, 315.0f/(64*M_PI*h3)) { }
+  Poly6Kernel(float h) : KernelScalar(h) { coef = 315.0f/(64*M_PI*h3); }
   ~Poly6Kernel() {}
   
   // main kernel without coefficient
@@ -65,7 +65,7 @@ struct Poly6Kernel : public KernelScalar
 
 struct Poly6GradKernel : public KernelVector
 {
-  Poly6GradKernel(float h) : KernelVector(h, 1890.0f/(64*M_PI*h3)) { }
+  Poly6GradKernel(float h) : KernelVector(h) { coef = 1890.0f/(64*M_PI*h3); }
   ~Poly6GradKernel() { }
 
   inline Vector3d operator[](const Vector3d &r)
@@ -83,7 +83,7 @@ struct Poly6GradKernel : public KernelVector
 
 struct Poly6LapKernel : public KernelScalar
 {
-  Poly6LapKernel(float h) : KernelScalar(h, 1890.0f/(64*M_PI*h3)) { }
+  Poly6LapKernel(float h) : KernelScalar(h) { coef = 1890.0f/(64*M_PI*h3); }
   ~Poly6LapKernel() {}
 
   inline float operator[](const Vector3d &r)
@@ -102,7 +102,7 @@ struct Poly6LapKernel : public KernelScalar
 
 struct SpikyKernel : public KernelScalar
 {
-  SpikyKernel(float h) : KernelScalar(h, 15.0f/(M_PI*h3*h3)) { }
+  SpikyKernel(float h) : KernelScalar(h) { coef = 15.0f/(M_PI*h3*h3); }
   ~SpikyKernel() {}
 
   inline float operator[](const Vector3d &r)
@@ -120,26 +120,28 @@ struct SpikyKernel : public KernelScalar
 
 struct SpikyGradKernel : public KernelVector
 {
-  SpikyGradKernel(float h) : KernelVector(h, 45.0f/(M_PI*h3*h3)) { }
+  SpikyGradKernel(float h) : KernelVector(h) { coef = 45.0f/(M_PI*h3*h3); }
   ~SpikyGradKernel() { }
 
   // gradient of kernel
   inline Vector3d operator[](const Vector3d &r)
   {
     double rn = r.norm();
+    if (rn == 0.0f) // handle degeneracy
+      return Vector3d(h2, h2, h2); // chose one sided limit
+
     return rn <= h ? Vector3d((-pow2(h - rn) / rn)*r) : Vector3d(0.0f, 0.0f, 0.0f);
   }
   inline Vector3d operator()(const Vector3d &r)
   {
-    double rn = r.norm();
-    return rn <= h ? Vector3d((-coef*pow2(h - rn) / rn)*r) : Vector3d(0.0f, 0.0f, 0.0f);
+    return coef*operator[](r);
   }
 }; // SpikyGradKernel
 
 // laplacian of spiky kernel
 struct SpikyLapKernel : public KernelScalar
 {
-  SpikyLapKernel(float h) : KernelScalar(h, 90.0f/(M_PI*h3*h3)) { }
+  SpikyLapKernel(float h) : KernelScalar(h) { coef = 90.0f/(M_PI*h3*h3); }
   ~SpikyLapKernel() {}
 
   inline float operator[](const Vector3d &r)
@@ -170,7 +172,7 @@ struct SpikyLapKernel : public KernelScalar
 
 struct ViscKernel : public KernelScalar
 {
-  ViscKernel(float h) : KernelScalar(h, 15.0f/(2*M_PI*h3)) { }
+  ViscKernel(float h) : KernelScalar(h) { coef = 15.0f/(2*M_PI*h3); }
   ~ViscKernel() {}
 
   inline float operator[](const Vector3d &r)
@@ -200,7 +202,7 @@ struct ViscKernel : public KernelScalar
 
 struct ViscGradKernel : public KernelVector
 {
-  ViscGradKernel(float h) : KernelVector(h, 15.0f/(2*M_PI*h3)) { }
+  ViscGradKernel(float h) : KernelVector(h) { coef = 15.0f/(2*M_PI*h3); }
   ~ViscGradKernel() { }
 
   inline Vector3d operator[](const Vector3d &r)
@@ -221,7 +223,7 @@ struct ViscGradKernel : public KernelVector
 
 struct ViscLapKernel : public KernelScalar
 {
-  ViscLapKernel(float h) : KernelScalar(h, 45.0f/(M_PI*h3*h3)) { }
+  ViscLapKernel(float h) : KernelScalar(h) { coef = 45.0f/(M_PI*h3*h3); }
   ~ViscLapKernel() { }
 
   inline float operator[](const Vector3d &r)

@@ -37,7 +37,7 @@ public:
     m_diffuse_color = Vector4f(kd[0], kd[1], kd[2], 1.0f);
     m_specular_color = Vector4f(ks[0], ks[1], ks[2], 1.0f);
   }
-  ~GLPrimitiveS() { }
+  virtual ~GLPrimitiveS() { }
 
   QOpenGLVertexArrayObject &get_vao()     { return m_vao; }
   QOpenGLShaderProgram     *get_program() { return m_prog; }
@@ -58,7 +58,6 @@ public:
   virtual inline SIZE get_num_indices()  const = 0;
   virtual inline SIZE get_num_vertices() const = 0;
 
-  virtual void update_data() = 0;
   virtual void update_glbuf() = 0;
   virtual void update_shader(ShaderManager::ShaderType type) = 0;
 

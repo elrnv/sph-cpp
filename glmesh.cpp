@@ -3,130 +3,12 @@
 #include <QtGui/QOpenGLBuffer>
 #include <limits>
 #include <assimp/scene.h>
-#include "mesh.h"
-
-// Mesh stuff
-
-template<typename REAL, typename SIZE>
-MeshRS<REAL,SIZE>::MeshRS(const aiMesh *mesh, bool need_bbox)
-{
-  // First copy all the vertices
-  if (!mesh->HasPositions())
-    return;
-
-  aiVector3D *verts = mesh->mVertices;
-  SIZE num_verts = mesh->mNumVertices;
-  m_verts.resize(num_verts);
-
-  typename VertexVecR<REAL>::iterator v_it = m_verts.begin(); // member face iterator
-  for (SIZE i = 0; i < num_verts; ++i, ++v_it)
-    v_it->pos << verts[i].x, verts[i].y, verts[i].z;
-
-  if (need_bbox)
-    compute_bbox(); // compute the bounded box if requested
-
-  if (mesh->HasNormals())
-  {
-    aiVector3D *normals = mesh->mNormals;
-    v_it = m_verts.begin();
-    for (SIZE i = 0; i < num_verts; ++i, ++v_it)
-      v_it->nml << normals[i].x, normals[i].y, normals[i].z;
-  }
-
-  if (!mesh->HasFaces())
-    return;
-
-  aiFace *faces = mesh->mFaces;
-  SIZE num_faces = mesh->mNumFaces;
-  m_faces.reserve(num_faces);
-  
-  // Assume all faces are already triangles as returned by assimp
-  for (SIZE i = 0; i < num_faces; ++i)
-  {
-    if (faces[i].mNumIndices < 3)
-      continue; // ignore line and point primitives
-    m_faces.push_back(
-        FaceRS<REAL, SIZE>(
-          faces[i].mIndices[0],
-          faces[i].mIndices[1],
-          faces[i].mIndices[2]));
-  }
-
-  if (mesh->HasNormals())
-    return; // Already collected the normals
-
-  // Each vertex normal is the average of the neighbouring face normals
-  typename FaceVecRS<REAL,SIZE>::iterator f_it = m_faces.begin(); // member face iterator
-  for (f_it = m_faces.begin(); f_it != m_faces.end(); ++f_it)
-  {
-    FaceRS<REAL,SIZE> &face = *f_it;
-    for (unsigned char i = 0; i < 3; ++i)
-    {
-      Vector3d e1 = (m_verts[face[(i+1)%3]].pos - m_verts[face[i]].pos).normalized();
-      Vector3d e2 = (m_verts[face[(i+2)%3]].pos - m_verts[face[i]].pos).normalized();
-      m_verts[(*f_it)[i]].nml += e1.cross(e2); // compute the sum
-    }
-  }
-
-  for (v_it = m_verts.begin(); v_it != m_verts.end(); ++v_it)
-    v_it->nml.normalize();                  // take the average
-}
-
-template<typename REAL, typename SIZE>
-MeshRS<REAL,SIZE>::~MeshRS()
-{
-}
-
-template<typename REAL, typename SIZE>
-void MeshRS<REAL,SIZE>::compute_face_normals()
-{
-  typename FaceVecRS<REAL,SIZE>::iterator f_it = m_faces.begin();
-  for ( ; f_it != m_faces.end(); ++f_it)
-  {
-    FaceRS<REAL,SIZE> &face = *f_it;
-    Vector3d e1 = m_verts[face[1]].pos - m_verts[face[0]].pos;
-    Vector3d e2 = m_verts[face[2]].pos - m_verts[face[1]].pos;
-    face.nml = e1.cross(e2).normalized();
-  }
-}
-
-template<typename REAL, typename SIZE>
-void MeshRS<REAL,SIZE>::compute_bbox()
-{
-  m_bbox.setEmpty();
-  typename VertexVecR<REAL>::iterator v_it;
-  for (v_it = m_verts.begin(); v_it != m_verts.end(); ++v_it)
-    m_bbox.extend(v_it->pos.template cast<float>());
-}
-
-template<typename REAL, typename SIZE>
-std::ostream& operator<<(std::ostream& out, const MeshRS<REAL,SIZE>& mesh)
-{
-  out << "mesh({ ";
-  typename VertexVecR<REAL>::const_iterator v_it;
-  for (v_it = mesh.m_verts.begin(); v_it != mesh.m_verts.end(); ++v_it)
-  {
-    if (v_it != mesh.m_verts.begin()) out << ",\n       ";
-    out << v_it->pos[0] << " " << v_it->pos[1] << " " << v_it->pos[2];
-  }
-  out << "},\n\n     { ";
-
-  typename FaceVecRS<REAL,SIZE>::const_iterator f_it;
-  for (f_it = mesh.m_faces.begin(); f_it != mesh.m_faces.end(); ++f_it)
-  {
-    if (f_it != mesh.m_faces.begin()) out << ",\n       ";
-    out << "[ " << (*f_it)[0] << " " << (*f_it)[1] << " " << (*f_it)[2] << " ]";
-  }
-  out << "});\n";
-  return out;
-}
-
+#include "glmesh.h"
 
 // GLMesh stuff
-
-template<typename SIZE>
-GLMeshS<SIZE>::GLMeshS(
-    MeshS<SIZE> *mesh,
+template<typename REAL, typename SIZE>
+GLMeshRS<REAL,SIZE>::GLMeshRS(
+    MeshRS<REAL,SIZE> *mesh,
     const Material *mat,
     UniformBuffer &ubo,
     ShaderManager &shaderman)
@@ -150,11 +32,11 @@ GLMeshS<SIZE>::GLMeshS(
     }
 
   // collect indices
-  const FaceVecS<SIZE> &faces = mesh->get_faces();
+  const FaceVecRS<REAL, SIZE> &faces = mesh->get_faces();
 
   GLuint indices[faces.size()*3];
 
-  typename FaceVecS<SIZE>::const_iterator f_it = faces.begin();
+  typename FaceVecRS<REAL, SIZE>::const_iterator f_it = faces.begin();
   i = 0;
   for ( ; f_it != faces.end(); ++f_it)
     for (short j = 0; j < 3; ++j)
@@ -184,13 +66,13 @@ GLMeshS<SIZE>::GLMeshS(
   update_shader(ShaderManager::PHONG);
 }
 
-template<typename SIZE>
-GLMeshS<SIZE>::~GLMeshS()
+template<typename REAL, typename SIZE>
+GLMeshRS<REAL,SIZE>::~GLMeshRS()
 {
 }
 
-template<typename SIZE>
-void GLMeshS<SIZE>::update_data()
+template<typename REAL, typename SIZE>
+void GLMeshRS<REAL, SIZE>::update_data()
 {
   std::lock_guard<std::mutex> guard(this->m_lock);
 
@@ -216,8 +98,8 @@ void GLMeshS<SIZE>::update_data()
   m_insync = false;
 }
 
-template<typename SIZE>
-void GLMeshS<SIZE>::update_glbuf()
+template<typename REAL, typename SIZE>
+void GLMeshRS<REAL, SIZE>::update_glbuf()
 {
   std::lock_guard<std::mutex> guard(this->m_lock);
   
@@ -234,8 +116,8 @@ void GLMeshS<SIZE>::update_glbuf()
   m_insync = true;
 }
 
-template<typename SIZE>
-void GLMeshS<SIZE>::update_shader(ShaderManager::ShaderType type)
+template<typename REAL, typename SIZE>
+void GLMeshRS<REAL, SIZE>::update_shader(ShaderManager::ShaderType type)
 {
   if (this->m_prog)
   {
@@ -263,8 +145,5 @@ void GLMeshS<SIZE>::update_shader(ShaderManager::ShaderType type)
   this->m_ubo.bindToProg(this->m_prog->programId(), "Globals");
 }
 
-
-template class MeshRS<double, unsigned int>;
-template class GLMeshS<unsigned int>;
-
-template std::ostream& operator<<(std::ostream& out, const Mesh& mesh);
+// defaults
+template class GLMeshRS<double, unsigned int>;

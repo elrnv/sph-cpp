@@ -6,7 +6,6 @@
 #include "mesh.h"
 
 // Mesh stuff
-
 template<typename REAL, typename SIZE>
 MeshRS<REAL,SIZE>::MeshRS(const aiMesh *mesh, bool need_bbox)
 {
@@ -56,20 +55,18 @@ MeshRS<REAL,SIZE>::MeshRS(const aiMesh *mesh, bool need_bbox)
     return; // Already collected the normals
 
   // Each vertex normal is the average of the neighbouring face normals
-  typename FaceVecRS<REAL,SIZE>::iterator f_it = m_faces.begin(); // member face iterator
-  for (f_it = m_faces.begin(); f_it != m_faces.end(); ++f_it)
+  for ( auto &f : m_faces )
   {
-    FaceRS<REAL,SIZE> &face = *f_it;
     for (unsigned char i = 0; i < 3; ++i)
     {
-      Vector3d e1 = (m_verts[face[(i+1)%3]].pos - m_verts[face[i]].pos).normalized();
-      Vector3d e2 = (m_verts[face[(i+2)%3]].pos - m_verts[face[i]].pos).normalized();
-      m_verts[(*f_it)[i]].nml += e1.cross(e2); // compute the sum
+      Vector3d e1 = (m_verts[f[(i+1)%3]].pos - m_verts[f[i]].pos).normalized();
+      Vector3d e2 = (m_verts[f[(i+2)%3]].pos - m_verts[f[i]].pos).normalized();
+      m_verts[f[i]].nml += e1.cross(e2); // compute the sum
     }
   }
 
-  for (v_it = m_verts.begin(); v_it != m_verts.end(); ++v_it)
-    v_it->nml.normalize();                  // take the average
+  for ( auto &v : m_verts )
+    v.nml.normalize();                  // take the average
 }
 
 template<typename REAL, typename SIZE>
@@ -80,13 +77,11 @@ MeshRS<REAL,SIZE>::~MeshRS()
 template<typename REAL, typename SIZE>
 void MeshRS<REAL,SIZE>::compute_face_normals()
 {
-  typename FaceVecRS<REAL,SIZE>::iterator f_it = m_faces.begin();
-  for ( ; f_it != m_faces.end(); ++f_it)
+  for ( auto &f : m_faces )
   {
-    FaceRS<REAL,SIZE> &face = *f_it;
-    Vector3d e1 = m_verts[face[1]].pos - m_verts[face[0]].pos;
-    Vector3d e2 = m_verts[face[2]].pos - m_verts[face[1]].pos;
-    face.nml = e1.cross(e2).normalized();
+    Vector3d e1 = m_verts[f[1]].pos - m_verts[f[0]].pos;
+    Vector3d e2 = m_verts[f[2]].pos - m_verts[f[1]].pos;
+    f.nml = e1.cross(e2).normalized();
   }
 }
 
@@ -94,10 +89,27 @@ template<typename REAL, typename SIZE>
 void MeshRS<REAL,SIZE>::compute_bbox()
 {
   m_bbox.setEmpty();
-  typename VertexVecR<REAL>::iterator v_it;
-  for (v_it = m_verts.begin(); v_it != m_verts.end(); ++v_it)
-    m_bbox.extend(v_it->pos.template cast<float>());
+  for ( auto &v : m_verts )
+    m_bbox.extend(v.pos.template cast<float>());
 }
+
+template<typename REAL, typename SIZE>
+void MeshRS<REAL,SIZE>::transform(const AffineCompact3f &trans)
+{
+  // convert positions to canonical homogenized coordinates
+  for ( auto &v : m_verts )
+  {
+    Vector3R<REAL> vec( trans.linear().template cast<REAL>() * v.pos );
+    Translation3f T( trans.translation() );
+    v.pos = vec + Vector3R<REAL>(T.x(), T.y(), T.z());
+    v.nml = trans.inverse().linear().transpose().template cast<REAL>() * v.nml;
+  }
+  for ( auto &f : m_faces )
+  {
+    f.nml = trans.inverse().linear().transpose().template cast<REAL>() * f.nml;
+  }
+}
+
 
 template<typename REAL, typename SIZE>
 std::ostream& operator<<(std::ostream& out, const MeshRS<REAL,SIZE>& mesh)
@@ -121,150 +133,7 @@ std::ostream& operator<<(std::ostream& out, const MeshRS<REAL,SIZE>& mesh)
   return out;
 }
 
-
-// GLMesh stuff
-
-template<typename SIZE>
-GLMeshS<SIZE>::GLMeshS(
-    MeshS<SIZE> *mesh,
-    const Material *mat,
-    UniformBuffer &ubo,
-    ShaderManager &shaderman)
-  : GLPrimitiveS<SIZE>(mat, ubo, shaderman)
-  , m_mesh(mesh)
-  , m_insync(true)
-{
-  // collect vertex attributes
-  const VertexVec &verts = mesh->get_verts();
-
-  GLfloat vertices[verts.size()*3];
-  GLfloat normals[verts.size()*3];
-
-  VertexVec::const_iterator v_it = verts.cbegin();
-  int i = 0;
-  for ( ; v_it != verts.cend(); ++v_it)
-    for (short j = 0; j < 3; ++j)
-    {
-      vertices[i] = GLfloat(v_it->pos[j]);
-      normals[i++]  = GLfloat(v_it->nml[j]);
-    }
-
-  // collect indices
-  const FaceVecS<SIZE> &faces = mesh->get_faces();
-
-  GLuint indices[faces.size()*3];
-
-  typename FaceVecS<SIZE>::const_iterator f_it = faces.begin();
-  i = 0;
-  for ( ; f_it != faces.end(); ++f_it)
-    for (short j = 0; j < 3; ++j)
-    {
-      indices[i] = GLuint((*f_it)[j]);
-      ++i;
-    }
-
-  this->m_vao.create();
-  this->m_vao.bind();
-
-  this->m_pos.create();
-  this->m_pos.setUsagePattern( QOpenGLBuffer::StaticDraw );
-  this->m_pos.bind();
-  this->m_pos.allocate( vertices, sizeof( vertices ) );
-
-  this->m_nml.create();
-  this->m_nml.setUsagePattern( QOpenGLBuffer::StaticDraw );
-  this->m_nml.bind();
-  this->m_nml.allocate( normals, sizeof( normals ) );
-
-  this->m_idx.create();
-  this->m_idx.setUsagePattern( QOpenGLBuffer::StaticDraw );
-  this->m_idx.bind();
-  this->m_idx.allocate( indices, sizeof( indices ) );
-
-  update_shader(ShaderManager::PHONG);
-}
-
-template<typename SIZE>
-GLMeshS<SIZE>::~GLMeshS()
-{
-}
-
-template<typename SIZE>
-void GLMeshS<SIZE>::update_data()
-{
-  std::lock_guard<std::mutex> guard(this->m_lock);
-
-  if (!m_insync)
-    return;
-
-  // collect vertex attributes
-  const VertexVec &verts = m_mesh->get_verts();
-
-  m_vertices.resize(verts.size()*3);
-  m_normals.resize(verts.size()*3);
-
-  int i = 0;
-  for ( auto &v : verts )
-  {
-    for (short j = 0; j < 3; ++j)
-    {
-      m_vertices[i] = GLfloat(v.pos[j]);
-      m_normals[i++] = GLfloat(v.nml[j]);
-    }
-  }
-
-  m_insync = false;
-}
-
-template<typename SIZE>
-void GLMeshS<SIZE>::update_glbuf()
-{
-  std::lock_guard<std::mutex> guard(this->m_lock);
-  
-  if (m_insync) //TODO: test with atomic m_insync
-    return;
-
-  this->m_pos.bind();
-  this->m_pos.write( 0, m_vertices.data(), sizeof( m_vertices ) );
-
-  this->m_nml.bind();
-  this->m_nml.write( 0, m_normals.data(), sizeof( m_normals ) );
-  this->m_nml.release();
-
-  m_insync = true;
-}
-
-template<typename SIZE>
-void GLMeshS<SIZE>::update_shader(ShaderManager::ShaderType type)
-{
-  if (this->m_prog)
-  {
-    this->m_prog->disableAttributeArray( "pos" );
-    this->m_prog->disableAttributeArray( "nml" );
-  }
-
-  if (type == ShaderManager::PHONG)
-    this->m_prog = this->m_shaderman.get_phong_shader();
-  else if (type == ShaderManager::PARTICLE)
-    this->m_prog = this->m_shaderman.get_particle_shader();
-  else
-    this->m_prog = this->m_shaderman.get_wireframe_shader();
-
-  this->m_vao.bind();
-
-  this->m_pos.bind();
-  this->m_prog->enableAttributeArray( "pos" );
-  this->m_prog->setAttributeBuffer( "pos", GL_FLOAT, 0, 3 );
-
-  this->m_nml.bind();
-  this->m_prog->enableAttributeArray( "nml" );
-  this->m_prog->setAttributeBuffer( "nml", GL_FLOAT, 0, 3 );
-
-  this->m_ubo.bindToProg(this->m_prog->programId(), "Globals");
-}
-
-
+// defaults
 template class MeshRS<double, unsigned int>;
-template class GLMeshS<unsigned int>;
 
 template std::ostream& operator<<(std::ostream& out, const Mesh& mesh);

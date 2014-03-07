@@ -8,7 +8,7 @@
 #include "dynamics.h"
 
 SimWindow::SimWindow()
-  : m_viewmode(ShaderManager::PHONG)
+  : m_viewmode(ShaderManager::PARTICLE)
   , m_change_prog(true)
   , m_shaderman(this)
 {
@@ -17,8 +17,15 @@ SimWindow::SimWindow()
 
 SimWindow::~SimWindow()
 {
+  clear_threads();
+}
+
+void SimWindow::clear_threads()
+{
   for ( auto & thread : m_sim_threads )
     thread.join();
+
+  m_sim_threads.clear();
 }
 
 void SimWindow::init()
@@ -32,7 +39,7 @@ void SimWindow::init()
   m_ubo.bindToIndex();
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-  load_model(1);
+  load_model(7);
 }
 
 void SimWindow::load_model(int i)
@@ -94,7 +101,8 @@ void SimWindow::load_model(int i)
   scene->rotate(angle_x, Vector3f::UnitX());
   scene->rotate(angle_y, Vector3f::UnitY());
   scene->normalize_model(ext_x, ext_y, ext_z);
-  m_udata.modelmtx = Affine3d(scene->get_trans()).matrix().cast<float>();
+  scene->flatten();
+  m_udata.modelmtx.setIdentity();
 
 #ifndef QT_NO_DEBUG
   scene->print();
@@ -130,8 +138,15 @@ void SimWindow::update_viewmode(ViewMode vm)
   }
 }
 
+void SimWindow::make_static()
+{
+  clear_threads();
+  set_animating(false);
+}
+
 void SimWindow::make_dynamic()
 {
+  clear_threads();
   for ( const GLPrimitivePtr &prim_ptr : m_glprims )
   {
     GLPrimitive *glprim = prim_ptr.get();
@@ -144,6 +159,7 @@ void SimWindow::make_dynamic()
     // run simulation
     m_sim_threads.push_back(std::thread(&DynamicPointCloud::run, dpc));
   }
+  set_animating(true);
 }
 
 void SimWindow::render()
@@ -200,7 +216,7 @@ void SimWindow::render()
     if (m_viewmode == ShaderManager::PARTICLE)
     {
       glprim->get_program()->setUniformValue("pt_scale", float(14*window_dim()[1]*m_near));
-      glprim->get_program()->setUniformValue("pt_radius", 0.01f);
+      glprim->get_program()->setUniformValue("pt_radius", 0.02f);
       glDrawArrays(GL_POINTS, 0, glprim->get_num_vertices());
     }
     else
@@ -222,6 +238,9 @@ void SimWindow::keyPressEvent(QKeyEvent *event)
   {
     case Qt::Key_D:
       make_dynamic();
+      break;
+    case Qt::Key_C:
+      make_static();
       break;
     case Qt::Key_W:
       update_viewmode(ViewMode::WIREFRAME);

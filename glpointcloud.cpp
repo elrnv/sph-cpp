@@ -3,58 +3,8 @@
 #include <QtGui/QOpenGLBuffer>
 #include <assimp/scene.h>
 #include <thread>
-#include "pointcloud.h"
+#include "glpointcloud.h"
 #include "dynamics.h"
-
-// PointCloud stuff
-
-template<typename REAL, typename SIZE>
-PointCloudRS<REAL,SIZE>::PointCloudRS(const aiMesh *mesh)
-{
-  // First copy all the vertices
-  if (!mesh->HasPositions())
-    return;
-
-  aiVector3D *verts = mesh->mVertices;
-  SIZE num_verts = mesh->mNumVertices;
-  m_pos.resize(NoChange, num_verts);
-
-  for (SIZE i = 0; i < num_verts; ++i)
-    m_pos.col(i) << verts[i].x, verts[i].y, verts[i].z;
-
-  compute_bbox(); // compute the bounded box if requested
-}
-
-template<typename REAL, typename SIZE>
-PointCloudRS<REAL,SIZE>::~PointCloudRS()
-{
-}
-
-template<typename REAL, typename SIZE>
-void PointCloudRS<REAL,SIZE>::compute_bbox()
-{
-  m_bbox.setEmpty();
-  SIZE num_verts = m_pos.cols();
-  for (SIZE i = 0; i < num_verts; ++i)
-    m_bbox.extend(Vector3d(m_pos.col(i)).cast<float>());
-}
-
-template<typename REAL, typename SIZE>
-std::ostream& operator<<(std::ostream& out, const PointCloudRS<REAL,SIZE>& pc)
-{
-  SIZE num_verts = pc.get_num_vertices();
-  out << "pc({ ";
-  for (SIZE i = 0; i < num_verts; ++i)
-  {
-    if (i > 0) out << ",\n     ";
-    Vector3d v = pc.m_pos.col(i);
-    out << v[0] << " " << v[1] << " " << v[2];
-  }
-  out << "}";
-  return out;
-}
-
-
 
 // GLPointCloud stuff
 template<typename REAL, typename SIZE>
@@ -81,6 +31,7 @@ GLPointCloudRS<REAL,SIZE>::GLPointCloudRS(
   this->m_pos.setUsagePattern( QOpenGLBuffer::StaticDraw );
   this->m_pos.bind();
   this->m_pos.allocate( vertices, sizeof( vertices ) );
+  qDebug() << "#" << vertices[0] << vertices[1] << vertices[2];
 
   update_shader(ShaderManager::PARTICLE);
 }
@@ -94,15 +45,17 @@ template<typename REAL, typename SIZE>
 void GLPointCloudRS<REAL,SIZE>::update_data()
 {
   std::lock_guard<std::mutex> guard(this->m_lock);
-  std::cerr << "YAY" << std::endl;
   if (!m_insync)
     return;
-
+  
   const Matrix3XR<REAL> &pts = m_pc->get_pos();
   m_vertices.resize(pts.size());
   const REAL *pt_data = pts.data();
+  qDebug() << "numpts written:" << pts.size();
   for (SIZE i = 0; i < pts.size(); ++i)
     m_vertices[i] = GLfloat(pt_data[i]);
+
+  qDebug() << "#" << m_vertices[0] << m_vertices[1] << m_vertices[2];
 
   m_insync = false;
 }
@@ -115,8 +68,11 @@ void GLPointCloudRS<REAL,SIZE>::update_glbuf()
   if (m_insync)
     return;
 
+  qDebug() << "-" << m_vertices[0] << m_vertices[1] << m_vertices[2];
+
+  qDebug() << "num bytes read:" << sizeof(GLfloat) * m_vertices.size();
   this->m_pos.bind();
-  this->m_pos.write( 0, m_vertices.data(), sizeof( m_vertices ) );
+  this->m_pos.write( 0, m_vertices.data(), sizeof( GLfloat ) * m_vertices.size() );
   this->m_pos.release();
 
   m_insync = true;
@@ -152,13 +108,13 @@ template<typename REAL, typename SIZE>
 DynamicPointCloudRS<REAL,SIZE> *GLPointCloudRS<REAL,SIZE>::make_dynamic(REAL mass)
 {
   this->m_pos.setUsagePattern( QOpenGLBuffer::StreamDraw );
-  DynamicPointCloudRS<REAL,SIZE> *dpc = new DynamicPointCloudRS<double, SIZE>(*m_pc, mass, &GLPointCloudRS<REAL,SIZE>::update_data);
+
+  DynamicPointCloudRS<REAL,SIZE> *dpc =
+    new DynamicPointCloudRS<double, SIZE>(this, mass);
+
   delete m_pc; // delete the old point cloud
   m_pc = dpc;  // set new dynamic point cloud as a member
   return dpc;  // return new dynamic point cloud
 }
 
-template class PointCloudRS<double, unsigned int>;
 template class GLPointCloudRS<double, unsigned int>;
-
-template std::ostream& operator<<(std::ostream& out, const PointCloud& pc);

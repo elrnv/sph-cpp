@@ -9,8 +9,8 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include "scene.h"
-#include "mesh.h"
-#include "pointcloud.h"
+#include "glmesh.h"
+#include "glpointcloud.h"
 
 namespace Util
 {

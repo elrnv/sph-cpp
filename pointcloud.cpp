@@ -39,6 +39,20 @@ void PointCloudRS<REAL,SIZE>::compute_bbox()
     m_bbox.extend(Vector3d(m_pos.col(i)).cast<float>());
 }
 
+
+template<typename REAL, typename SIZE>
+void PointCloudRS<REAL,SIZE>::transform(const AffineCompact3f &trans)
+{
+  // convert positions to canonical homogenized coordinates
+  Translation3f T(trans.translation());
+  Matrix3XR<REAL> Tmtx; // translation matrix
+  Tmtx.resize(NoChange, m_pos.cols());
+  Tmtx.row(0).fill(T.x());
+  Tmtx.row(1).fill(T.y());
+  Tmtx.row(2).fill(T.z());
+  m_pos = trans.linear().template cast<REAL>() * m_pos + Tmtx;
+}
+
 template<typename REAL, typename SIZE>
 std::ostream& operator<<(std::ostream& out, const PointCloudRS<REAL,SIZE>& pc)
 {

@@ -24,7 +24,10 @@ public:
 
   typedef ShaderManager::ShaderType ViewMode;
   void update_viewmode(ViewMode vm);
+  void make_static();
   void make_dynamic();
+
+  void clear_threads();
 
 protected:
   void keyPressEvent(QKeyEvent *event);

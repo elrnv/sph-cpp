@@ -40,9 +40,6 @@ using VertexVecR = std::vector< VertexR<REAL> >;
 template<typename REAL, typename SIZE>
 using FaceVecRS = std::vector< FaceRS<REAL, SIZE> >;
 
-template<typename SIZE>
-using FaceVecS = FaceVecRS<double, SIZE>;
-
 // defaults
 typedef VertexVecR<double> VertexVec;
 typedef FaceVecRS<double, unsigned int> FaceVec;
@@ -63,6 +60,8 @@ public:
 
   bool is_mesh() const { return true; }
 
+  inline void transform(const AffineCompact3f &trans);
+
   friend std::ostream& operator<< <>(std::ostream& out, const MeshRS<REAL,SIZE>& mesh);
 
 protected:
@@ -70,45 +69,7 @@ protected:
   FaceVecRS<REAL, SIZE> m_faces;
 };
 
-template<typename SIZE>
-using MeshS = MeshRS<double, SIZE>;
-
-// A triangular mesh representation for OpenGL applications
-template<typename SIZE>
-class GLMeshS : public GLPrimitiveS<SIZE>
-{
-public:
-  explicit GLMeshS(
-      MeshS<SIZE> *mesh,
-      const Material *mat,
-      UniformBuffer &ubo,
-      ShaderManager &shaderman);
-  ~GLMeshS();
-
-  MeshS<SIZE> *get_mesh() { return m_mesh; }
-
-  bool is_mesh() const { return true; }
-
-  SIZE get_num_indices()  const { return m_mesh->get_faces().size()*3; }
-  SIZE get_num_vertices() const { return m_mesh->get_verts().size();   }
-
-  void update_data();
-  void update_glbuf();
-  void update_shader(ShaderManager::ShaderType type);
-  
-  void print() const { std::cerr << *m_mesh << std::endl; }
-
-protected:
-  MeshS<SIZE> *m_mesh; // reference to the native mesh object
-
-  // intermediate buffers between mesh and glbuffers
-  std::vector<GLfloat> m_vertices; 
-  std::vector<GLfloat> m_normals;
-  bool                 m_insync;
-};
-
 // defaults
 typedef MeshRS<double, unsigned int> Mesh;
-typedef GLMeshS<unsigned int> GLMesh;
 
 #endif // MESH_H

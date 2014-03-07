@@ -11,7 +11,9 @@ SOURCES += \
   material.cpp \
   uniformbuffer.cpp \
   shadermanager.cpp \
-  dynamics.cpp
+  dynamics.cpp \
+  glmesh.cpp \
+  glpointcloud.cpp \
 
 HEADERS += \
   openglwindow.h \
@@ -24,10 +26,12 @@ HEADERS += \
   uniformbuffer.h \
   shadermanager.h \
   dynamics.h \
+  glmesh.h \
+  glpointcloud.h \
   glprimitive.h \
   eigen.h \
   util.h \
-  kernel.h 
+  kernel.h
 
 # compile with latest c++ specs
 CONFIG += c++11

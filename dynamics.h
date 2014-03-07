@@ -6,14 +6,18 @@
 #include "kernel.h"
 #include "pointcloud.h"
 
+#define M_G 9.81f
+
 // Partially matrix template for convenience
 template<typename REAL>
 using Vector3R = Matrix<REAL, 3, 1>;
 
-// forward declaration
+// forward declarations
 template<typename REAL, typename SIZE>
 class DynamicPointCloudRS;
 
+template<typename REAL, typename SIZE>
+class GLPointCloudRS;
 
 template<typename REAL>
 struct ParticleDataR
@@ -29,6 +33,82 @@ struct ParticleDataR
   REAL pressure;
 };
 
+
+// process routines used to compute SPH quantities
+template<typename REAL>
+class ProcessPressureR
+{
+public:
+  ProcessPressureR(float h) : kern(h) { }
+  ~ProcessPressureR() { }
+  void init(REAL m, REAL rd, REAL c) 
+  { mass = m; rest_density = rd; constant = c; }
+
+  inline void init(ParticleDataR<REAL> &p)
+  {
+    p.dinv = 0.0f;
+  }
+
+  inline void operator()(ParticleDataR<REAL> &p, ParticleDataR<REAL> &near_p)
+  {
+    p.dinv += kern[ p.pos - near_p.pos ];
+    //qDebug() << "temp p.dinv" << p.dinv;
+  }
+
+  inline void finish(ParticleDataR<REAL> &p)
+  {
+    REAL density = p.dinv * mass * kern.coef;
+    p.dinv = 1.0f/density;
+    p.pressure = constant * (density - rest_density);
+    //qDebug() << "p.dinv:" << p.dinv << " p.pressure:" << p.pressure;
+  }
+
+private:
+  Poly6Kernel kern; // used to compute pressure force
+  REAL mass;
+  REAL rest_density;
+  REAL constant;
+};
+
+
+template<typename REAL>
+class ProcessAccelR
+{
+public:
+  ProcessAccelR(float h) : kern(h) { }
+  ~ProcessAccelR() { }
+
+  void init(REAL m)
+  {  mass = m; }
+
+  inline void init(ParticleDataR<REAL> &p) { Q_UNUSED(p); }
+
+  inline void operator()(ParticleDataR<REAL> &p, ParticleDataR<REAL> &near_p)
+  {
+    Vector3R<REAL> res(
+        0.5*near_p.dinv*(p.pressure + near_p.pressure)*kern[p.pos - near_p.pos]
+        );
+
+    for (unsigned char i = 0; i < 3; ++i)
+      p.accel[i] += res[i]; // copy intermediate result
+  }
+
+  inline void finish(ParticleDataR<REAL> &p)
+  {
+    for (unsigned char i = 0; i < 3; ++i)
+      p.accel[i] = -(mass*p.dinv*kern.coef*p.accel[i]) - M_G;
+    //qDebug() << "p.dinv:" << p.dinv;
+    //qDebug() << "kern.coef:" << kern.coef;
+    //qDebug() << "M_G:" << M_G;
+    //qDebug() << "p.accel:" << p.accel[0] << p.accel[1] << p.accel[2];
+  }
+
+private:
+  SpikyGradKernel kern; // used to compute pressure force
+  REAL mass;
+};
+
+
 // Grid structure used to optimize computing particle properties using kernels
 template<typename REAL, typename SIZE>
 class UniformGridRS
@@ -41,38 +121,10 @@ public:
   typedef typename Grid::template array_view<3>::type GridView;
   typedef typename Grid::index_range IndexRange;
 
-  UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, float h)
-    : m_dpc(dpc)
-    , m_h(h)
-    , m_hinv(1.0f/h)
-  { }
+  UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, float h);
+  ~UniformGridRS();
   
-  void init()
-  {
-    // determine the number of voxels needed
-    AlignedBox3f &bbox = m_dpc->get_bbox();
-
-    bmin = bbox.corner(Eigen::AlignedBox3f::BottomLeftFloor);
-    bmax = bbox.corner(Eigen::AlignedBox3f::TopRightCeil);
-
-    SIZE nx = 1 + (bmax[0] - bmin[0])*m_hinv;
-    SIZE ny = 1 + (bmax[1] - bmin[1])*m_hinv;
-    SIZE nz = 1 + (bmax[2] - bmin[2])*m_hinv;
-    
-    m_data.resize( boost::extents[nx][ny][nz] );
-
-    SIZE num_vtx = m_dpc->get_num_vertices();
-    for ( SIZE i = 0; i < num_vtx; ++i )
-    {
-      Vector3R<REAL> pos( m_dpc->pos_at(i) );
-      Vector3R<REAL> vel( m_dpc->vel_at(i) );
-      m_data(get_voxel_index(pos)).push_back( ParticleDataR<REAL>(pos, vel, m_dpc->accel_at(i)) );
-    }
-
-    compute_initial_density();
-  }
-
-  ~UniformGridRS() { }
+  void init();
 
   inline Index get_voxel_index(const Vector3R<REAL> &pos)
   {
@@ -86,14 +138,14 @@ public:
   void compute_pressure();
 
   template<typename ProcessFunc>
-  void compute_quantity(ProcessFunc process);
+  inline void compute_quantity(ProcessFunc process);
 
 private:
   // utility function used in the constructor to get a range of two elements
   // centered at x (or 2 if x is on the boundary)
   inline IndexRange range3(SIZE x, SIZE hi)
   {
-    return IndexRange(x == 0 ? 0 : x-1, x == hi-1 ? x+1 : hi-1);
+    return IndexRange(x == 0 ? 0 : x-1, x == hi-1 ? hi : x+2 );
   }
 
 private:
@@ -106,6 +158,9 @@ private:
   float m_hinv; // 1 / h
   Vector3f bmin;
   Vector3f bmax;
+  
+  ProcessPressureR<REAL> m_proc_pressure;
+  ProcessAccelR<REAL> m_proc_accel;
 }; // class UniformGridRS
 
 
@@ -114,11 +169,8 @@ template<typename REAL, typename SIZE>
 class DynamicPointCloudRS : public PointCloudRS<REAL,SIZE>
 {
 public:
-  // dynamic point cloud from a mesh
-  explicit DynamicPointCloudRS(const aiMesh *pc, REAL mass, void (* update_data_callback)(void));
-
-  // dynamic point cloud from a regular point cloud
-  explicit DynamicPointCloudRS(const PointCloudRS<REAL, SIZE> &pc, REAL mass, void (* update_data_callback)(void));
+  // dynamic point cloud from a regular updatable gl point cloud
+  explicit DynamicPointCloudRS(GLPointCloudRS<REAL, SIZE> *glpc, REAL mass);
   ~DynamicPointCloudRS();
 
   inline REAL get_mass(SIZE idx = -1) { Q_UNUSED(idx); return m_mass; }
@@ -132,12 +184,7 @@ public:
 
   inline void reset_accel() { m_accel.setZero(); }
 
-  void run() 
-  {
-    std::cerr << "HELLOW" << std::endl; 
-    if (m_update_data_callback)
-      m_update_data_callback();
-  }
+  void run();
 
   friend UniformGridRS<REAL,SIZE>;
 
@@ -150,8 +197,7 @@ protected:
   Matrix3XR<REAL> m_accel; // accelerations
   UniformGridRS<REAL, SIZE> m_grid;
 
-  // callback to GL class to update new positions
-  void (* m_update_data_callback)(void);
+  GLPointCloudRS<REAL,SIZE> *m_glpc; // should only used for callback
 }; // class DynamicPointCloudRS
 
 // defaults

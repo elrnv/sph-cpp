@@ -1,6 +1,49 @@
 #include "dynamics.h"
+#include "glpointcloud.h"
 
 // UniformGrid stuff
+
+template<typename REAL, typename SIZE>
+UniformGridRS<REAL,SIZE>::UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, float h)
+  : m_dpc(dpc)
+  , m_h(h)
+  , m_hinv(1.0f/h)
+  , m_proc_pressure(m_h)
+  , m_proc_accel(m_h)
+{ }
+
+template<typename REAL, typename SIZE>
+UniformGridRS<REAL,SIZE>::~UniformGridRS() 
+{ }
+  
+template<typename REAL, typename SIZE>
+void UniformGridRS<REAL,SIZE>::init()
+{
+  // determine the number of voxels needed
+  AlignedBox3f &bbox = m_dpc->get_bbox();
+
+  bmin = bbox.corner(Eigen::AlignedBox3f::BottomLeftFloor);
+  bmax = bbox.corner(Eigen::AlignedBox3f::TopRightCeil);
+
+  SIZE nx = 1 + (bmax[0] - bmin[0])*m_hinv;
+  SIZE ny = 1 + (bmax[1] - bmin[1])*m_hinv;
+  SIZE nz = 1 + (bmax[2] - bmin[2])*m_hinv;
+  
+  m_data.resize( boost::extents[nx][ny][nz] );
+
+  SIZE num_vtx = m_dpc->get_num_vertices();
+  for ( SIZE i = 0; i < num_vtx; ++i )
+  {
+    Vector3R<REAL> pos( m_dpc->pos_at(i) );
+    Vector3R<REAL> vel( m_dpc->vel_at(i) );
+    m_data(get_voxel_index(pos)).push_back( ParticleDataR<REAL>(pos, vel, m_dpc->accel_at(i)) );
+  }
+
+  compute_initial_density();
+
+  m_proc_pressure.init(m_dpc->m_mass, m_dpc->m_rest_density, m_dpc->m_constant);
+  m_proc_accel.init(m_dpc->get_mass());
+}
 
 template<typename REAL>
 class ProcessInitialDensityR
@@ -42,82 +85,17 @@ void UniformGridRS<REAL,SIZE>::compute_initial_density()
   m_dpc->m_rest_density /= m_dpc->m_num_vertices;
 }
 
-
-template<typename REAL>
-class ProcessPressureR
-{
-public:
-  ProcessPressureR(float h, REAL m, REAL rd, REAL c) 
-    : kern(h), mass(m), rest_density(rd), constant(c) { }
-  ~ProcessPressureR() { }
-
-  inline void init(ParticleDataR<REAL> &p)
-  {
-    p.dinv = 0.0f;
-  }
-
-  inline void operator()(ParticleDataR<REAL> &p, ParticleDataR<REAL> &near_p)
-  {
-    p.dinv += kern[ p.pos - near_p.pos ];
-  }
-
-  inline void finish(ParticleDataR<REAL> &p)
-  {
-    REAL density = p.dinv * mass * kern.coef;
-    p.dinv = 1.0f/density;
-    p.pressure = constant * (density - rest_density);
-  }
-
-private:
-  Poly6Kernel kern; // used to compute pressure force
-  REAL mass;
-  REAL rest_density;
-  REAL constant;
-};
-
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::compute_pressure()
 {
-  ProcessPressureR<REAL> proc(m_h,
-      m_dpc->m_mass, m_dpc->m_rest_density, m_dpc->m_constant);
-  compute_quantity(proc);
+  compute_quantity(m_proc_pressure);
 }
-
-
-template<typename REAL>
-class ProcessAccelR
-{
-public:
-  ProcessAccelR(float h, REAL m)
-    : kern(h), mass(m) { }
-  ~ProcessAccelR() { }
-
-  inline void init(ParticleDataR<REAL> &p) { Q_UNUSED(p); }
-
-  inline void operator()(ParticleDataR<REAL> &p, ParticleDataR<REAL> &near_p)
-  {
-    Vector3R<REAL> res(0.5*near_p.dinv*(p.pressure + near_p.pressure)*kern[p.pos - near_p.pos]);
-    for (unsigned char i = 0; i < 3; ++i)
-      p.accel[i] += res[i]; // copy intermediate result
-  }
-
-  inline void finish(ParticleDataR<REAL> &p)
-  {
-    for (unsigned char i = 0; i < 3; ++i)
-      p.accel[i] = -(mass*p.dinv*kern.coef*p.accel[i]);
-  }
-
-private:
-  SpikyGradKernel kern; // used to compute pressure force
-  REAL mass;
-};
 
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::compute_accel()
 {
   m_dpc->reset_accel();     // now may assume all accelerations are zero
-  ProcessAccelR<REAL> proc(m_h, m_dpc->get_mass());
-  compute_quantity< ProcessAccelR<REAL> >( proc );
+  compute_quantity< ProcessAccelR<REAL> >( m_proc_accel );
 }
 
 template<typename REAL, typename SIZE>
@@ -133,11 +111,14 @@ void UniformGridRS<REAL,SIZE>::compute_quantity(ProcessFunc process)
     {
       for (SIZE k = 0; k < nz; ++k)
       {
+        DataVec &datavec = m_data[i][j][k];
+        if (datavec.empty())
+          continue;
+
         IndexRange xrange = range3(i,nx);
         IndexRange yrange = range3(j,ny);
         IndexRange zrange = range3(k,nz);
         GridView neigh_view = m_data[ boost::indices[xrange][yrange][zrange] ];
-        DataVec &datavec = m_data[i][j][k];
 
         for ( ParticleDataR<REAL> &p : datavec )  // prepare data
           process.init(p);
@@ -145,12 +126,23 @@ void UniformGridRS<REAL,SIZE>::compute_quantity(ProcessFunc process)
         SIZE xrange_size = xrange.finish() - xrange.start();
         SIZE yrange_size = yrange.finish() - yrange.start();
         SIZE zrange_size = zrange.finish() - zrange.start();
-        for (SIZE near_i = 0; near_i < xrange_size; ++i)
-          for (SIZE near_j = 0; near_j < yrange_size; ++j)
-            for (SIZE near_k = 0; near_k < zrange_size; ++k)
+        for (SIZE near_i = 0; near_i < xrange_size; ++near_i)
+        {
+          for (SIZE near_j = 0; near_j < yrange_size; ++near_j)
+          {
+            for (SIZE near_k = 0; near_k < zrange_size; ++near_k)
+            {
               for ( ParticleDataR<REAL> &p : datavec )
+              {
                 for ( ParticleDataR<REAL> &near_p : neigh_view[near_i][near_j][near_k])
-                  process(p, near_p); // process data
+                {
+                  if (&p != &near_p)
+                    process(p, near_p); // process data
+                }
+              }
+            }
+          }
+        }
 
         for ( ParticleDataR<REAL> &p : datavec )  // finalize data
           process.finish(p);
@@ -163,35 +155,15 @@ void UniformGridRS<REAL,SIZE>::compute_quantity(ProcessFunc process)
 
 template<typename REAL, typename SIZE>
 DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
-    const aiMesh *mesh,
-    REAL mass,
-    void (* update_data_callback)(void))
-  : PointCloudRS<REAL,SIZE>(mesh)
+    GLPointCloudRS<REAL, SIZE> *glpc,
+    REAL mass)
+  : PointCloudRS<REAL,SIZE>(*glpc->get_pointcloud())
   , m_num_vertices(this->get_num_vertices())
   , m_mass(mass)
   , m_constant(300.0f * 0.8f)
   , m_rest_density(0.0f)
-  , m_grid(this, 0.1f)
-  , m_update_data_callback(update_data_callback)
-{
-  m_accel.resizeLike(this->m_pos);
-  m_vel.resizeLike(this->m_pos);
-  m_vel.setZero();
-  reset_accel();
-}
-
-template<typename REAL, typename SIZE>
-DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
-    const PointCloudRS<REAL, SIZE> &pc,
-    REAL mass,
-    void (* update_data_callback)(void))
-  : PointCloudRS<REAL,SIZE>(pc)
-  , m_num_vertices(this->get_num_vertices())
-  , m_mass(mass)
-  , m_constant(300.0f * 0.8f)
-  , m_rest_density(0.0f)
-  , m_grid(this, 0.1f)
-  , m_update_data_callback(update_data_callback)
+  , m_grid(this, 0.04f)
+  , m_glpc(glpc)
 {
   m_accel.resizeLike(this->m_pos);
   m_vel.resizeLike(this->m_pos);
@@ -202,6 +174,33 @@ DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
 template<typename REAL, typename SIZE>
 DynamicPointCloudRS<REAL,SIZE>::~DynamicPointCloudRS()
 {
+}
+
+template<typename REAL, typename SIZE>
+void DynamicPointCloudRS<REAL,SIZE>::run()
+{
+  m_grid.init();
+  float dt = 0.0000001;
+
+  m_grid.compute_pressure();
+  m_grid.compute_accel(); // update m_accel
+
+  m_vel = m_vel + 0.5*dt*m_accel; // initial half velocity
+
+  for (int i = 0; i < 100; ++i)
+  {
+    this->m_pos = (this->m_pos + dt*m_vel).eval();
+
+    if (m_glpc)
+      m_glpc->update_data(); // notify gl we have new positions
+
+    m_vel = m_vel + 0.5*dt*m_accel;
+    
+    m_grid.compute_pressure();
+    m_grid.compute_accel(); // update m_accel
+
+    m_vel = m_vel + dt*m_accel;
+  }
 }
 
 template class DynamicPointCloudRS<double, unsigned int>;
