@@ -21,8 +21,6 @@ PointCloudRS<REAL,SIZE>::PointCloudRS(const aiMesh *mesh)
 
   for (SIZE i = 0; i < num_verts; ++i)
     m_pos.col(i) << verts[i].x, verts[i].y, verts[i].z;
-
-  compute_bbox(); // compute the bounded box if requested
 }
 
 template<typename REAL, typename SIZE>
@@ -31,12 +29,13 @@ PointCloudRS<REAL,SIZE>::~PointCloudRS()
 }
 
 template<typename REAL, typename SIZE>
-void PointCloudRS<REAL,SIZE>::compute_bbox()
+AlignedBox3f &PointCloudRS<REAL,SIZE>::compute_bbox()
 {
   m_bbox.setEmpty();
   SIZE num_verts = m_pos.cols();
   for (SIZE i = 0; i < num_verts; ++i)
     m_bbox.extend(Vector3d(m_pos.col(i)).cast<float>());
+  return m_bbox;
 }
 
 

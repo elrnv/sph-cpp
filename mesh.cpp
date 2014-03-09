@@ -7,7 +7,7 @@
 
 // Mesh stuff
 template<typename REAL, typename SIZE>
-MeshRS<REAL,SIZE>::MeshRS(const aiMesh *mesh, bool need_bbox)
+MeshRS<REAL,SIZE>::MeshRS(const aiMesh *mesh)
 {
   // First copy all the vertices
   if (!mesh->HasPositions())
@@ -20,9 +20,6 @@ MeshRS<REAL,SIZE>::MeshRS(const aiMesh *mesh, bool need_bbox)
   typename VertexVecR<REAL>::iterator v_it = m_verts.begin(); // member face iterator
   for (SIZE i = 0; i < num_verts; ++i, ++v_it)
     v_it->pos << verts[i].x, verts[i].y, verts[i].z;
-
-  if (need_bbox)
-    compute_bbox(); // compute the bounded box if requested
 
   if (mesh->HasNormals())
   {
@@ -86,11 +83,12 @@ void MeshRS<REAL,SIZE>::compute_face_normals()
 }
 
 template<typename REAL, typename SIZE>
-void MeshRS<REAL,SIZE>::compute_bbox()
+AlignedBox3f &MeshRS<REAL,SIZE>::compute_bbox()
 {
   m_bbox.setEmpty();
   for ( auto &v : m_verts )
     m_bbox.extend(v.pos.template cast<float>());
+  return m_bbox;
 }
 
 template<typename REAL, typename SIZE>

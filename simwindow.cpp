@@ -22,6 +22,22 @@ SimWindow::~SimWindow()
 
 void SimWindow::clear_threads()
 {
+  for ( const GLPrimitivePtr &prim_ptr : m_glprims )
+  {
+    GLPrimitive *glprim = prim_ptr.get();
+    if (!glprim->is_pointcloud())
+      continue;
+
+    GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
+    PointCloud *pc = glpc->get_pointcloud();
+
+    if (!pc->is_dynamic())
+      continue;
+
+    DynamicPointCloud *dpc = static_cast<DynamicPointCloud *>(pc);
+    dpc->request_stop(); // stop threads
+  }
+
   for ( auto & thread : m_sim_threads )
     thread.join();
 
@@ -44,6 +60,7 @@ void SimWindow::init()
 
 void SimWindow::load_model(int i)
 {
+  clear_threads();
   std::string filename;
 
   // optionally extend centered container box on load
@@ -88,7 +105,7 @@ void SimWindow::load_model(int i)
     case 7:
       filename = "sphere.obj";
       ext_x = Vector2f(2.0f, 2.0f);
-      ext_y = Vector2f(4.0f, 0.0f);
+      ext_y = Vector2f(2.0f, 2.0f);
       ext_z = Vector2f(2.0f, 2.0f);
       scale = 0.7f;
       break;
@@ -102,6 +119,7 @@ void SimWindow::load_model(int i)
   scene->rotate(angle_y, Vector3f::UnitY());
   scene->normalize_model(ext_x, ext_y, ext_z);
   scene->flatten();
+  scene->cube_bbox();
   m_udata.modelmtx.setIdentity();
 
 #ifndef QT_NO_DEBUG

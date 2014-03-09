@@ -98,6 +98,12 @@ AlignedBox3f &SceneNode::compute_bbox()
     m_bbox.extend(node->compute_bbox());
   return m_bbox;
 }
+void SceneNode::cube_bbox()
+{ 
+  m_bbox = AlignedBox3f(Vector3f(-1.f,-1.f,-1.f), Vector3f(1.f,1.f,1.f)); 
+  for( SceneNode *node : m_children )
+    node->cube_bbox();
+}
 
 void SceneNode::normalize_model()
 {
@@ -204,6 +210,15 @@ AlignedBox3f &GeometryNode::compute_bbox()
 {
   m_bbox.setEmpty();
   if (m_primitive)
-    m_bbox.extend(m_primitive->get_bbox());
+    m_bbox.extend(m_primitive->compute_bbox());
+  for( SceneNode *node : m_children )
+    m_bbox.extend(node->compute_bbox());
   return m_bbox;
+}
+
+void GeometryNode::cube_bbox()
+{
+  SceneNode::cube_bbox();
+  if (m_primitive)
+    m_primitive->cube_bbox();
 }

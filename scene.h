@@ -46,6 +46,7 @@ public:
   void translate(const Vector3f& amount);
 
   // compute the parent transformations into the children, reset m_trans
+  // this operation invalidates the bounding box
   virtual void flatten();
 
   virtual void print(int depth = 0) const;
@@ -58,6 +59,7 @@ public:
 
   virtual AlignedBox3f &compute_bbox();
   AlignedBox3f &get_bbox() { return m_bbox; }
+  virtual void cube_bbox();
 
   // translate and scale model to fit in a 2x2x2 box centered at the origin
   void normalize_model();
@@ -128,11 +130,13 @@ public:
   }
 
   // compute the transformations into the primitives
+  // this operation invalidates the bounding box
   virtual void flatten();
 
   void print(int depth = 0) const;
 
   AlignedBox3f &compute_bbox();
+  void cube_bbox();
 
 protected:
   Primitive *m_primitive;

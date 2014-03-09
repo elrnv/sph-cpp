@@ -29,8 +29,9 @@ public:
 
   friend std::ostream& operator<< <>(std::ostream& out, const PointCloudRS<REAL,SIZE>& pc);
 
+  inline AlignedBox3f &compute_bbox();
+
 protected:
-  void compute_bbox();
 
   Matrix3XR<REAL> m_pos;
 }; // class PointCloudRS

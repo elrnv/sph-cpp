@@ -18,6 +18,7 @@ using Eigen::Vector4d;
 using Eigen::Vector4f;
 using Eigen::Vector3d;
 using Eigen::Vector3f;
+using Eigen::Vector3i;
 using Eigen::Vector2d;
 using Eigen::Vector2f;
 
@@ -32,9 +33,10 @@ using Eigen::NoChange;
 
 using Eigen::Matrix3d;
 using Eigen::Matrix3f;
+using Eigen::Matrix3Xd;
+using Eigen::Matrix3Xi;
 using Eigen::Matrix4d;
 using Eigen::Matrix4f;
-using Eigen::Matrix3Xd;
 
 template<typename REAL>
 using Matrix3XR = Matrix<REAL, 3, Dynamic>;

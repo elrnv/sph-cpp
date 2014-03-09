@@ -6,7 +6,7 @@
 #include "kernel.h"
 #include "pointcloud.h"
 
-#define M_G 9.81f
+#define M_G 209.81f
 
 // Partially matrix template for convenience
 template<typename REAL>
@@ -95,12 +95,11 @@ public:
 
   inline void finish(ParticleDataR<REAL> &p)
   {
-    for (unsigned char i = 0; i < 3; ++i)
-      p.accel[i] = -(mass*p.dinv*kern.coef*p.accel[i]) - M_G;
-    //qDebug() << "p.dinv:" << p.dinv;
-    //qDebug() << "kern.coef:" << kern.coef;
-    //qDebug() << "M_G:" << M_G;
-    //qDebug() << "p.accel:" << p.accel[0] << p.accel[1] << p.accel[2];
+    p.accel[0] = -(mass*p.dinv*kern.coef*p.accel[0]);
+    p.accel[1] = -(mass*p.dinv*kern.coef*p.accel[1]) - M_G;
+    p.accel[2] = -(mass*p.dinv*kern.coef*p.accel[2]);
+
+    //qDebug("pr: % 10.5e di: % 10.5e  kc: % 10.5e  ac: % 10.5e % 10.5e % 10.5e", p.pressure, p.dinv, kern.coef, p.accel[0], p.accel[1], p.accel[2]);
   }
 
 private:
@@ -121,16 +120,23 @@ public:
   typedef typename Grid::template array_view<3>::type GridView;
   typedef typename Grid::index_range IndexRange;
 
-  UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, float h);
+  UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, float h, const Vector3f &bmin);
   ~UniformGridRS();
   
   void init();
 
   inline Index get_voxel_index(const Vector3R<REAL> &pos)
   {
-    return {{ static_cast<typename Grid::index>(m_hinv*(pos[0]-bmin[0])),
-              static_cast<typename Grid::index>(m_hinv*(pos[1]-bmin[1])),
-              static_cast<typename Grid::index>(m_hinv*(pos[2]-bmin[2])) }};
+    return {{ static_cast<typename Grid::index>(m_hinv*(pos[0]-m_bmin[0])),
+              static_cast<typename Grid::index>(m_hinv*(pos[1]-m_bmin[1])),
+              static_cast<typename Grid::index>(m_hinv*(pos[2]-m_bmin[2])) }};
+  }
+  inline bool is_valid(const Index &idx)
+  {
+    for (unsigned char i = 0; i < 3; ++i)
+      if (idx[i] < 0 || idx[i] >= static_cast<typename Grid::index>(m_grid.shape()[i]))
+        return false;
+    return true;
   }
 
   void compute_accel();
@@ -139,6 +145,8 @@ public:
 
   template<typename ProcessFunc>
   inline void compute_quantity(ProcessFunc process);
+
+  inline void update();
 
 private:
   // utility function used in the constructor to get a range of two elements
@@ -152,15 +160,15 @@ private:
   DynamicPointCloudRS<REAL, SIZE> *m_dpc; // main point cloud
 
   // array of cells containing xyzp (position and density) for each vertex
-  Grid  m_data;
+  Grid  m_grid;
 
   float m_h;    // grid size
   float m_hinv; // 1 / h
-  Vector3f bmin;
-  Vector3f bmax;
-  
+
   ProcessPressureR<REAL> m_proc_pressure;
   ProcessAccelR<REAL> m_proc_accel;
+
+  const Vector3f &m_bmin;
 }; // class UniformGridRS
 
 
@@ -180,11 +188,18 @@ public:
   inline REAL *vel_at(SIZE i)    { return m_vel.data() + i*3; }
   inline REAL *accel_at(SIZE i)  { return m_accel.data() + i*3; }
 
+  inline const Vector3f &get_bmin() const { return m_bmin; }
+  inline const Vector3f &get_bmax() const { return m_bmax; }
+
   inline bool is_dynamic() const { return true; }
 
   inline void reset_accel() { m_accel.setZero(); }
 
+  inline int clamp(REAL &d, REAL min, REAL max);
+  inline void resolve_collisions();
+
   void run();
+  void request_stop() { m_stop_requested = true; }
 
   friend UniformGridRS<REAL,SIZE>;
 
@@ -195,9 +210,15 @@ protected:
   REAL m_rest_density;
   Matrix3XR<REAL> m_vel; // velocities
   Matrix3XR<REAL> m_accel; // accelerations
+
+  Vector3f m_bmin;
+  Vector3f m_bmax;
+
   UniformGridRS<REAL, SIZE> m_grid;
 
   GLPointCloudRS<REAL,SIZE> *m_glpc; // should only used for callback
+
+  std::atomic<bool> m_stop_requested;
 }; // class DynamicPointCloudRS
 
 // defaults

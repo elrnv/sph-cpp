@@ -31,7 +31,7 @@ GLPointCloudRS<REAL,SIZE>::GLPointCloudRS(
   this->m_pos.setUsagePattern( QOpenGLBuffer::StaticDraw );
   this->m_pos.bind();
   this->m_pos.allocate( vertices, sizeof( vertices ) );
-  qDebug() << "#" << vertices[0] << vertices[1] << vertices[2];
+  //qDebug() << "#" << vertices[0] << vertices[1] << vertices[2];
 
   update_shader(ShaderManager::PARTICLE);
 }
@@ -51,11 +51,11 @@ void GLPointCloudRS<REAL,SIZE>::update_data()
   const Matrix3XR<REAL> &pts = m_pc->get_pos();
   m_vertices.resize(pts.size());
   const REAL *pt_data = pts.data();
-  qDebug() << "numpts written:" << pts.size();
+  //qDebug() << "numpts written:" << pts.size();
   for (SIZE i = 0; i < pts.size(); ++i)
     m_vertices[i] = GLfloat(pt_data[i]);
 
-  qDebug() << "#" << m_vertices[0] << m_vertices[1] << m_vertices[2];
+  //qDebug() << "#" << m_vertices[0] << m_vertices[1] << m_vertices[2];
 
   m_insync = false;
 }
@@ -68,12 +68,11 @@ void GLPointCloudRS<REAL,SIZE>::update_glbuf()
   if (m_insync)
     return;
 
-  qDebug() << "-" << m_vertices[0] << m_vertices[1] << m_vertices[2];
-
-  qDebug() << "num bytes read:" << sizeof(GLfloat) * m_vertices.size();
+  //qDebug() << "num bytes read:" << sizeof(GLfloat) * m_vertices.size();
   this->m_pos.bind();
   this->m_pos.write( 0, m_vertices.data(), sizeof( GLfloat ) * m_vertices.size() );
   this->m_pos.release();
+  //qDebug() << "-" << m_vertices[0] << m_vertices[1] << m_vertices[2];
 
   m_insync = true;
 }

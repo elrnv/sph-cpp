@@ -106,7 +106,6 @@ void loadGLData(
     loadGLData(child, gl_prims, ubo, shaderman);
 }
 
-
 };
 
 #endif // UTIL_H

@@ -49,10 +49,10 @@ template<typename REAL, typename SIZE>
 class MeshRS : public Primitive 
 {
 public:
-  explicit MeshRS(const aiMesh *mesh, bool compute_bbox = true);
+  explicit MeshRS(const aiMesh *mesh);
   ~MeshRS();
 
-  void compute_bbox();
+  inline AlignedBox3f &compute_bbox();
   void compute_face_normals();
 
   const VertexVecR<REAL>      &get_verts() const { return m_verts; }

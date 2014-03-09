@@ -236,9 +236,8 @@ void OpenGLWindow::set_animating(bool animating)
 void OpenGLWindow::reset_view()
 { 
   m_zoom = 0;
-  m_hra = 25.0f; // degrees
-  m_vra = 25.0f; // degrees
-  set_animating(false);
+  m_hra = 0.0f;//25.0f; // degrees
+  m_vra = 0.0f;//25.0f; // degrees
   recompute_view();
 }
 
