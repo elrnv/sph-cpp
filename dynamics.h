@@ -6,7 +6,7 @@
 #include "kernel.h"
 #include "pointcloud.h"
 
-#define M_G 209.81f
+#define M_G 9.81f
 
 // Partially matrix template for convenience
 template<typename REAL>
@@ -60,7 +60,7 @@ public:
     REAL density = p.dinv * mass * kern.coef;
     p.dinv = 1.0f/density;
     p.pressure = constant * (density - rest_density);
-    //qDebug() << "p.dinv:" << p.dinv << " p.pressure:" << p.pressure;
+    //qDebug() << "density:" << density << " p.pressure:" << p.pressure;
   }
 
 private:
@@ -75,36 +75,43 @@ template<typename REAL>
 class ProcessAccelR
 {
 public:
-  ProcessAccelR(float h) : kern(h) { }
+  ProcessAccelR(float h) : p_kern(h), v_kern(h) { }
   ~ProcessAccelR() { }
 
-  void init(REAL m)
-  {  mass = m; }
+  void init(REAL m, REAL v, REAL s)
+  {  mass = m; viscosity = v; st = s; }
 
   inline void init(ParticleDataR<REAL> &p) { Q_UNUSED(p); }
 
   inline void operator()(ParticleDataR<REAL> &p, ParticleDataR<REAL> &near_p)
   {
     Vector3R<REAL> res(
-        0.5*near_p.dinv*(p.pressure + near_p.pressure)*kern[p.pos - near_p.pos]
+        -0.5*near_p.dinv*(p.pressure + near_p.pressure)*p_kern(p.pos - near_p.pos) // pressure contribution
+    //    + viscosity*near_p.dinv*(near_p.vel - p.vel)*v_kern(p.pos - near_p.pos) // viscosity contribution
         );
-
     for (unsigned char i = 0; i < 3; ++i)
       p.accel[i] += res[i]; // copy intermediate result
+
+    Vector3R<REAL> temp(p_kern[p.pos - near_p.pos]);
+    //qDebug("t: % 10.5e % 10.5e % 10.5e   ac: % 10.5e % 10.5e % 10.5e",
+     //    temp[0], temp[1], temp[2], p.accel[0], p.accel[1], p.accel[2]);
+
   }
 
   inline void finish(ParticleDataR<REAL> &p)
   {
-    p.accel[0] = -(mass*p.dinv*kern.coef*p.accel[0]);
-    p.accel[1] = -(mass*p.dinv*kern.coef*p.accel[1]) - M_G;
-    p.accel[2] = -(mass*p.dinv*kern.coef*p.accel[2]);
+    for (unsigned char i = 0; i < 3; ++i)
+      p.accel[i] = mass*p.dinv*p.accel[i];
+    p.accel[1] -= M_G;
 
-    //qDebug("pr: % 10.5e di: % 10.5e  kc: % 10.5e  ac: % 10.5e % 10.5e % 10.5e", p.pressure, p.dinv, kern.coef, p.accel[0], p.accel[1], p.accel[2]);
   }
 
 private:
-  SpikyGradKernel kern; // used to compute pressure force
+  SpikyGradKernel p_kern; // used to compute pressure force
+  ViscLapKernel   v_kern; // used to compute viscosity force
   REAL mass;
+  REAL viscosity;
+  REAL st;
 };
 
 
@@ -178,12 +185,10 @@ class DynamicPointCloudRS : public PointCloudRS<REAL,SIZE>
 {
 public:
   // dynamic point cloud from a regular updatable gl point cloud
-  explicit DynamicPointCloudRS(GLPointCloudRS<REAL, SIZE> *glpc, REAL mass);
+  explicit DynamicPointCloudRS(GLPointCloudRS<REAL, SIZE> *glpc,
+      REAL density, REAL viscosity, REAL surfacetension);
   ~DynamicPointCloudRS();
 
-  inline REAL get_mass(SIZE idx = -1) { Q_UNUSED(idx); return m_mass; }
-  inline REAL get_constant()     { return m_constant; }
-  inline REAL get_rest_density() { return m_rest_density; }
   inline REAL *pos_at(SIZE i)    { return this->m_pos.data() + i*3; }
   inline REAL *vel_at(SIZE i)    { return m_vel.data() + i*3; }
   inline REAL *accel_at(SIZE i)  { return m_accel.data() + i*3; }
@@ -205,9 +210,11 @@ public:
 
 protected:
   SIZE m_num_vertices;
-  REAL m_mass; // uniform constant mass for each particle
-  REAL m_constant;
+  REAL m_c2;
+  REAL m_mass;
   REAL m_rest_density;
+  REAL m_viscosity;
+  REAL m_st;
   Matrix3XR<REAL> m_vel; // velocities
   Matrix3XR<REAL> m_accel; // accelerations
 

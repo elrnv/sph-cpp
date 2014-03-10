@@ -31,7 +31,7 @@ public:
   void update_glbuf();
   void update_shader(ShaderManager::ShaderType type);
 
-  DynamicPointCloudRS<REAL,SIZE> *make_dynamic(REAL mass);
+  DynamicPointCloudRS<REAL,SIZE> *make_dynamic(REAL d, REAL v, REAL st);
 
   void print() const { std::cerr << *m_pc << std::endl; }
 

@@ -1,5 +1,6 @@
 #include "dynamics.h"
 #include "glpointcloud.h"
+#include <ctime>
 
 // UniformGrid stuff
 
@@ -11,7 +12,9 @@ UniformGridRS<REAL,SIZE>::UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, flo
   , m_proc_pressure(m_h)
   , m_proc_accel(m_h)
   , m_bmin(bmin)
-{ }
+{
+  qDebug() << "cell size" << h;
+}
 
 template<typename REAL, typename SIZE>
 UniformGridRS<REAL,SIZE>::~UniformGridRS() 
@@ -26,6 +29,7 @@ void UniformGridRS<REAL,SIZE>::init()
   SIZE nx = 1 + (bmax[0] - m_bmin[0])*m_hinv;
   SIZE ny = 1 + (bmax[1] - m_bmin[1])*m_hinv;
   SIZE nz = 1 + (bmax[2] - m_bmin[2])*m_hinv;
+  qDebug() << nx << ny << nz;
   
   m_grid.resize( boost::extents[nx][ny][nz] );
 
@@ -43,13 +47,19 @@ void UniformGridRS<REAL,SIZE>::init()
 
   compute_initial_density();
 
-  m_proc_pressure.init(m_dpc->m_mass, m_dpc->m_rest_density, m_dpc->m_constant);
-  m_proc_accel.init(m_dpc->get_mass());
+  qDebug() << "mass per particle" << m_dpc->m_mass;
+
+  m_proc_pressure.init(m_dpc->m_mass, m_dpc->m_rest_density, m_dpc->m_c2);
+  m_proc_accel.init(m_dpc->m_mass, m_dpc->m_viscosity, m_dpc->m_st);
 }
 
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::update()
 {
+#if 1
+  int size = 0;
+  int count = 0;
+#endif
   SIZE nx = m_grid.shape()[0];
   SIZE ny = m_grid.shape()[1];
   SIZE nz = m_grid.shape()[2];
@@ -62,7 +72,12 @@ void UniformGridRS<REAL,SIZE>::update()
         DataVec &datavec = m_grid[i][j][k];
         if (datavec.empty())
           continue;
-        
+
+#if 1
+        size += datavec.size();
+        count++;
+#endif
+
         typename DataVec::iterator it = datavec.begin();
         for ( ; it != datavec.end(); )
         {
@@ -82,9 +97,10 @@ void UniformGridRS<REAL,SIZE>::update()
           }
           ++it;
         }
-      }
-    }
-  }
+      } // for k
+    } // for j
+  } // for i
+  //qDebug() << "avg particles per cell:" << size / count;
 }
 
 template<typename REAL>
@@ -125,6 +141,7 @@ void UniformGridRS<REAL,SIZE>::compute_initial_density()
   ProcessInitialDensityR<REAL> proc(m_h, m_dpc->m_mass, m_dpc->m_rest_density);
   compute_quantity(proc);
   m_dpc->m_rest_density /= m_dpc->m_num_vertices;
+  qDebug() << "rest density" << m_dpc->m_rest_density;
 }
 
 template<typename REAL, typename SIZE>
@@ -195,18 +212,22 @@ void UniformGridRS<REAL,SIZE>::compute_quantity(ProcessFunc process)
 
 // DynamicPointCloud stuff
 
+// inflating the size of the grid
+#define INFLATE 2.0 
+
 template<typename REAL, typename SIZE>
 DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
     GLPointCloudRS<REAL, SIZE> *glpc,
-    REAL mass)
+    REAL density, REAL viscosity, REAL st)
   : PointCloudRS<REAL,SIZE>(*glpc->get_pointcloud())
   , m_num_vertices(this->get_num_vertices())
-  , m_mass(mass)
-  , m_constant(300.0f * 0.3f)
-  , m_rest_density(0.0f)
+  , m_c2(2.2e3)
+  , m_rest_density(density)
+  , m_viscosity(viscosity)
+  , m_st(st) // surface tension
   , m_bmin(this->m_bbox.corner(Eigen::AlignedBox3f::BottomLeftFloor))
   , m_bmax(this->m_bbox.corner(Eigen::AlignedBox3f::TopRightCeil))
-  , m_grid(this, 0.04f, m_bmin)
+  , m_grid(this, INFLATE*this->compute_mindist(), m_bmin)
   , m_glpc(glpc)
   , m_stop_requested(false)
 {
@@ -214,6 +235,17 @@ DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
   m_vel.resizeLike(this->m_pos);
   m_vel.setZero();
   reset_accel();
+
+  REAL h = this->get_mindist();
+  m_mass = m_rest_density * h * h * h * 1.348;
+
+  //const clock_t begin_time = clock();
+  //float d1 = PointCloudRS<REAL,SIZE>::compute_mindist();
+  //float t1 = clock();
+  //float d2 = PointCloudRS<REAL,SIZE>::compute_mindist_brute();
+  //float t2 = clock();
+  //qDebug() << float( t1 - begin_time ) / CLOCKS_PER_SEC << " to get " << d1;
+  //qDebug() << float( t2 - t1 ) / CLOCKS_PER_SEC << " to get " << d2;
 }
 
 template<typename REAL, typename SIZE>
@@ -260,13 +292,16 @@ template<typename REAL, typename SIZE>
 void DynamicPointCloudRS<REAL,SIZE>::run()
 {
   m_grid.init();
-  float dt = 1e-8;
+  float dt = 0.0217;
 
   m_grid.compute_pressure();
   m_grid.compute_accel(); // update m_accel
 
   m_vel = m_vel + 0.5*dt*m_accel; // initial half velocity
 
+  clock_t prev_t = clock();
+  float t = 0.0f;
+  unsigned int count=0;
   for ( ; ; )
   {
     this->m_pos = (this->m_pos + dt*m_vel).eval();
@@ -285,7 +320,13 @@ void DynamicPointCloudRS<REAL,SIZE>::run()
     m_grid.compute_accel(); // update m_accel
 
     m_vel = m_vel + dt*m_accel;
+
+    clock_t cur_t = clock();
+    t += float(cur_t - prev_t) / CLOCKS_PER_SEC;
+    prev_t = cur_t;
+    count += 1;
   }
+  qDebug() << "average time per step:" << t / float(count);
 }
 
 template class DynamicPointCloudRS<double, unsigned int>;

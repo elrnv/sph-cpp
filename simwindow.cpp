@@ -55,7 +55,7 @@ void SimWindow::init()
   m_ubo.bindToIndex();
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-  load_model(7);
+  load_model(6);
 }
 
 void SimWindow::load_model(int i)
@@ -95,19 +95,24 @@ void SimWindow::load_model(int i)
       filename = "bunnyData.obj";
       break;
     case 5:
-      filename = "pcm-house4.obj";
-      angle_x = -90.0f;
-      break;
-    case 6:
       filename = "cowpts.obj";
       angle_y = 180.0f;
       break;
-    case 7:
+    case 6:
       filename = "sphere.obj";
-      ext_x = Vector2f(2.0f, 2.0f);
-      ext_y = Vector2f(2.0f, 2.0f);
-      ext_z = Vector2f(2.0f, 2.0f);
-      scale = 0.7f;
+      ext_x = Vector2f(1.0f, 1.0f);
+      ext_y = Vector2f(2.0f, 0.0f);
+      ext_z = Vector2f(1.0f, 1.0f);
+      angle_x = 40.0f;
+      angle_y = 40.0f;
+      break;
+    case 7:
+      filename = "densesphere.obj";
+      ext_x = Vector2f(1.0f, 1.0f);
+      ext_y = Vector2f(2.0f, 0.0f);
+      ext_z = Vector2f(1.0f, 1.0f);
+      angle_x = 40.0f;
+      angle_y = 40.0f;
       break;
   }
   SceneNode *scene = Util::loadScene(filename);
@@ -172,7 +177,10 @@ void SimWindow::make_dynamic()
       continue;
   
     GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
-    DynamicPointCloud *dpc = glpc->make_dynamic(/*particle mass = */1.0f);
+    DynamicPointCloud *dpc = glpc->make_dynamic(
+        /*density = */1000.0f,
+        /*viscosity = */0.001f,
+        /*surface tension coefficient = */0.0728f);
 
     // run simulation
     m_sim_threads.push_back(std::thread(&DynamicPointCloud::run, dpc));

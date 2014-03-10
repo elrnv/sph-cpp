@@ -1,3 +1,6 @@
+mtllib sphere.mtl
+o Cow Points
+usemtl Material
 v 3.716360 2.343387 0.000000
 v 4.126565 0.642027 0.000000
 v 3.454971 2.169877 0.000000

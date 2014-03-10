@@ -104,12 +104,13 @@ void GLPointCloudRS<REAL,SIZE>::update_shader(ShaderManager::ShaderType type)
 }
 
 template<typename REAL, typename SIZE>
-DynamicPointCloudRS<REAL,SIZE> *GLPointCloudRS<REAL,SIZE>::make_dynamic(REAL mass)
+DynamicPointCloudRS<REAL,SIZE> *GLPointCloudRS<REAL,SIZE>::make_dynamic(
+    REAL density, REAL viscosity, REAL st)
 {
   this->m_pos.setUsagePattern( QOpenGLBuffer::StreamDraw );
 
   DynamicPointCloudRS<REAL,SIZE> *dpc =
-    new DynamicPointCloudRS<double, SIZE>(this, mass);
+    new DynamicPointCloudRS<double, SIZE>(this, density, viscosity, st);
 
   delete m_pc; // delete the old point cloud
   m_pc = dpc;  // set new dynamic point cloud as a member

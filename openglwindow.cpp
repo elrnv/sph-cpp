@@ -202,7 +202,7 @@ void OpenGLWindow::renderNow()
     ++m_frame;
     if (m_frame == 100)
     {
-      fprintf(stderr, "\r%d       ", 100000 / m_time.elapsed() );
+      //fprintf(stderr, "\r%d       ", 100000 / m_time.elapsed() );
       m_time.restart();
       m_frame = 0;
     }

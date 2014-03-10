@@ -26,13 +26,15 @@ public:
   inline bool is_pointcloud() const { return true; }
 
   inline void transform(const AffineCompact3f &trans);
+  inline AlignedBox3f &compute_bbox();
+  REAL get_mindist() { return m_mindist; }
+  REAL compute_mindist();
+  REAL compute_mindist_brute();
 
   friend std::ostream& operator<< <>(std::ostream& out, const PointCloudRS<REAL,SIZE>& pc);
 
-  inline AlignedBox3f &compute_bbox();
-
 protected:
-
+  REAL m_mindist;
   Matrix3XR<REAL> m_pos;
 }; // class PointCloudRS
 
