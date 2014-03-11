@@ -7,6 +7,7 @@
 #include <QtGui/QMatrix4x4>
 #include <QTime>
 #include "eigen.h"
+#include "gltext.h"
 
 class OpenGLWindow : public QWindow, protected QOpenGLFunctions_3_3_Core
 {
@@ -70,4 +71,5 @@ private:
 
   QOpenGLContext *m_context;
 };
+
 #endif // OPENGLWINDOW_H

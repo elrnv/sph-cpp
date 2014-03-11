@@ -1,3 +1,5 @@
+QT += opengl
+
 TARGET = sim
 
 SOURCES += \
@@ -14,6 +16,7 @@ SOURCES += \
   dynamics.cpp \
   glmesh.cpp \
   glpointcloud.cpp \
+  gltext.cpp
 
 HEADERS += \
   openglwindow.h \
@@ -28,6 +31,7 @@ HEADERS += \
   dynamics.h \
   glmesh.h \
   glpointcloud.h \
+  gltext.h \
   glprimitive.h \
   eigen.h \
   util.h \
@@ -50,13 +54,3 @@ LIBS += -L/opt/local/lib -lassimp
 QMAKE_CXXFLAGS += -Winline
 
 RESOURCES += resources.qrc
-
-OTHER_FILES += \
-  phong.vert \
-  phong.frag \
-  normals.geom \
-  normals.vert \
-  particle.vert \
-  particle.geom \
-  particle.frag
-

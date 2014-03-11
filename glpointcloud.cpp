@@ -2,7 +2,6 @@
 #include <QtGui/QOpenGLVertexArrayObject>
 #include <QtGui/QOpenGLBuffer>
 #include <assimp/scene.h>
-#include <thread>
 #include "glpointcloud.h"
 #include "dynamics.h"
 

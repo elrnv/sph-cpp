@@ -55,12 +55,13 @@ public:
     //qDebug() << "temp p.dinv" << p.dinv;
   }
 
+  inline REAL pow7(REAL x) { return x*x*x*x*x*x*x; }
+
   inline void finish(ParticleDataR<REAL> &p)
   {
     REAL density = p.dinv * mass * kern.coef;
     p.dinv = 1.0f/density;
-    p.pressure = constant * (density - rest_density);
-    //qDebug() << "density:" << density << " p.pressure:" << p.pressure;
+    p.pressure = constant * (pow7(density / rest_density) - 1);
   }
 
 private:
@@ -81,21 +82,21 @@ public:
   void init(REAL m, REAL v, REAL s)
   {  mass = m; viscosity = v; st = s; }
 
-  inline void init(ParticleDataR<REAL> &p) { Q_UNUSED(p); }
+  inline void init(ParticleDataR<REAL> &p) {
+    Q_UNUSED(p); 
+  }
 
   inline void operator()(ParticleDataR<REAL> &p, ParticleDataR<REAL> &near_p)
   {
+    if (&p == &near_p)
+      return;
     Vector3R<REAL> res(
         -0.5*near_p.dinv*(p.pressure + near_p.pressure)*p_kern(p.pos - near_p.pos) // pressure contribution
-    //    + viscosity*near_p.dinv*(near_p.vel - p.vel)*v_kern(p.pos - near_p.pos) // viscosity contribution
+        + viscosity*near_p.dinv*(near_p.vel - p.vel)*v_kern(p.pos - near_p.pos) // viscosity contribution
         );
+
     for (unsigned char i = 0; i < 3; ++i)
       p.accel[i] += res[i]; // copy intermediate result
-
-    Vector3R<REAL> temp(p_kern[p.pos - near_p.pos]);
-    //qDebug("t: % 10.5e % 10.5e % 10.5e   ac: % 10.5e % 10.5e % 10.5e",
-     //    temp[0], temp[1], temp[2], p.accel[0], p.accel[1], p.accel[2]);
-
   }
 
   inline void finish(ParticleDataR<REAL> &p)
@@ -103,6 +104,9 @@ public:
     for (unsigned char i = 0; i < 3; ++i)
       p.accel[i] = mass*p.dinv*p.accel[i];
     p.accel[1] -= M_G;
+
+//    qDebug() << "p.dinv:" << p.dinv;
+    //qDebug(" ac: % 10.5e % 10.5e % 10.5e", p.accel[0], p.accel[1], p.accel[2]);
 
   }
 
@@ -122,28 +126,28 @@ class UniformGridRS
 public:
   typedef std::vector< ParticleDataR<REAL> > DataVec;
 
-  typedef boost::multi_array< DataVec, 3 > Grid;
-  typedef boost::array<typename Grid::index, 3> Index;
-  typedef typename Grid::template array_view<3>::type GridView;
-  typedef typename Grid::index_range IndexRange;
+  typedef boost::multi_array< DataVec, 3 > Array3;
+  typedef typename Array3::index Index;
+  typedef boost::array<Index, 3> Array3Index;
+  typedef typename Array3::template array_view<3>::type GridView;
+  typedef typename Array3::index_range IndexRange;
 
   UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, float h, const Vector3f &bmin);
   ~UniformGridRS();
   
   void init();
 
-  inline Index get_voxel_index(const Vector3R<REAL> &pos)
+  inline Index clamp(Index d, Index min, Index max)
   {
-    return {{ static_cast<typename Grid::index>(m_hinv*(pos[0]-m_bmin[0])),
-              static_cast<typename Grid::index>(m_hinv*(pos[1]-m_bmin[1])),
-              static_cast<typename Grid::index>(m_hinv*(pos[2]-m_bmin[2])) }};
+    return std::max(std::min(d, max), min);
   }
-  inline bool is_valid(const Index &idx)
+
+  inline Array3Index get_voxel_index(const Vector3R<REAL> &pos)
   {
-    for (unsigned char i = 0; i < 3; ++i)
-      if (idx[i] < 0 || idx[i] >= static_cast<typename Grid::index>(m_grid.shape()[i]))
-        return false;
-    return true;
+    return {{ 
+      clamp(static_cast<Index>(m_hinv*(pos[0]-m_bmin[0])), 0, m_gridsize[0]-1),
+      clamp(static_cast<Index>(m_hinv*(pos[1]-m_bmin[1])), 0, m_gridsize[1]-1),
+      clamp(static_cast<Index>(m_hinv*(pos[2]-m_bmin[2])), 0, m_gridsize[2]-1) }};
   }
 
   void compute_accel();
@@ -167,7 +171,8 @@ private:
   DynamicPointCloudRS<REAL, SIZE> *m_dpc; // main point cloud
 
   // array of cells containing xyzp (position and density) for each vertex
-  Grid  m_grid;
+  Array3 m_grid;
+  Array3Index  m_gridsize;
 
   float m_h;    // grid size
   float m_hinv; // 1 / h
@@ -200,7 +205,7 @@ public:
 
   inline void reset_accel() { m_accel.setZero(); }
 
-  inline int clamp(REAL &d, REAL min, REAL max);
+  inline bool clamp(REAL &d, REAL min, REAL max);
   inline void resolve_collisions();
 
   void run();

@@ -23,7 +23,8 @@ public:
   void load_model(int i);
 
   typedef ShaderManager::ShaderType ViewMode;
-  void update_viewmode(ViewMode vm);
+  void change_viewmode(ViewMode vm);
+  void reset_viewmode();
   void make_static();
   void make_dynamic();
 

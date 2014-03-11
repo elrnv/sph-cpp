@@ -49,7 +49,7 @@ loadScene( const std::string &filename )
 
   // Read the file into an assimp scene data structure
   const aiScene *scene = 
-    importer.ReadFile( filename, 0
+    importer.ReadFile( "data/" + filename, 0
       | aiProcess_CalcTangentSpace     
       | aiProcess_GenSmoothNormals // or GenNormals
       | aiProcess_JoinIdenticalVertices

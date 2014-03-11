@@ -25,7 +25,10 @@ OpenGLWindow::~OpenGLWindow()
 
 }
 
-void OpenGLWindow::init() { }
+void OpenGLWindow::init() 
+{
+  gl::text.init();
+}
 
 
 Vector2f OpenGLWindow::window_dim()
@@ -40,6 +43,7 @@ void OpenGLWindow::reshape()
 	glViewport(0, 0, dim[0], dim[1]);
 	m_P.setIdentity();
 	m_P.perspective(m_fov, dim[0]/dim[1], m_near, m_far);
+  gl::text.set_screen_size(dim);
 }
 
 void OpenGLWindow::render() { }

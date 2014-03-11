@@ -1,5 +1,6 @@
 #include "dynamics.h"
 #include "glpointcloud.h"
+#include "gltext.h"
 #include <ctime>
 
 // UniformGrid stuff
@@ -13,7 +14,7 @@ UniformGridRS<REAL,SIZE>::UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, flo
   , m_proc_accel(m_h)
   , m_bmin(bmin)
 {
-  qDebug() << "cell size" << h;
+  gl::text.print("cell size: \n");
 }
 
 template<typename REAL, typename SIZE>
@@ -26,23 +27,22 @@ void UniformGridRS<REAL,SIZE>::init()
   // determine the number of voxels needed
   const Vector3f &bmax = m_dpc->get_bmax();
 
-  SIZE nx = 1 + (bmax[0] - m_bmin[0])*m_hinv;
-  SIZE ny = 1 + (bmax[1] - m_bmin[1])*m_hinv;
-  SIZE nz = 1 + (bmax[2] - m_bmin[2])*m_hinv;
-  qDebug() << nx << ny << nz;
+  m_gridsize = {{
+    static_cast<Index>((bmax[0] - m_bmin[0])*m_hinv),
+    static_cast<Index>((bmax[1] - m_bmin[1])*m_hinv),
+    static_cast<Index>((bmax[2] - m_bmin[2])*m_hinv) }};
+
+  qDebug() << m_gridsize[0] << m_gridsize[1] << m_gridsize[2];
   
-  m_grid.resize( boost::extents[nx][ny][nz] );
+  m_grid.resize( boost::extents[m_gridsize[0]][m_gridsize[1]][m_gridsize[2]] );
 
   SIZE num_vtx = m_dpc->get_num_vertices();
   for ( SIZE i = 0; i < num_vtx; ++i )
   {
-    Vector3R<REAL> pos( m_dpc->pos_at(i) );
-    Vector3R<REAL> vel( m_dpc->vel_at(i) );
-    Index idx = get_voxel_index(pos);
-    if (is_valid(idx))
-      m_grid(idx).push_back( ParticleDataR<REAL>(pos, vel, m_dpc->accel_at(i)) );
-    else
-      qDebug() << "particle off grid at creation";
+    Vector3R<REAL> pos( m_dpc->m_pos.col(i) );
+    Vector3R<REAL> vel( m_dpc->m_vel.col(i) );
+    Array3Index idx = get_voxel_index(pos);
+    m_grid(idx).push_back( ParticleDataR<REAL>(pos, vel, m_dpc->accel_at(i)) );
   }
 
   compute_initial_density();
@@ -60,9 +60,9 @@ void UniformGridRS<REAL,SIZE>::update()
   int size = 0;
   int count = 0;
 #endif
-  SIZE nx = m_grid.shape()[0];
-  SIZE ny = m_grid.shape()[1];
-  SIZE nz = m_grid.shape()[2];
+  SIZE nx = m_gridsize[0];
+  SIZE ny = m_gridsize[1];
+  SIZE nz = m_gridsize[2];
   for (SIZE i = 0; i < nx; ++i)
   {
     for (SIZE j = 0; j < ny; ++j)
@@ -70,36 +70,20 @@ void UniformGridRS<REAL,SIZE>::update()
       for (SIZE k = 0; k < nz; ++k)
       {
         DataVec &datavec = m_grid[i][j][k];
-        if (datavec.empty())
-          continue;
-
-#if 1
-        size += datavec.size();
-        count++;
-#endif
-
-        typename DataVec::iterator it = datavec.begin();
-        for ( ; it != datavec.end(); )
-        {
-          Index idx(get_voxel_index(it->pos));
-          if (!is_valid(idx))
-          {
-            qDebug() << "particle off grid";
-            datavec.erase(it);
-            continue;
-          }
-
-          if ( idx[0] != i || idx[1] != j || idx[2] != k )
-          { 
-            datavec.erase(it);
-            m_grid(idx).push_back(*it);
-            continue;
-          }
-          ++it;
-        }
+        datavec.clear();
       } // for k
     } // for j
   } // for i
+
+
+  SIZE num_vtx = m_dpc->get_num_vertices();
+  for ( SIZE i = 0; i < num_vtx; ++i )
+  {
+    Vector3R<REAL> pos( m_dpc->m_pos.col(i) );
+    Vector3R<REAL> vel( m_dpc->m_vel.col(i) );
+    Array3Index idx = get_voxel_index(pos);
+    m_grid(idx).push_back( ParticleDataR<REAL>(pos, vel, m_dpc->accel_at(i)) );
+  }
   //qDebug() << "avg particles per cell:" << size / count;
 }
 
@@ -195,8 +179,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity(ProcessFunc process)
               {
                 for ( ParticleDataR<REAL> &near_p : neigh_view[near_i][near_j][near_k])
                 {
-                  if (&p != &near_p)
-                    process(p, near_p); // process data
+                  process(p, near_p); // process data
                 }
               }
             }
@@ -221,13 +204,13 @@ DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
     REAL density, REAL viscosity, REAL st)
   : PointCloudRS<REAL,SIZE>(*glpc->get_pointcloud())
   , m_num_vertices(this->get_num_vertices())
-  , m_c2(2.2e3)
+  , m_c2(2.2e5)
   , m_rest_density(density)
   , m_viscosity(viscosity)
   , m_st(st) // surface tension
   , m_bmin(this->m_bbox.corner(Eigen::AlignedBox3f::BottomLeftFloor))
   , m_bmax(this->m_bbox.corner(Eigen::AlignedBox3f::TopRightCeil))
-  , m_grid(this, INFLATE*this->compute_mindist(), m_bmin)
+  , m_grid(this, 2.0/*INFLATE*this->compute_mindist()*/, m_bmin)
   , m_glpc(glpc)
   , m_stop_requested(false)
 {
@@ -236,8 +219,8 @@ DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
   m_vel.setZero();
   reset_accel();
 
-  REAL h = this->get_mindist();
-  m_mass = m_rest_density * h * h * h * 1.348;
+  REAL h = this->compute_mindist();
+  m_mass = m_rest_density * h * h * h * 1.1f;
 
   //const clock_t begin_time = clock();
   //float d1 = PointCloudRS<REAL,SIZE>::compute_mindist();
@@ -257,19 +240,19 @@ DynamicPointCloudRS<REAL,SIZE>::~DynamicPointCloudRS()
 // clamp value d to min and max boundaries,
 // return -1 if clamed with max, 1 if clamped with min, otherwise 0
 template<typename REAL, typename SIZE>
-inline int DynamicPointCloudRS<REAL,SIZE>::clamp(REAL &d, REAL min, REAL max)
+inline bool DynamicPointCloudRS<REAL,SIZE>::clamp(REAL &d, REAL min, REAL max)
 {
   if ( d < min )
   {
     d = min;
-    return 1;
+    return true;
   }
   else if (d > max)
   {
     d = max;
-    return 1;
+    return true;
   }
-  return 0;
+  return false;
 }
 
 
@@ -282,7 +265,7 @@ void DynamicPointCloudRS<REAL,SIZE>::resolve_collisions()
     {
       if (clamp(pos_at(i)[j], m_bmin[j], m_bmax[j]))
       {
-        vel_at(i)[j] *= -1;
+        vel_at(i)[j] *= -1.0;
       }
     }
   }
@@ -292,7 +275,7 @@ template<typename REAL, typename SIZE>
 void DynamicPointCloudRS<REAL,SIZE>::run()
 {
   m_grid.init();
-  float dt = 0.0217;
+  float dt = 0.000217;
 
   m_grid.compute_pressure();
   m_grid.compute_accel(); // update m_accel
@@ -315,11 +298,17 @@ void DynamicPointCloudRS<REAL,SIZE>::run()
       break;
 
     m_vel = m_vel + 0.5*dt*m_accel;
-    
+
     m_grid.compute_pressure();
     m_grid.compute_accel(); // update m_accel
 
     m_vel = m_vel + dt*m_accel;
+//    if (count == 0)
+//    {
+//      for (int i = 0; i < 10; ++i)
+//        qDebug() << m_accel.col(i)[0] << m_accel.col(i)[1] << m_accel.col(i)[2] ;
+//      return;
+//    }
 
     clock_t cur_t = clock();
     t += float(cur_t - prev_t) / CLOCKS_PER_SEC;

@@ -1,7 +1,8 @@
 #ifndef SHADERMANAGER_H
 #define SHADERMANAGER_H
 #include <QtGui/QOpenGLShaderProgram>
-#include "openglwindow.h"
+
+class OpenGLWindow;
 
 class ShaderManager : public QObject
 {

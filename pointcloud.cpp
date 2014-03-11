@@ -57,6 +57,9 @@ AlignedBox3f &PointCloudRS<REAL,SIZE>::compute_bbox()
 template<typename REAL, typename SIZE>
 REAL PointCloudRS<REAL,SIZE>::compute_mindist_brute()
 {
+  if (m_mindist != -1)
+    return m_mindist;
+
   float dist2 = std::numeric_limits<float>::infinity();
   SIZE num_verts = m_pos.cols();
   
@@ -75,6 +78,9 @@ REAL PointCloudRS<REAL,SIZE>::compute_mindist_brute()
 template<typename REAL, typename SIZE>
 REAL PointCloudRS<REAL,SIZE>::compute_mindist()
 {
+  if (m_mindist != -1)
+    return m_mindist;
+
   float dist2 = std::numeric_limits<float>::infinity();
   
   SIZE num_verts = m_pos.cols();

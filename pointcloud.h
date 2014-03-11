@@ -27,7 +27,6 @@ public:
 
   inline void transform(const AffineCompact3f &trans);
   inline AlignedBox3f &compute_bbox();
-  REAL get_mindist() { return m_mindist; }
   REAL compute_mindist();
   REAL compute_mindist_brute();
 

@@ -16,7 +16,7 @@ struct UBOInfo
 class UniformBuffer
 {
 public:
-  UniformBuffer();
+  explicit UniformBuffer();
 
   enum UsagePattern
   {

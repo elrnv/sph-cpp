@@ -46,6 +46,7 @@ void SimWindow::clear_threads()
 
 void SimWindow::init()
 {
+  OpenGLWindow::init();
   m_shaderman.init();
 
 	m_ubo.create();
@@ -95,8 +96,12 @@ void SimWindow::load_model(int i)
       filename = "bunnyData.obj";
       break;
     case 5:
-      filename = "cowpts.obj";
-      angle_y = 180.0f;
+      filename = "sparsesphere.obj";
+      ext_x = Vector2f(1.0f, 1.0f);
+      ext_y = Vector2f(2.0f, 0.0f);
+      ext_z = Vector2f(1.0f, 1.0f);
+      angle_x = 40.0f;
+      angle_y = 40.0f;
       break;
     case 6:
       filename = "sphere.obj";
@@ -135,17 +140,21 @@ void SimWindow::load_model(int i)
   m_glprims.reserve( scene->num_primitives() );
   Util::loadGLData( scene, m_glprims, m_ubo, m_shaderman );
   delete scene;
-  update_viewmode(m_viewmode);
+  change_viewmode(m_viewmode);
 }
 
-void SimWindow::update_viewmode(ViewMode vm)
+void SimWindow::change_viewmode(ViewMode vm)
 {
   m_viewmode = vm;
   m_change_prog = true;
+  reset_viewmode();
+}
 
+void SimWindow::reset_viewmode()
+{
   glEnable(GL_BLEND);
 
-  if (vm == ViewMode::PARTICLE) 
+  if (m_viewmode == ViewMode::PARTICLE) 
   {
     glDisable(GL_DEPTH_TEST);
 	  glDisable(GL_CULL_FACE);
@@ -179,7 +188,7 @@ void SimWindow::make_dynamic()
     GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
     DynamicPointCloud *dpc = glpc->make_dynamic(
         /*density = */1000.0f,
-        /*viscosity = */0.001f,
+        /*viscosity = */1000.0f,
         /*surface tension coefficient = */0.0728f);
 
     // run simulation
@@ -218,7 +227,7 @@ void SimWindow::render()
     glprim->get_program()->bind();
     m_ubo.bind();
 
-    int offset = 0;
+    int offset = 0; // TODO: replace with one write
     offset = m_ubo.write(offset, m_udata.mvpmtx.data(), sizeof(Matrix4f));
     offset = m_ubo.write(offset, m_udata.vpmtx.data(), sizeof(Matrix4f));
     offset = m_ubo.write(offset, m_udata.modelmtx.data(), sizeof(Matrix4f));
@@ -239,6 +248,7 @@ void SimWindow::render()
 
     glprim->get_vao().bind();
 
+    reset_viewmode();
     if (m_viewmode == ShaderManager::PARTICLE)
     {
       glprim->get_program()->setUniformValue("pt_scale", float(14*window_dim()[1]*m_near));
@@ -253,6 +263,8 @@ void SimWindow::render()
     glprim->get_vao().release();
     m_ubo.release();
     glprim->get_program()->release();
+
+    gl::text.draw_text();
   }
   m_change_prog = false;
 }
@@ -269,13 +281,13 @@ void SimWindow::keyPressEvent(QKeyEvent *event)
       make_static();
       break;
     case Qt::Key_W:
-      update_viewmode(ViewMode::WIREFRAME);
+      change_viewmode(ViewMode::WIREFRAME);
       break;
     case Qt::Key_S:
-      update_viewmode(ViewMode::PHONG);
+      change_viewmode(ViewMode::PHONG);
       break;
     case Qt::Key_P:
-      update_viewmode(ViewMode::PARTICLE);
+      change_viewmode(ViewMode::PARTICLE);
       break;
     case Qt::Key_1: load_model(1); break;
     case Qt::Key_2: load_model(2); break;

@@ -1,3 +1,4 @@
+#include "openglwindow.h"
 #include "shadermanager.h"
 
 ShaderManager::ShaderManager(OpenGLWindow *parent)
