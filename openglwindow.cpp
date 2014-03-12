@@ -9,12 +9,12 @@ OpenGLWindow::OpenGLWindow(QWindow *parent)
 	: QWindow(parent)
   , m_near(0.1), m_far(100.0), m_fov(40.0)
   , m_frame(0)
+	, m_context(0)
 	, m_update_pending(false)
 	, m_animating(false)
 	, m_rotation_control(false)
 	, m_prev_x(0), m_prev_y(0)
   , m_zoom(0)
-	, m_context(0)
 {
 	setSurfaceType(QWindow::OpenGLSurface);
   m_time.start();
@@ -27,7 +27,7 @@ OpenGLWindow::~OpenGLWindow()
 
 void OpenGLWindow::init() 
 {
-  gl::text.init();
+  m_text_painter.init();
 }
 
 
@@ -43,7 +43,7 @@ void OpenGLWindow::reshape()
 	glViewport(0, 0, dim[0], dim[1]);
 	m_P.setIdentity();
 	m_P.perspective(m_fov, dim[0]/dim[1], m_near, m_far);
-  gl::text.set_screen_size(dim);
+  m_text_painter.set_screen_size(dim);
 }
 
 void OpenGLWindow::render() { }
@@ -132,6 +132,7 @@ void OpenGLWindow::mouseReleaseEvent(QMouseEvent *event)
 void OpenGLWindow::mouseMoveEvent(QMouseEvent *event)
 {
   int y = event->y();
+  int x = event->x();
   if (event->modifiers() & Qt::ShiftModifier)
   {
     m_zoom += event->y() - m_prev_y;
@@ -142,11 +143,9 @@ void OpenGLWindow::mouseMoveEvent(QMouseEvent *event)
   }
   else if (m_rotation_control)
   {
-    int x = event->x();
     m_hra = (m_hra - m_prev_x + x);
     m_hra = m_hra > 180 ? m_hra - 360 : m_hra;
     m_hra = m_hra < -180 ? m_hra + 360 : m_hra;
-    m_prev_x = x;
 
     float vra_temp = std::max(m_vra - m_prev_y + y, -180.0f);
     m_vra = std::min(vra_temp, 180.0f);
@@ -154,7 +153,8 @@ void OpenGLWindow::mouseMoveEvent(QMouseEvent *event)
     recompute_view();
     renderLater();
   }
-  m_prev_y = y; // always update previous value of y (for zoom)
+  m_prev_x = x;
+  m_prev_y = y;
 }
 
 void OpenGLWindow::wheelEvent(QWheelEvent *event)
@@ -177,6 +177,7 @@ void OpenGLWindow::wheelEvent(QWheelEvent *event)
 void OpenGLWindow::keyPressEvent(QKeyEvent *event)
 {
 	int key = event->key();
+	m_context->makeCurrent(this);
 	switch (key)
 	{
 		case Qt::Key_R:
@@ -198,6 +199,7 @@ void OpenGLWindow::renderNow()
 	m_context->makeCurrent(this);
 
 	render();
+  m_text_painter.draw_text(m_prev_x, m_prev_y);
 
 	m_context->swapBuffers(this);
 

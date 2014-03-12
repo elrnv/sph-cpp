@@ -8,9 +8,13 @@
 #include "eigen.h"
 #include "gltext.h"
 
+// This source must be at the head of compilation chain
 namespace gl
 {
-  GLText text;
+  GLTextBuffer topleft;
+  GLTextBuffer topright;
+  GLTextBuffer bottomleft;
+  GLTextBuffer bottomright;
 };
 
 static uint32_t
@@ -28,13 +32,13 @@ nearest_pow2(uint32_t num)
   return n;
 }
 
-// GLText stuff
-GLText::GLText()
+// GLTextPainter stuff
+GLTextPainter::GLTextPainter()
   : m_prog(this)
   , m_chars(END_CHAR - START_CHAR + 1)
 { }
 
-void GLText::init()
+void GLTextPainter::init()
 {
 	initializeOpenGLFunctions();
 
@@ -45,6 +49,7 @@ void GLText::init()
   int id = QFontDatabase::addApplicationFont(":/proggyclean.ttf");
   QString family = QFontDatabase::applicationFontFamilies(id).at(0);
   QFont font(family, 16);
+  font.setStyleHint(QFont::Monospace, QFont::NoAntialias);
   
   QFontMetrics metric(font);
   m_height = metric.height();
@@ -117,7 +122,7 @@ void GLText::init()
     m_prog.enableAttributeArray( "vtx" );
     m_prog.setAttributeBuffer( "vtx", GL_FLOAT, 0, 4 );
 
-    GLubyte idx_data[6] = { 0, 1, 2, 1, 2, 3 };
+    GLubyte idx_data[6] = { 2, 1, 0, 1, 2, 3 };
     QOpenGLBuffer idxbuf(QOpenGLBuffer::IndexBuffer);
     idxbuf.create();
     idxbuf.setUsagePattern( QOpenGLBuffer::StaticDraw );
@@ -129,13 +134,13 @@ void GLText::init()
   }
 }
 
-GLText::~GLText()
+GLTextPainter::~GLTextPainter()
 {
   for ( auto &x : m_width_vao_map )
     delete x.second;
 }
 
-void GLText::set_screen_size(const Vector2f &dim)
+void GLTextPainter::set_screen_size(const Vector2f &dim)
 {
   m_prog.bind();
   m_prog.setUniformValue("scale", QVector2D(2.0/dim[0], -2.0/dim[1]));
@@ -143,40 +148,7 @@ void GLText::set_screen_size(const Vector2f &dim)
   m_screen_size = dim;
 }
 
-// printing routines
-void GLText::print(const std::string &text)
-{
-  print(text, gl::TOP_LEFT, gl::WHITE );
-}
-void GLText::print(const std::string &text, gl::Corner corner)
-{
-  print(text, corner, gl::WHITE);
-}
-void GLText::print(const std::string &text, gl::Color color)
-{
-  print(text, gl::TOP_LEFT, color);
-}
-void GLText::print(const std::string &text, gl::Corner corner, gl::Color color)
-{
-  Vector3f c;
-  switch (color)
-  {
-    case gl::RED:   c = Vector3f(1.0f, 0.0f, 0.0f); break;
-    case gl::GREEN: c = Vector3f(0.0f, 1.0f, 0.0f); break;
-    case gl::BLUE:  c = Vector3f(0.0f, 0.0f, 1.0f); break;
-    case gl::BLACK: c = Vector3f(0.0f, 0.0f, 0.0f); break;
-    case gl::WHITE: // FALL THROUGH
-    default: c = Vector3f(1.0f, 1.0f, 1.0f); break;
-  }
-  switch (corner)
-  {
-    case gl::TOP_RIGHT: m_topright.push_back(TextBlock( text, c )); break;
-    case gl::TOP_LEFT:  // FALL THROUGH
-    default: m_topleft.push_back(TextBlock( text, c )); break;
-  }
-}
-
-void GLText::draw_text()
+void GLTextPainter::draw_text(int xcur, int ycur)
 {
   glEnable(GL_BLEND);
   glDisable(GL_DEPTH_TEST);
@@ -186,13 +158,17 @@ void GLText::draw_text()
   GLfloat left(2.0f);
   GLfloat right(m_screen_size[0] - 2.0f);
   GLfloat top(2.0f);
+  GLfloat bottom(m_screen_size[1] - 2.0f - m_height);
 
+  float opacity = 0.5f;
+
+  // print top left buffer
   GLfloat x = left;
   GLfloat y = top;
-  for ( TextBlock &tb : m_topleft )
+  for ( gl::TextBlock &tb : gl::topleft )
   {
     glActiveTexture(0);
-    m_prog.setUniformValue("color", QVector4D(tb.color[0], tb.color[1], tb.color[2], 1.0));
+    m_prog.setUniformValue("color", QVector4D(tb.color[0], tb.color[1], tb.color[2], opacity));
     m_prog.setUniformValue("ypos", y);
 
     unsigned int text_len = tb.text.length();
@@ -205,17 +181,17 @@ void GLText::draw_text()
       {
         y += m_height;
         m_prog.setUniformValue("ypos", y);
-        x = GLfloat(2.0f);
+        x = left;
         continue;
       }
 
-      if (c < START_CHAR && c > END_CHAR)
+      if (c < START_CHAR || c > END_CHAR)
         c = ' ';
 
       m_prog.setUniformValue("xpos", x);
       FontChar fc = m_chars[c - START_CHAR];
       glBindTexture(GL_TEXTURE_2D, fc.tex_id);
-
+       
       fc.vao->bind();
 
       glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, 0);
@@ -226,20 +202,21 @@ void GLText::draw_text()
     }
   }
 
+  // print top right buffer
   x = right;
   y = top;
 
-  for ( TextBlock &tb : m_topright )
+  for ( gl::TextBlock &tb : gl::topright )
   {
     glActiveTexture(0);
-    m_prog.setUniformValue("color", QVector4D(tb.color[0], tb.color[1], tb.color[2], 1.0));
+    m_prog.setUniformValue("color", QVector4D(tb.color[0], tb.color[1], tb.color[2], opacity));
     m_prog.setUniformValue("ypos", y);
 
     unsigned int text_len = tb.text.length();
 
     for (unsigned int j = text_len; j > 0; --j)
     {
-      unsigned int i = j;
+      unsigned int i = j-1;
       char c = tb.text[i];
 
       if (c == '\n')
@@ -250,11 +227,11 @@ void GLText::draw_text()
         continue;
       }
 
-      if (c < START_CHAR && c > END_CHAR)
+      if (c < START_CHAR || c > END_CHAR)
         c = ' ';
 
-      m_prog.setUniformValue("xpos", x);
       FontChar fc = m_chars[c - START_CHAR];
+      m_prog.setUniformValue("xpos", x-fc.width);
       glBindTexture(GL_TEXTURE_2D, fc.tex_id);
 
       fc.vao->bind();
@@ -264,6 +241,89 @@ void GLText::draw_text()
       fc.vao->release();
 
       x -= fc.width;
+    }
+  }
+  
+  // print bottom right buffer
+  x = right;
+  y = bottom;
+
+  for ( gl::TextBlock &tb : gl::bottomright )
+  {
+    glActiveTexture(0);
+    m_prog.setUniformValue("color", QVector4D(tb.color[0], tb.color[1], tb.color[2], opacity));
+    m_prog.setUniformValue("ypos", y);
+
+    unsigned int text_len = tb.text.length();
+
+    for (unsigned int j = text_len; j > 0; --j)
+    {
+      unsigned int i = j-1;
+      char c = tb.text[i];
+
+      if (c == '\n')
+      {
+        y -= m_height;
+        m_prog.setUniformValue("ypos", y);
+        x = right;
+        continue;
+      }
+
+      if (c < START_CHAR || c > END_CHAR)
+        c = ' ';
+
+      FontChar fc = m_chars[c - START_CHAR];
+      m_prog.setUniformValue("xpos", x-fc.width);
+      glBindTexture(GL_TEXTURE_2D, fc.tex_id);
+
+      fc.vao->bind();
+
+      glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, 0);
+
+      fc.vao->release();
+
+      x -= fc.width;
+    } // for each char
+  }
+
+  // print bottom left buffer
+  x = left;
+  y = bottom;
+
+  for ( gl::TextBlock &tb : gl::bottomleft )
+  {
+    glActiveTexture(0);
+    m_prog.setUniformValue("color", QVector4D(tb.color[0], tb.color[1], tb.color[2], opacity));
+    m_prog.setUniformValue("ypos", y);
+
+    unsigned int text_len = tb.text.length();
+
+    for (unsigned int i = 0; i < text_len; ++i)
+    {
+      char c = tb.text[i];
+
+      if (c == '\n')
+      {
+        y -= m_height;
+        m_prog.setUniformValue("ypos", y);
+        x = left;
+        continue;
+      }
+
+      if (c < START_CHAR || c > END_CHAR)
+        c = ' ';
+
+      m_prog.setUniformValue("xpos", x);
+      FontChar fc = m_chars[c - START_CHAR];
+      glBindTexture(GL_TEXTURE_2D, fc.tex_id);
+       
+      fc.vao->bind();
+
+      glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, 0);
+
+      fc.vao->release();
+
+      x += fc.width;
     }
   }
   m_prog.release();

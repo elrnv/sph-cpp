@@ -6,6 +6,22 @@
 // UniformGrid stuff
 
 template<typename REAL, typename SIZE>
+UniformGridRS<REAL,SIZE>::UniformGridRS(
+    DynamicPointCloudRS<REAL,SIZE> *dpc,
+    float h,
+    float grid_h,
+    const Vector3f &bmin)
+  : m_dpc(dpc)
+  , m_h(h)
+  , m_hinv(1.0f/grid_h)
+  , m_proc_pressure(m_h)
+  , m_proc_accel(m_h)
+  , m_bmin(bmin)
+{
+  glprintf_tr("cell size: %.2f\n", grid_h);
+}
+
+template<typename REAL, typename SIZE>
 UniformGridRS<REAL,SIZE>::UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, float h, const Vector3f &bmin)
   : m_dpc(dpc)
   , m_h(h)
@@ -14,7 +30,7 @@ UniformGridRS<REAL,SIZE>::UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, flo
   , m_proc_accel(m_h)
   , m_bmin(bmin)
 {
-  gl::text.print("cell size: \n");
+  glprintf_tr("cell size: %.2f\n", h);
 }
 
 template<typename REAL, typename SIZE>
@@ -196,7 +212,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity(ProcessFunc process)
 // DynamicPointCloud stuff
 
 // inflating the size of the grid
-#define INFLATE 2.0 
+#define INFLATE 6.0 
 
 template<typename REAL, typename SIZE>
 DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
@@ -204,13 +220,13 @@ DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
     REAL density, REAL viscosity, REAL st)
   : PointCloudRS<REAL,SIZE>(*glpc->get_pointcloud())
   , m_num_vertices(this->get_num_vertices())
-  , m_c2(2.2e5)
+  , m_c2(2.2e4)
   , m_rest_density(density)
   , m_viscosity(viscosity)
   , m_st(st) // surface tension
   , m_bmin(this->m_bbox.corner(Eigen::AlignedBox3f::BottomLeftFloor))
   , m_bmax(this->m_bbox.corner(Eigen::AlignedBox3f::TopRightCeil))
-  , m_grid(this, 2.0/*INFLATE*this->compute_mindist()*/, m_bmin)
+  , m_grid(this, INFLATE*this->compute_mindist(), 2.0f, m_bmin)
   , m_glpc(glpc)
   , m_stop_requested(false)
 {
@@ -265,7 +281,7 @@ void DynamicPointCloudRS<REAL,SIZE>::resolve_collisions()
     {
       if (clamp(pos_at(i)[j], m_bmin[j], m_bmax[j]))
       {
-        vel_at(i)[j] *= -1.0;
+        vel_at(i)[j] *= -0.1;
       }
     }
   }

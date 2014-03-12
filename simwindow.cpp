@@ -7,12 +7,40 @@
 #include "simwindow.h"
 #include "dynamics.h"
 
+void SimWindow::toggle_shortcuts()
+{
+  m_show_shortcuts = !m_show_shortcuts;
+  if (!m_show_shortcuts)
+  {
+    glclear_bl();
+    return;
+  }
+
+  glprintf_bl("Shortcuts:\n");
+  glprintf_blc(BLUE, "  H: show/hide shortcuts\n");
+  glprintf_bl("  View Modes: \n");
+  glprintf_blc(GREEN, "    W: wireframe\n");
+  glprintf_blc(RED,   "    S: phong\n");
+  glprintf_blc(BLUE, "    P: particles\n");
+  glprintf_bl("  Models: \n");
+  glprintf_blc(GREEN, "    1: cube\n");
+  glprintf_blc(GREEN, "    2: cow\n");
+  glprintf_blc(GREEN, "    3: bunny\n");
+  glprintf_blc(BLUE,  "    4: sparse point cloud\n");
+  glprintf_blc(BLUE,  "    5: normal point cloud\n");
+  glprintf_blc(BLUE,  "    6: dense point cloud\n");
+  glprintf_bl("  Dynamics: \n");
+  glprintf_blc(RED,  "    D: enable\n");
+  glprintf_blc(RED,  "    C: disable\n");
+}
+
 SimWindow::SimWindow()
-  : m_viewmode(ShaderManager::PARTICLE)
+  : m_show_shortcuts(false) // immediately toggled below
+  , m_viewmode(ShaderManager::PARTICLE)
   , m_change_prog(true)
   , m_shaderman(this)
 {
-
+  toggle_shortcuts();
 }
 
 SimWindow::~SimWindow()
@@ -56,7 +84,7 @@ void SimWindow::init()
   m_ubo.bindToIndex();
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-  load_model(6);
+  load_model(4);
 }
 
 void SimWindow::load_model(int i)
@@ -93,9 +121,6 @@ void SimWindow::load_model(int i)
       filename = "bun_zipper.ply";
       break;
     case 4:
-      filename = "bunnyData.obj";
-      break;
-    case 5:
       filename = "sparsesphere.obj";
       ext_x = Vector2f(1.0f, 1.0f);
       ext_y = Vector2f(2.0f, 0.0f);
@@ -103,7 +128,7 @@ void SimWindow::load_model(int i)
       angle_x = 40.0f;
       angle_y = 40.0f;
       break;
-    case 6:
+    case 5:
       filename = "sphere.obj";
       ext_x = Vector2f(1.0f, 1.0f);
       ext_y = Vector2f(2.0f, 0.0f);
@@ -111,7 +136,7 @@ void SimWindow::load_model(int i)
       angle_x = 40.0f;
       angle_y = 40.0f;
       break;
-    case 7:
+    case 6:
       filename = "densesphere.obj";
       ext_x = Vector2f(1.0f, 1.0f);
       ext_y = Vector2f(2.0f, 0.0f);
@@ -119,6 +144,9 @@ void SimWindow::load_model(int i)
       angle_x = 40.0f;
       angle_y = 40.0f;
       break;
+    default:
+      glprintf_trc(RED, "model not found\n");
+      return;
   }
   SceneNode *scene = Util::loadScene(filename);
   if (!scene)
@@ -185,6 +213,9 @@ void SimWindow::make_dynamic()
     if (!glprim->is_pointcloud())
       continue;
   
+    // use right text buffer for dynamic properties
+    glclear_tr(); // so clear it
+
     GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
     DynamicPointCloud *dpc = glpc->make_dynamic(
         /*density = */1000.0f,
@@ -252,7 +283,14 @@ void SimWindow::render()
     if (m_viewmode == ShaderManager::PARTICLE)
     {
       glprim->get_program()->setUniformValue("pt_scale", float(14*window_dim()[1]*m_near));
-      glprim->get_program()->setUniformValue("pt_radius", 0.02f);
+      if (glprim->is_pointcloud())
+      {
+        glprim->get_program()->setUniformValue(
+        "pt_radius",
+         GLfloat(static_cast<GLPointCloud *>(glprim)->get_pointcloud()->get_radius()));
+      }
+      else
+        glprim->get_program()->setUniformValue("pt_radius", 0.02f);
       glDrawArrays(GL_POINTS, 0, glprim->get_num_vertices());
     }
     else
@@ -263,8 +301,6 @@ void SimWindow::render()
     glprim->get_vao().release();
     m_ubo.release();
     glprim->get_program()->release();
-
-    gl::text.draw_text();
   }
   m_change_prog = false;
 }
@@ -272,8 +308,12 @@ void SimWindow::render()
 void SimWindow::keyPressEvent(QKeyEvent *event)
 {
   int key = event->key();
+  m_context->makeCurrent(this);
   switch (key)
   {
+    case Qt::Key_H:
+      toggle_shortcuts();
+      break;
     case Qt::Key_D:
       make_dynamic();
       break;

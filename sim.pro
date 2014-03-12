@@ -4,6 +4,7 @@ TARGET = sim
 
 SOURCES += \
   main.cpp \
+  gltext.cpp \
   openglwindow.cpp \
   simwindow.cpp \
   scene.cpp \
@@ -15,10 +16,10 @@ SOURCES += \
   shadermanager.cpp \
   dynamics.cpp \
   glmesh.cpp \
-  glpointcloud.cpp \
-  gltext.cpp
+  glpointcloud.cpp
 
 HEADERS += \
+  gltext.h \
   openglwindow.h \
   simwindow.h \
   scene.h \
@@ -31,7 +32,6 @@ HEADERS += \
   dynamics.h \
   glmesh.h \
   glpointcloud.h \
-  gltext.h \
   glprimitive.h \
   eigen.h \
   util.h \

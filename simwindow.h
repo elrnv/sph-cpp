@@ -30,10 +30,14 @@ public:
 
   void clear_threads();
 
+  inline void toggle_shortcuts();
+
 protected:
   void keyPressEvent(QKeyEvent *event);
 
 private:
+  bool m_show_shortcuts;
+
   UniformBuffer m_ubo;
 
   struct UBOData

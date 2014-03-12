@@ -29,6 +29,7 @@ public:
   inline AlignedBox3f &compute_bbox();
   REAL compute_mindist();
   REAL compute_mindist_brute();
+  REAL get_radius() { return 0.5*compute_mindist(); }
 
   friend std::ostream& operator<< <>(std::ostream& out, const PointCloudRS<REAL,SIZE>& pc);
 

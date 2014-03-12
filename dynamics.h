@@ -92,7 +92,7 @@ public:
       return;
     Vector3R<REAL> res(
         -0.5*near_p.dinv*(p.pressure + near_p.pressure)*p_kern(p.pos - near_p.pos) // pressure contribution
-        + viscosity*near_p.dinv*(near_p.vel - p.vel)*v_kern(p.pos - near_p.pos) // viscosity contribution
+//        + viscosity*near_p.dinv*(near_p.vel - p.vel)*v_kern(p.pos - near_p.pos) // viscosity contribution
         );
 
     for (unsigned char i = 0; i < 3; ++i)
@@ -132,6 +132,7 @@ public:
   typedef typename Array3::template array_view<3>::type GridView;
   typedef typename Array3::index_range IndexRange;
 
+  UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, float h, float grid_h, const Vector3f &bmin);
   UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, float h, const Vector3f &bmin);
   ~UniformGridRS();
   
@@ -174,8 +175,8 @@ private:
   Array3 m_grid;
   Array3Index  m_gridsize;
 
-  float m_h;    // grid size
-  float m_hinv; // 1 / h
+  float m_h;    // kernel size
+  float m_hinv; // 1 / grid_size
 
   ProcessPressureR<REAL> m_proc_pressure;
   ProcessAccelR<REAL> m_proc_accel;

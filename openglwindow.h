@@ -54,6 +54,8 @@ protected:
   unsigned int m_frame;
   QTime        m_time;
 
+  QOpenGLContext *m_context;
+
 private:
 
   bool m_update_pending;
@@ -69,7 +71,7 @@ private:
   Projective3f m_P; // perspective projection
   AffineCompact3f m_V; // view transform
 
-  QOpenGLContext *m_context;
+  GLTextPainter m_text_painter;
 };
 
 #endif // OPENGLWINDOW_H
