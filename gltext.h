@@ -118,7 +118,9 @@ inline void _glprintf(gl::Corner corner, gl::Color color, const char *fmt, ...)
   {
     case gl::BOTTOM_RIGHT: 
       boost::split(strs, text , boost::is_any_of("\n"));
-      for ( auto &s : boost::adaptors::reverse(strs) )
+      if (strs.back().empty())
+        strs.pop_back();
+      for ( auto &s : strs )
         gl::bottomright.push_front(gl::TextBlock("\n" + s, c));
       break;
     case gl::BOTTOM_LEFT:
@@ -126,6 +128,8 @@ inline void _glprintf(gl::Corner corner, gl::Color color, const char *fmt, ...)
       break;
     case gl::TOP_RIGHT: 
       boost::split(strs, text, boost::is_any_of("\n"));
+      if (strs.back().empty())
+        strs.pop_back();
       for ( auto &s : strs )
         gl::topright.push_back(gl::TextBlock("\n" + s, c));
       break;

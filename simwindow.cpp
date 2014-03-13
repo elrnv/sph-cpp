@@ -160,10 +160,6 @@ void SimWindow::load_model(int i)
   scene->cube_bbox();
   m_udata.modelmtx.setIdentity();
 
-#ifndef QT_NO_DEBUG
-  scene->print();
-#endif
-  
   m_glprims.clear();
   m_glprims.reserve( scene->num_primitives() );
   Util::loadGLData( scene, m_glprims, m_ubo, m_shaderman );
@@ -250,26 +246,19 @@ void SimWindow::render()
     m_udata.options[0] = glprim->get_specpow();
     m_udata.options[1] = glprim->get_opacity();
 
+    //if (m_viewmode == ShaderManager::PARTICLE)
+    //  glprim->sort_by_depth(AffineCompact3f(vtrans.matrix() * m_udata.modelmtx));
+
     glprim->update_glbuf(); // in case data has changed
 
     if (m_change_prog)
       glprim->update_shader(m_viewmode);
 
     glprim->get_program()->bind();
+
     m_ubo.bind();
-
-    int offset = 0; // TODO: replace with one write
-    offset = m_ubo.write(offset, m_udata.mvpmtx.data(), sizeof(Matrix4f));
-    offset = m_ubo.write(offset, m_udata.vpmtx.data(), sizeof(Matrix4f));
-    offset = m_ubo.write(offset, m_udata.modelmtx.data(), sizeof(Matrix4f));
-    offset = m_ubo.write(offset, m_udata.normalmtx.data(), sizeof(Matrix4f));
-    offset = m_ubo.write(offset, m_udata.vinvmtx.data(), sizeof(Matrix4f));
-    offset = m_ubo.write(offset, m_udata.eyepos.data(), sizeof(Vector4f));
-
-    offset = m_ubo.write(offset, m_udata.ambient.data(), sizeof(Vector4f));
-    offset = m_ubo.write(offset, m_udata.diffuse.data(), sizeof(Vector4f));
-    offset = m_ubo.write(offset, m_udata.specular.data(), sizeof(Vector4f));
-    offset = m_ubo.write(offset, m_udata.options.data(), sizeof(Vector4f));
+    m_ubo.write(0, &m_udata, sizeof( m_udata )); // write uniform buffer object
+    //m_ubo.release();
     
     Vector4f l1 = m_udata.vinvmtx * Vector4f(0.0, 0.0, 10.0, 1.0);
     glprim->get_program()->setUniformValue("lights[0].pos", QVector4D(l1[0], l1[1], l1[2], l1[3]));
@@ -278,19 +267,30 @@ void SimWindow::render()
     glprim->get_program()->setUniformValue("lights[1].col", QVector4D(0.0, 0.0, 0.0, 0.0));
 
     glprim->get_vao().bind();
-
-    reset_viewmode();
+    //reset_viewmode();
     if (m_viewmode == ShaderManager::PARTICLE)
     {
-      glprim->get_program()->setUniformValue("pt_scale", float(14*window_dim()[1]*m_near));
-      if (glprim->is_pointcloud())
-      {
-        glprim->get_program()->setUniformValue(
-        "pt_radius",
-         GLfloat(static_cast<GLPointCloud *>(glprim)->get_pointcloud()->get_radius()));
-      }
-      else
+      glprim->get_program()->setUniformValue("pt_scale", float(14.5*window_dim()[1]*m_near));
+      //if (glprim->is_pointcloud())
+      //{
+      //  PointCloud *pc = static_cast<GLPointCloud *>(glprim)->get_pointcloud();
+      //  glprim->get_program()->setUniformValue( "pt_radius", GLfloat(pc->get_radius()));
+      //  if (pc->is_dynamic())
+      //  {
+      //    glprim->get_program()->setUniformValue(
+      //        "pt_halo",
+      //        GLfloat(static_cast<DynamicPointCloud *>(pc)->get_kernel_radius())
+      //        );
+      //  }
+      //  else
+      //    glprim->get_program()->setUniformValue("pt_halo", GLfloat(pc->get_radius()));
+      //}
+      //else
+      //{
         glprim->get_program()->setUniformValue("pt_radius", 0.02f);
+        //glprim->get_program()->setUniformValue("pt_halo", 0.02f);
+      //}
+
       glDrawArrays(GL_POINTS, 0, glprim->get_num_vertices());
     }
     else

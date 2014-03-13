@@ -32,16 +32,9 @@ PointCloudRS<REAL,SIZE>::~PointCloudRS()
 }
 
 template<typename REAL, typename SIZE>
-void PointCloudRS<REAL,SIZE>::transform(const AffineCompact3f &trans)
+void PointCloudRS<REAL,SIZE>::transform_in_place(const AffineCompact3f &trans)
 {
-  // convert positions to canonical homogenized coordinates
-  Translation3f T(trans.translation());
-  Matrix3XR<REAL> Tmtx; // translation matrix
-  Tmtx.resize(NoChange, m_pos.cols());
-  Tmtx.row(0).fill(T.x());
-  Tmtx.row(1).fill(T.y());
-  Tmtx.row(2).fill(T.z());
-  m_pos = trans.linear().template cast<REAL>() * m_pos + Tmtx;
+  m_pos = trans.template cast<REAL>() * m_pos;;
 }
 
 template<typename REAL, typename SIZE>

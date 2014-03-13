@@ -27,6 +27,8 @@ in fData
 {
   vec4 pos;
   vec4 col;
+//  float halo_ratio;
+//  float dimming;
 } frag;
 
 out vec4 frag_color;
@@ -52,12 +54,18 @@ void main()
     acc += (diff + spec) * lights[i].col.xyz;
   }
 
-  if (length(rel) < 0.5)
-  {
+//  acc *= frag.dimming;
+
+ if (length(rel) < 0.5)
     frag_color = vec4(ambient.xyz + acc, options.y);
-  }
+ // if (length(rel) < 0.5*frag.halo_ratio)
+ // {
+ //   frag_color = vec4(ambient.xyz + acc, options.y);
+ // }
+ // else if (length(rel) < 0.5 && length(rel) > 0.49)
+ // {
+ //   frag_color = vec4(0.5*ambient.xyz + acc, 0.5*options.y);
+ // }
   else
-  {
-    frag_color = vec4(0.0f,0.0f,0.0f, 0.0f);
-  }
+    discard;
 }

@@ -60,7 +60,7 @@ public:
 
   bool is_mesh() const { return true; }
 
-  inline void transform(const AffineCompact3f &trans);
+  inline void transform_in_place(const AffineCompact3f &trans);
 
   friend std::ostream& operator<< <>(std::ostream& out, const MeshRS<REAL,SIZE>& mesh);
 

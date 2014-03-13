@@ -38,7 +38,7 @@ HEADERS += \
   kernel.h
 
 # compile with latest c++ specs
-CONFIG += c++11
+CONFIG += c++11 debug
 
 QT_CONFIG -= no-pkg-config
 CONFIG += link_pkgconfig

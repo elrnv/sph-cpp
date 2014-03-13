@@ -28,6 +28,7 @@ public:
   inline SIZE get_num_indices()  const { return get_num_vertices(); }
   inline SIZE get_num_vertices() const { return m_pc->get_num_vertices(); }
 
+  void sort_by_depth(const AffineCompact3f &mvmtx);
   void update_glbuf();
   void update_shader(ShaderManager::ShaderType type);
 
@@ -41,8 +42,9 @@ protected:
   PointCloudRS<REAL, SIZE> *m_pc; // reference to the native mesh object
 
   // intermediate buffer between pc and glbuffer
-  std::vector<GLfloat> m_vertices;
-  bool                 m_insync;
+  Matrix3Xf m_vertices;
+
+  bool m_insync;
 };
 
 // defaults

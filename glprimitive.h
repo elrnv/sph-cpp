@@ -58,6 +58,7 @@ public:
   virtual inline SIZE get_num_indices()  const = 0;
   virtual inline SIZE get_num_vertices() const = 0;
 
+  virtual void sort_by_depth(const AffineCompact3f &mvtrans) = 0;
   virtual void update_glbuf() = 0;
   virtual void update_shader(ShaderManager::ShaderType type) = 0;
 

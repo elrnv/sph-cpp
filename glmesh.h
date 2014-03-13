@@ -27,6 +27,7 @@ public:
   SIZE get_num_vertices() const { return m_mesh->get_verts().size();   }
 
   void update_data();
+  void sort_by_depth(const AffineCompact3f &mvtrans) { }
   void update_glbuf();
   void update_shader(ShaderManager::ShaderType type);
   

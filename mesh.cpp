@@ -92,7 +92,7 @@ AlignedBox3f &MeshRS<REAL,SIZE>::compute_bbox()
 }
 
 template<typename REAL, typename SIZE>
-void MeshRS<REAL,SIZE>::transform(const AffineCompact3f &trans)
+void MeshRS<REAL,SIZE>::transform_in_place(const AffineCompact3f &trans)
 {
   // convert positions to canonical homogenized coordinates
   for ( auto &v : m_verts )

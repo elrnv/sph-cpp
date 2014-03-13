@@ -2,6 +2,7 @@
 #include <QtGui/QOpenGLVertexArrayObject>
 #include <QtGui/QOpenGLBuffer>
 #include <assimp/scene.h>
+#include <limits>
 #include "glpointcloud.h"
 #include "dynamics.h"
 
@@ -14,23 +15,17 @@ GLPointCloudRS<REAL,SIZE>::GLPointCloudRS(
     ShaderManager &shaderman)
   : GLPrimitiveS<SIZE>(mat, ubo, shaderman)
   , m_pc(pc)
+  , m_vertices(3, get_num_vertices())
   , m_insync(true)
 {
-  // collect vertex attributes
-  const Matrix3XR<REAL> &pts = pc->get_pos();
-  GLfloat vertices[pts.size()];
-  const REAL *pt_data = pts.data();
-  for (SIZE i = 0; i < pts.size(); ++i)
-    vertices[i] = GLfloat(pt_data[i]);
-
+  m_vertices = m_pc->get_pos().template cast<float>();
   this->m_vao.create();
   this->m_vao.bind();
 
   this->m_pos.create();
   this->m_pos.setUsagePattern( QOpenGLBuffer::StaticDraw );
   this->m_pos.bind();
-  this->m_pos.allocate( vertices, sizeof( vertices ) );
-  //qDebug() << "#" << vertices[0] << vertices[1] << vertices[2];
+  this->m_pos.allocate( m_vertices.data(), sizeof( GLfloat ) * m_vertices.size() );
 
   update_shader(ShaderManager::PARTICLE);
 }
@@ -44,19 +39,33 @@ template<typename REAL, typename SIZE>
 void GLPointCloudRS<REAL,SIZE>::update_data()
 {
   std::lock_guard<std::mutex> guard(this->m_lock);
+
   if (!m_insync)
     return;
   
-  const Matrix3XR<REAL> &pts = m_pc->get_pos();
-  m_vertices.resize(pts.size());
-  const REAL *pt_data = pts.data();
-  //qDebug() << "numpts written:" << pts.size();
-  for (SIZE i = 0; i < pts.size(); ++i)
-    m_vertices[i] = GLfloat(pt_data[i]);
-
-  //qDebug() << "#" << m_vertices[0] << m_vertices[1] << m_vertices[2];
+  m_vertices = m_pc->get_pos().template cast<float>();
 
   m_insync = false;
+}
+
+template<typename REAL, typename SIZE>
+void GLPointCloudRS<REAL,SIZE>::sort_by_depth(const AffineCompact3f &mvtrans)
+{
+  std::lock_guard<std::mutex> guard(this->m_lock); // prevent others from reading buffers
+
+  // Sort all vertices by the z value
+  Matrix3Xf mvpos = mvtrans * m_vertices;
+  SIZE num_verts = get_num_vertices();
+  VectorXT<SIZE> perm_vec(num_verts);
+  for (SIZE i = 0; i < num_verts; ++i)
+    perm_vec[i] = i;
+
+  SIZE *perm_data = perm_vec.data();
+
+  std::sort(perm_data, perm_data + num_verts,
+      [mvpos](SIZE i, SIZE j) { return mvpos.col(i)[2] < mvpos.col(j)[2]; });
+
+  m_vertices = m_vertices * PermutationMatrix<Dynamic, Dynamic, SIZE>(perm_vec);
 }
 
 template<typename REAL, typename SIZE>
@@ -67,11 +76,10 @@ void GLPointCloudRS<REAL,SIZE>::update_glbuf()
   if (m_insync)
     return;
 
-  //qDebug() << "num bytes read:" << sizeof(GLfloat) * m_vertices.size();
+  // write to gl buffer object
   this->m_pos.bind();
   this->m_pos.write( 0, m_vertices.data(), sizeof( GLfloat ) * m_vertices.size() );
   this->m_pos.release();
-  //qDebug() << "-" << m_vertices[0] << m_vertices[1] << m_vertices[2];
 
   m_insync = true;
 }

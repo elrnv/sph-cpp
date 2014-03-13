@@ -188,7 +188,7 @@ GeometryNode::~GeometryNode()
 void GeometryNode::flatten()
 {
   if (m_primitive)
-    m_primitive->transform(m_trans);
+    m_primitive->transform_in_place(m_trans);
 
   SceneNode::flatten();
 }

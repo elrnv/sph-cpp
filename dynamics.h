@@ -202,6 +202,8 @@ public:
   inline const Vector3f &get_bmin() const { return m_bmin; }
   inline const Vector3f &get_bmax() const { return m_bmax; }
 
+  inline REAL get_kernel_radius() const { return m_kernel_radius; }
+
   inline bool is_dynamic() const { return true; }
 
   inline void reset_accel() { m_accel.setZero(); }
@@ -226,6 +228,8 @@ protected:
 
   Vector3f m_bmin;
   Vector3f m_bmax;
+
+  REAL m_kernel_radius;
 
   UniformGridRS<REAL, SIZE> m_grid;
 

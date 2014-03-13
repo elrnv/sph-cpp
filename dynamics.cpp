@@ -18,7 +18,7 @@ UniformGridRS<REAL,SIZE>::UniformGridRS(
   , m_proc_accel(m_h)
   , m_bmin(bmin)
 {
-  glprintf_tr("cell size: %.2f\n", grid_h);
+  glprintf_tr("radius: %.2f\n", h);
 }
 
 template<typename REAL, typename SIZE>
@@ -30,7 +30,7 @@ UniformGridRS<REAL,SIZE>::UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, flo
   , m_proc_accel(m_h)
   , m_bmin(bmin)
 {
-  glprintf_tr("cell size: %.2f\n", h);
+  glprintf_tr("radius: %.2f\n", h);
 }
 
 template<typename REAL, typename SIZE>
@@ -47,9 +47,8 @@ void UniformGridRS<REAL,SIZE>::init()
     static_cast<Index>((bmax[0] - m_bmin[0])*m_hinv),
     static_cast<Index>((bmax[1] - m_bmin[1])*m_hinv),
     static_cast<Index>((bmax[2] - m_bmin[2])*m_hinv) }};
+  glprintf_tr("grid size: %d %d %d\n", m_gridsize[0], m_gridsize[1], m_gridsize[2]);
 
-  qDebug() << m_gridsize[0] << m_gridsize[1] << m_gridsize[2];
-  
   m_grid.resize( boost::extents[m_gridsize[0]][m_gridsize[1]][m_gridsize[2]] );
 
   SIZE num_vtx = m_dpc->get_num_vertices();
@@ -63,7 +62,7 @@ void UniformGridRS<REAL,SIZE>::init()
 
   compute_initial_density();
 
-  qDebug() << "mass per particle" << m_dpc->m_mass;
+  glprintf_tr("mass: %.2f\n", m_dpc->m_mass);
 
   m_proc_pressure.init(m_dpc->m_mass, m_dpc->m_rest_density, m_dpc->m_c2);
   m_proc_accel.init(m_dpc->m_mass, m_dpc->m_viscosity, m_dpc->m_st);
@@ -141,7 +140,7 @@ void UniformGridRS<REAL,SIZE>::compute_initial_density()
   ProcessInitialDensityR<REAL> proc(m_h, m_dpc->m_mass, m_dpc->m_rest_density);
   compute_quantity(proc);
   m_dpc->m_rest_density /= m_dpc->m_num_vertices;
-  qDebug() << "rest density" << m_dpc->m_rest_density;
+  glprintf_tr("rest density: %.2f\n", m_dpc->m_rest_density);
 }
 
 template<typename REAL, typename SIZE>
@@ -212,7 +211,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity(ProcessFunc process)
 // DynamicPointCloud stuff
 
 // inflating the size of the grid
-#define INFLATE 6.0 
+#define INFLATE 2.0 
 
 template<typename REAL, typename SIZE>
 DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
@@ -226,7 +225,8 @@ DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
   , m_st(st) // surface tension
   , m_bmin(this->m_bbox.corner(Eigen::AlignedBox3f::BottomLeftFloor))
   , m_bmax(this->m_bbox.corner(Eigen::AlignedBox3f::TopRightCeil))
-  , m_grid(this, INFLATE*this->compute_mindist(), 2.0f, m_bmin)
+  , m_kernel_radius(INFLATE*this->get_radius())
+  , m_grid(this, m_kernel_radius, 2.0f, m_bmin)
   , m_glpc(glpc)
   , m_stop_requested(false)
 {
@@ -292,6 +292,7 @@ void DynamicPointCloudRS<REAL,SIZE>::run()
 {
   m_grid.init();
   float dt = 0.000217;
+  glprintf_tr("step: %.2es\n", dt);
 
   m_grid.compute_pressure();
   m_grid.compute_accel(); // update m_accel
@@ -331,7 +332,7 @@ void DynamicPointCloudRS<REAL,SIZE>::run()
     prev_t = cur_t;
     count += 1;
   }
-  qDebug() << "average time per step:" << t / float(count);
+  glprintf_tr("avg time per step: %.2es\n", t / float(count));
 }
 
 template class DynamicPointCloudRS<double, unsigned int>;

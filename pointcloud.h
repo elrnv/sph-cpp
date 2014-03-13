@@ -25,7 +25,7 @@ public:
   inline SIZE get_num_vertices() const { return m_pos.cols(); }
   inline bool is_pointcloud() const { return true; }
 
-  inline void transform(const AffineCompact3f &trans);
+  inline void transform_in_place(const AffineCompact3f &trans);
   inline AlignedBox3f &compute_bbox();
   REAL compute_mindist();
   REAL compute_mindist_brute();
