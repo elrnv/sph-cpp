@@ -63,6 +63,7 @@ GLMeshRS<REAL,SIZE>::GLMeshRS(
   this->m_idx.bind();
   this->m_idx.allocate( indices, sizeof( indices ) );
 
+  this->m_vao.release();
   update_shader(ShaderManager::PHONG);
 }
 
@@ -106,14 +107,13 @@ void GLMeshRS<REAL, SIZE>::update_glbuf()
   if (m_insync) //TODO: test with atomic m_insync
     return;
 
-  //this->m_vao.bind();
+  this->m_vao.bind();
   this->m_pos.bind();
   this->m_pos.write( 0, m_vertices.data(), sizeof( m_vertices ) );
 
   this->m_nml.bind();
   this->m_nml.write( 0, m_normals.data(), sizeof( m_normals ) );
-  this->m_nml.release();
-  //this->m_vao.release();
+  this->m_vao.release();
 
   m_insync = true;
 }
@@ -123,7 +123,6 @@ void GLMeshRS<REAL, SIZE>::update_shader(ShaderManager::ShaderType type)
 {
   if (this->m_prog)
   {
-    //this->m_prog->bind();
     this->m_prog->disableAttributeArray( "pos" );
     this->m_prog->disableAttributeArray( "nml" );
   }
@@ -135,7 +134,6 @@ void GLMeshRS<REAL, SIZE>::update_shader(ShaderManager::ShaderType type)
   else
     this->m_prog = this->m_shaderman.get_wireframe_shader();
 
-  //this->m_prog->bind();
   this->m_vao.bind();
 
   this->m_pos.bind();
@@ -146,8 +144,7 @@ void GLMeshRS<REAL, SIZE>::update_shader(ShaderManager::ShaderType type)
   this->m_prog->enableAttributeArray( "nml" );
   this->m_prog->setAttributeBuffer( "nml", GL_FLOAT, 0, 3 );
 
-  //this->m_vao.release();
-  //this->m_prog->release();
+  this->m_vao.release();
 
   this->m_ubo.bindToProg(this->m_prog->programId(), "Globals");
 }
