@@ -10,6 +10,9 @@
         <file alias="particle.frag">shaders/particle.frag</file>
         <file alias="text.vert">shaders/text.vert</file>
         <file alias="text.frag">shaders/text.frag</file>
+        <file alias="test.vert">shaders/test.vert</file>
+        <file alias="test.geom">shaders/test.geom</file>
+        <file alias="test.frag">shaders/test.frag</file>
     </qresource>
     <qresource prefix="/">
         <file alias="proggyclean.ttf">fonts/ProggyCleanSZ.ttf/ProggyCleanSZ.ttf</file>

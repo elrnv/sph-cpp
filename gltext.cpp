@@ -96,8 +96,8 @@ void GLTextPainter::init()
 
     GLfloat vtx_data[16] = {
       /* x, y, u, v */
-      0,              0,                    s0, t0, // top-left
-      GLfloat(width), 0,                    s1, t0, // top-right
+      0,              0,                 s0, t0, // top-left
+      GLfloat(width), 0,                 s1, t0, // top-right
       0,              GLfloat(m_height), s0, t1, // bottom-left
       GLfloat(width), GLfloat(m_height), s1, t1  // bottom-right
     };

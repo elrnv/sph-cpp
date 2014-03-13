@@ -246,8 +246,8 @@ void SimWindow::render()
     m_udata.options[0] = glprim->get_specpow();
     m_udata.options[1] = glprim->get_opacity();
 
-    //if (m_viewmode == ShaderManager::PARTICLE)
-    //  glprim->sort_by_depth(AffineCompact3f(vtrans.matrix() * m_udata.modelmtx));
+    if (m_viewmode == ShaderManager::PARTICLE)
+      glprim->sort_by_depth(AffineCompact3f(vtrans.matrix() * m_udata.modelmtx));
 
     glprim->update_glbuf(); // in case data has changed
 
@@ -258,7 +258,9 @@ void SimWindow::render()
 
     m_ubo.bind();
     m_ubo.write(0, &m_udata, sizeof( m_udata )); // write uniform buffer object
-    //m_ubo.release();
+    m_ubo.release();
+
+    glFinish(); // Finish writing uniform buffer before drawing
     
     Vector4f l1 = m_udata.vinvmtx * Vector4f(0.0, 0.0, 10.0, 1.0);
     glprim->get_program()->setUniformValue("lights[0].pos", QVector4D(l1[0], l1[1], l1[2], l1[3]));
@@ -267,29 +269,29 @@ void SimWindow::render()
     glprim->get_program()->setUniformValue("lights[1].col", QVector4D(0.0, 0.0, 0.0, 0.0));
 
     glprim->get_vao().bind();
-    //reset_viewmode();
+    reset_viewmode();
     if (m_viewmode == ShaderManager::PARTICLE)
     {
       glprim->get_program()->setUniformValue("pt_scale", float(14.5*window_dim()[1]*m_near));
-      //if (glprim->is_pointcloud())
-      //{
-      //  PointCloud *pc = static_cast<GLPointCloud *>(glprim)->get_pointcloud();
-      //  glprim->get_program()->setUniformValue( "pt_radius", GLfloat(pc->get_radius()));
-      //  if (pc->is_dynamic())
-      //  {
-      //    glprim->get_program()->setUniformValue(
-      //        "pt_halo",
-      //        GLfloat(static_cast<DynamicPointCloud *>(pc)->get_kernel_radius())
-      //        );
-      //  }
-      //  else
-      //    glprim->get_program()->setUniformValue("pt_halo", GLfloat(pc->get_radius()));
-      //}
-      //else
-      //{
+      if (glprim->is_pointcloud())
+      {
+        PointCloud *pc = static_cast<GLPointCloud *>(glprim)->get_pointcloud();
+        glprim->get_program()->setUniformValue( "pt_radius", GLfloat(pc->get_radius()));
+        if (pc->is_dynamic())
+        {
+          glprim->get_program()->setUniformValue(
+              "pt_halo",
+              GLfloat(static_cast<DynamicPointCloud *>(pc)->get_kernel_radius())
+              );
+        }
+        else
+          glprim->get_program()->setUniformValue("pt_halo", GLfloat(pc->get_radius()));
+      }
+      else
+      {
         glprim->get_program()->setUniformValue("pt_radius", 0.02f);
-        //glprim->get_program()->setUniformValue("pt_halo", 0.02f);
-      //}
+        glprim->get_program()->setUniformValue("pt_halo", 0.02f);
+      }
 
       glDrawArrays(GL_POINTS, 0, glprim->get_num_vertices());
     }
@@ -299,7 +301,6 @@ void SimWindow::render()
     }
 
     glprim->get_vao().release();
-    m_ubo.release();
     glprim->get_program()->release();
   }
   m_change_prog = false;
