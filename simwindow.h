@@ -27,6 +27,7 @@ public:
   void reset_viewmode();
   void make_static();
   void make_dynamic();
+  void toggle_halos();
 
   void clear_threads();
 

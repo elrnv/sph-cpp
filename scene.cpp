@@ -47,22 +47,22 @@ SceneNode::~SceneNode()
 
 void SceneNode::rotate(float angle, const Vector3f &axis)
 {
-  m_trans.rotate(AngleAxisf(angle*RADIAN, axis));
+  m_trans.prerotate(AngleAxisf(angle*RADIAN, axis));
 }
 
 void SceneNode::scale(float amount)
 {
-  m_trans.scale(amount);
+  m_trans.prescale(amount);
 }
 
 void SceneNode::scale(const Vector3f& amount)
 {
-  m_trans.scale(amount);
+  m_trans.prescale(amount);
 }
 
 void SceneNode::translate(const Vector3f& amount)
 {
-  m_trans.translate(amount);
+  m_trans.pretranslate(amount);
 }
 
 void SceneNode::flatten()
@@ -133,9 +133,6 @@ void SceneNode::normalize_model(const Vector3f &ext_blf, const Vector3f &ext_trc
   Vector3f box_center = m_bbox.center();
   m_trans.translate(-box_center);
 }
-
-
-
 
 // GeometryNode
 

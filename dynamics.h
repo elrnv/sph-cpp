@@ -20,17 +20,25 @@ template<typename REAL, typename SIZE>
 class GLPointCloudRS;
 
 template<typename REAL>
-struct ParticleDataR
+struct ParticleR
 {
-  ParticleDataR(Vector3R<REAL> p, Vector3R<REAL> v, REAL *a)
-    : pos(p), vel(v), accel(a){ }
-  ~ParticleDataR() { }
+  ParticleR(Vector3R<REAL> p) : pos(p){ }
+  ~ParticleR() { }
 
   Vector3R<REAL> pos;
-  Vector3R<REAL> vel;
-  REAL *accel; // 3 array to which we will write
   REAL dinv;
   REAL pressure;
+};
+
+template<typename REAL>
+struct DynamicParticleR : public ParticleR<REAL>
+{
+  DynamicParticleR(Vector3R<REAL> p, Vector3R<REAL> v, REAL *a)
+    : ParticleR<REAL>(p), vel(v), accel(a){ }
+  ~DynamicParticleR() { }
+
+  Vector3R<REAL> vel;
+  REAL *accel;    // 3 array to which we will write
 };
 
 
@@ -44,12 +52,9 @@ public:
   void init(REAL m, REAL rd, REAL c) 
   { mass = m; rest_density = rd; constant = c; }
 
-  inline void init(ParticleDataR<REAL> &p)
-  {
-    p.dinv = 0.0f;
-  }
+  inline void init(ParticleR<REAL> &p) { p.dinv = 0.0f; }
 
-  inline void operator()(ParticleDataR<REAL> &p, ParticleDataR<REAL> &near_p)
+  inline void operator()(ParticleR<REAL> &p, ParticleR<REAL> &near_p)
   {
     p.dinv += kern[ p.pos - near_p.pos ];
     //qDebug() << "temp p.dinv" << p.dinv;
@@ -57,11 +62,12 @@ public:
 
   inline REAL pow7(REAL x) { return x*x*x*x*x*x*x; }
 
-  inline void finish(ParticleDataR<REAL> &p)
+  inline void finish(ParticleR<REAL> &p)
   {
     REAL density = p.dinv * mass * kern.coef;
     p.dinv = 1.0f/density;
     p.pressure = constant * (pow7(density / rest_density) - 1);
+    qDebug() << p.pressure;
   }
 
 private:
@@ -79,27 +85,26 @@ public:
   ProcessAccelR(float h) : p_kern(h), v_kern(h) { }
   ~ProcessAccelR() { }
 
-  void init(REAL m, REAL v, REAL s)
-  {  mass = m; viscosity = v; st = s; }
+  void init(REAL m, REAL v, REAL s) {  mass = m; viscosity = v; st = s; }
 
-  inline void init(ParticleDataR<REAL> &p) {
+  inline void init(DynamicParticleR<REAL> &p) {
     Q_UNUSED(p); 
   }
 
-  inline void operator()(ParticleDataR<REAL> &p, ParticleDataR<REAL> &near_p)
+  inline void operator()(DynamicParticleR<REAL> &p, ParticleR<REAL> &near_p)
   {
     if (&p == &near_p)
       return;
     Vector3R<REAL> res(
-        -0.5*near_p.dinv*(p.pressure + near_p.pressure)*p_kern(p.pos - near_p.pos) // pressure contribution
-//        + viscosity*near_p.dinv*(near_p.vel - p.vel)*v_kern(p.pos - near_p.pos) // viscosity contribution
+        -(p.pressure*p.dinv*p.dinv + near_p.pressure*near_p.dinv*near_p.dinv)*p_kern(p.pos - near_p.pos) // pressure contribution
+       // + viscosity*near_p.dinv*(near_p.vel - p.vel)*v_kern(p.pos - near_p.pos) // viscosity contribution
         );
 
     for (unsigned char i = 0; i < 3; ++i)
       p.accel[i] += res[i]; // copy intermediate result
   }
 
-  inline void finish(ParticleDataR<REAL> &p)
+  inline void finish(DynamicParticleR<REAL> &p)
   {
     for (unsigned char i = 0; i < 3; ++i)
       p.accel[i] = mass*p.dinv*p.accel[i];
@@ -124,9 +129,17 @@ template<typename REAL, typename SIZE>
 class UniformGridRS
 {
 public:
-  typedef std::vector< ParticleDataR<REAL> > DataVec;
+  typedef std::vector< DynamicParticleR<REAL> > DynamicParticles;
+  typedef std::vector< ParticleR<REAL> > StaticParticles;
 
-  typedef boost::multi_array< DataVec, 3 > Array3;
+  struct Cell
+  {
+    DynamicParticles fluidvec; // fluid particles
+    StaticParticles boundvec; // static boundary particles
+    //DynamicParticles rigidvec; // dynamic rigid body object data
+  };
+
+  typedef boost::multi_array< Cell, 3 > Array3;
   typedef typename Array3::index Index;
   typedef boost::array<Index, 3> Array3Index;
   typedef typename Array3::template array_view<3>::type GridView;
@@ -137,6 +150,10 @@ public:
   ~UniformGridRS();
   
   void init();
+  inline void update();
+  inline void populate_fluid_data();
+  inline void populate_bound_data();
+  inline void clear_fluid_data();
 
   inline Index clamp(Index d, Index min, Index max)
   {
@@ -155,10 +172,14 @@ public:
   void compute_initial_density();
   void compute_pressure();
 
-  template<typename ProcessFunc>
-  inline void compute_quantity(ProcessFunc process);
+  template<typename ProcessPairFunc>
+  inline void compute_bound_quantity(ProcessPairFunc process);
 
-  inline void update();
+  template<typename ProcessPairFunc>
+  inline void compute_fluid_quantity(ProcessPairFunc process);
+
+  inline void resolve_boundary_collisions();
+  inline void process_collisions_in_cell(SIZE i, SIZE j, SIZE k);
 
 private:
   // utility function used in the constructor to get a range of two elements

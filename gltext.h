@@ -65,7 +65,9 @@ namespace gl
   enum Color
   {
     RED,
+    YELLOW,
     GREEN,
+    CYAN,
     BLUE,
     BLACK,
     WHITE
@@ -106,36 +108,70 @@ inline void _glprintf(gl::Corner corner, gl::Color color, const char *fmt, ...)
   switch (color)
   {
     case gl::RED:   c = Vector3f(1.0f, 0.0f, 0.0f); break;
+    case gl::YELLOW: c = Vector3f(1.0f, 1.0f, 0.0f); break;
     case gl::GREEN: c = Vector3f(0.0f, 1.0f, 0.0f); break;
+    case gl::CYAN:  c = Vector3f(0.0f, 1.0f, 1.0f); break;
     case gl::BLUE:  c = Vector3f(0.3f, 0.4f, 1.0f); break;
     case gl::BLACK: c = Vector3f(0.0f, 0.0f, 0.0f); break;
     case gl::WHITE: // FALL THROUGH
     default: c = Vector3f(1.0f, 1.0f, 1.0f); break;
   }
-  std::vector<std::string> strs;
+  std::deque<std::string> strs;
   std::string text = std::string(buffer);
+  boost::split(strs, text , boost::is_any_of("\n"));
+  bool pop = false;
+  // strs.front().empty() iff \n in front of text
+  // strs.back().empty() iff \n in back of text
+  for ( auto &s : strs )
+  {
+    size_t found = s.find_last_of("\r");
+    if (found == std::string::npos)
+      continue;
+    s = s.substr(found+1);
+    if(!strs.front().empty())
+      pop = true;
+  }
+  std::string extra = "";
+  while (strs.back().empty() && !strs.empty())
+  {
+    strs.pop_back();
+    extra += "\n";
+  }
+  while (strs.front().empty() && !strs.empty() && strs.front() != strs.back())
+  {
+    strs.push_back(strs.front());
+    strs.pop_front();
+  }
   switch (corner)
   {
     case gl::BOTTOM_RIGHT: 
-      boost::split(strs, text , boost::is_any_of("\n"));
-      if (strs.back().empty())
-        strs.pop_back();
+      if (pop) 
+        while(!gl::bottomright.empty() && gl::bottomright.front().text.find_first_of("\n") == std::string::npos )
+          gl::bottomright.pop_front();
       for ( auto &s : strs )
-        gl::bottomright.push_front(gl::TextBlock("\n" + s, c));
+        gl::bottomright.push_front(gl::TextBlock(extra + s, c));
       break;
     case gl::BOTTOM_LEFT:
-      gl::bottomleft.push_front(gl::TextBlock(text, c));
+      if (pop)
+        while(!gl::bottomleft.empty()  && gl::bottomright.front().text.find_first_of("\n") == std::string::npos )
+          gl::bottomleft.pop_front();
+      for ( auto &s : strs )
+        gl::bottomleft.push_front(gl::TextBlock(s + extra, c));
       break;
     case gl::TOP_RIGHT: 
-      boost::split(strs, text, boost::is_any_of("\n"));
-      if (strs.back().empty())
-        strs.pop_back();
+      if (pop)
+        while(!gl::topright.empty()    && gl::bottomright.back().text.find_first_of("\n") == std::string::npos )
+          gl::topright.pop_back();
       for ( auto &s : strs )
-        gl::topright.push_back(gl::TextBlock("\n" + s, c));
+        gl::topright.push_back(gl::TextBlock(extra + s, c));
       break;
     case gl::TOP_LEFT:  // FALL THROUGH
     default: 
-      gl::topleft.push_back(gl::TextBlock( std::string(buffer), c)); 
+      if (pop)
+        while(!gl::topleft.empty()     && gl::bottomright.back().text.find_first_of("\n") == std::string::npos )
+           gl::topleft.pop_back();
+      for ( auto &s : strs )
+        gl::topleft.push_back(gl::TextBlock( s + extra, c)); 
       break;
   }
 }

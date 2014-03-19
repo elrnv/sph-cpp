@@ -22,6 +22,8 @@ public:
   virtual void render();
   void set_animating(bool animating);
 
+  void toggle_text();
+
 public slots:
   void renderLater();
   void renderNow();
@@ -57,6 +59,7 @@ protected:
   QOpenGLContext *m_context;
 
 private:
+  bool m_show_text;
 
   bool m_update_pending;
   bool m_animating;

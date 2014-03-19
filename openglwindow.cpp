@@ -5,8 +5,15 @@
 #include "eigen.h"
 #include "openglwindow.h"
 
+void OpenGLWindow::toggle_text()
+{
+  m_show_text = !m_show_text;
+  renderLater();
+}
+
 OpenGLWindow::OpenGLWindow(QWindow *parent)
 	: QWindow(parent)
+  , m_show_text(false) // immediately toggled
   , m_near(0.1), m_far(100.0), m_fov(40.0)
   , m_frame(0)
 	, m_context(0)
@@ -18,6 +25,8 @@ OpenGLWindow::OpenGLWindow(QWindow *parent)
 {
 	setSurfaceType(QWindow::OpenGLSurface);
   m_time.start();
+
+  toggle_text();
 }
 
 OpenGLWindow::~OpenGLWindow()
@@ -180,6 +189,9 @@ void OpenGLWindow::keyPressEvent(QKeyEvent *event)
 	m_context->makeCurrent(this);
 	switch (key)
 	{
+		case Qt::Key_Y:
+      toggle_text();
+			break;
 		case Qt::Key_R:
       reset_view();
 			break;
@@ -199,16 +211,24 @@ void OpenGLWindow::renderNow()
 	m_context->makeCurrent(this);
 
 	render();
-  m_text_painter.draw_text(m_prev_x, m_prev_y);
+  if (m_show_text)
+    m_text_painter.draw_text(m_prev_x, m_prev_y);
 
 	m_context->swapBuffers(this);
 
 	if (m_animating)
   {
     ++m_frame;
-    if (m_frame == 100)
+    if (m_frame == 10)
     {
-      //fprintf(stderr, "\r%d       ", 100000 / m_time.elapsed() );
+      glprintf_br("\rfps: ");
+      int fps = 10*1000 / m_time.elapsed();
+      if (fps < 20)
+        glprintf_brc(RED, "%d", fps );
+      else if (fps < 30)
+        glprintf_brc(YELLOW, "%d", fps );
+      else
+        glprintf_brc(GREEN, "%d", fps );
       m_time.restart();
       m_frame = 0;
     }

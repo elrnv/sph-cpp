@@ -47,10 +47,17 @@ PKGCONFIG += eigen3
 INCLUDEPATH += /opt/local/include
 LIBS += -L/opt/local/lib -lassimp
 
+MKLROOT = /opt/intel/mkl
+INCLUDEPATH += $${MKLROOT}/include /opt/intel/include
+LIBS += $${MKLROOT}/lib/libmkl_intel_lp64.a $${MKLROOT}/lib/libmkl_core.a $${MKLROOT}/lib/libmkl_intel_thread.a
+#LIBS += -L$${MKLROOT}/lib/ -lmkl_intel_lp64 -lmkl_core -lmkl_intel_thread
+LIBS += /opt/intel/lib/libiomp5.a
+LIBS += -ldl -lpthread -lm
+
 # use the following to boost performance
 # QMAKE_CXXFLAGS += -DBOOST_DISABLE_ASSERTS
 
 # show warnings if a function is not inlined
-QMAKE_CXXFLAGS += -Winline
+QMAKE_CXXFLAGS += -Winline -Wno-unused-parameter -DMKL_LP64 -m64
 
 RESOURCES += resources.qrc

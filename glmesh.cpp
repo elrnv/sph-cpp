@@ -14,6 +14,8 @@ GLMeshRS<REAL,SIZE>::GLMeshRS(
     ShaderManager &shaderman)
   : GLPrimitiveS<SIZE>(mat, ubo, shaderman)
   , m_mesh(mesh)
+  , m_vertices(3, get_num_vertices())
+  , m_normals(3, get_num_vertices())
   , m_insync(true)
 {
   // collect vertex attributes
@@ -64,6 +66,9 @@ GLMeshRS<REAL,SIZE>::GLMeshRS(
   this->m_idx.allocate( indices, sizeof( indices ) );
 
   this->m_vao.release();
+
+  //update_data(); // TODO: uncomment when sort_by_depth is done
+
   update_shader(ShaderManager::PHONG);
 }
 
@@ -83,18 +88,42 @@ void GLMeshRS<REAL, SIZE>::update_data()
   // collect vertex attributes
   const VertexVec &verts = m_mesh->get_verts();
 
-  m_vertices.resize(verts.size()*3);
-  m_normals.resize(verts.size()*3);
-
   int i = 0;
   for ( auto &v : verts )
   {
-    for (short j = 0; j < 3; ++j)
-    {
-      m_vertices[i] = GLfloat(v.pos[j]);
-      m_normals[i++] = GLfloat(v.nml[j]);
-    }
+    m_vertices.col(i) = v.pos.template cast<GLfloat>();
+    m_normals.col(i)  = v.nml.template cast<GLfloat>();
+    i += 1;
   }
+
+  m_insync = false;
+}
+
+template<typename REAL, typename SIZE>
+void GLMeshRS<REAL, SIZE>::sort_by_depth(const AffineCompact3f &mvtrans)
+{
+  return;
+  // TODO: implement this
+  std::lock_guard<std::mutex> guard(this->m_lock);
+
+  // Sort all vertices by the z value
+  Matrix3XR<GLfloat> mvpos = (mvtrans * m_vertices).eval(); // TODO: mem alloc expensive?
+  SIZE num_verts = get_num_vertices();
+  VectorXT<SIZE> perm_vec(num_verts);
+  for (SIZE i = 0; i < num_verts; ++i)
+    perm_vec[i] = i;
+
+  SIZE *perm_data = perm_vec.data();
+
+  std::sort(perm_data, perm_data + num_verts,
+      [mvpos](SIZE i, SIZE j) { return mvpos.col(i)[2] < mvpos.col(j)[2]; });
+
+  PermutationMatrix<Dynamic, Dynamic, SIZE> perm_mat(perm_vec);
+  m_vertices = m_vertices * perm_mat;
+  m_normals  = m_normals * perm_mat;
+
+  for (SIZE i = 0; i < num_verts; ++i)
+    std::cerr << m_vertices.col(i)[0] << " " << m_vertices.col(i)[1] << " " << m_vertices.col(i)[2] << std::endl;
 
   m_insync = false;
 }

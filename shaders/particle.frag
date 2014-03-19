@@ -38,31 +38,34 @@ void main()
   vec3 acc = vec3(0.0f, 0.0f, 0.0f); // light accumulator
 
   vec3 E = normalize((eye - frag.pos).xyz);
-  vec2 rel = gl_PointCoord - vec2(0.5);
+  vec2 rel_whole = 2.0*(gl_PointCoord - vec2(0.5));
+  vec2 rel = 0.9*(1/frag.halo_ratio)*rel_whole;
 
-  vec3 nml = normalize((ViewInvMtx * vec4(rel.x, -rel.y, sqrt(1.0f - dot(rel,rel)), 0.0f)).xyz);
-
-  for (int i = 0; i < 2; ++i)
+  float len_rel = length(rel_whole);
+  if (len_rel < frag.halo_ratio)
   {
-    vec3 L = normalize((lights[i].pos - frag.pos).xyz);
-    vec3 R = normalize(reflect(-L, nml));
+    vec3 nml = normalize((ViewInvMtx * vec4(rel.x, -rel.y,
+            sqrt(1.0f - dot(rel,rel)), 0.0f)).xyz);
 
-    vec3 diff = diffuse.xyz * max(dot(nml, L), 0.0f);
-    vec3 spec = vec3(0.f, 0.f, 0.f);
-    if (options.x > 0)
-       spec = specular.xyz * pow( max(dot(R,E), 0.0f), options.x);
-    acc += (diff + spec) * lights[i].col.xyz;
-  }
+    for (int i = 0; i < 2; ++i)
+    {
+      vec3 L = normalize((lights[i].pos - frag.pos).xyz);
+      vec3 R = normalize(reflect(-L, nml));
 
-  acc *= frag.dimming;
+      vec3 diff = diffuse.xyz * max(dot(nml, L), 0.0f);
+      vec3 spec = vec3(0.f, 0.f, 0.f);
+      if (options.x > 0)
+         spec = specular.xyz * pow( max(dot(R,E), 0.0f), options.x);
+      acc += (diff + spec) * lights[i].col.xyz;
+    }
 
-  if (length(rel) < 0.5*frag.halo_ratio)
-  {
+    acc *= frag.dimming;
+
     frag_color = vec4(ambient.xyz + acc, options.y);
   }
-  else if (length(rel) < 0.5 && length(rel) > 0.47)
+  else if (len_rel < 1 && len_rel > 0.95)
   {
-    frag_color = vec4(0.5*ambient.xyz + acc, 0.5*options.y);
+    frag_color = vec4(0.1*ambient.xyz + 0.1*lights[0].col.xyz, 0.1*options.y);
   }
   else
     discard;

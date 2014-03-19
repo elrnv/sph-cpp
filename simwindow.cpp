@@ -17,7 +17,9 @@ void SimWindow::toggle_shortcuts()
   }
 
   glprintf_bl("Shortcuts:\n");
-  glprintf_blc(BLUE, "  H: show/hide shortcuts\n");
+  glprintf_blc(BLUE, "  Y: show/hide text\n");
+  glprintf_blc(BLUE, "  T: show/hide shortcuts\n");
+  glprintf_blc(BLUE, "  R: reset view\n");
   glprintf_bl("  View Modes: \n");
   glprintf_blc(GREEN, "    W: wireframe\n");
   glprintf_blc(RED,   "    S: phong\n");
@@ -32,6 +34,7 @@ void SimWindow::toggle_shortcuts()
   glprintf_bl("  Dynamics: \n");
   glprintf_blc(RED,  "    D: enable\n");
   glprintf_blc(RED,  "    C: disable\n");
+  glprintf_blc(CYAN, "    H: show/hide halos\n");
 }
 
 SimWindow::SimWindow()
@@ -101,14 +104,10 @@ void SimWindow::load_model(int i)
   double angle_x = 0.0f;
   double angle_y = 0.0f;
 
-  // optionally uniformly scale model
-  float scale = 1.0f;
-
-
   switch (i)
   {
     case 0:
-      filename = "test.obj";
+      filename = "boundary.obj";
       break;
     case 1:
       filename = "cube.obj";
@@ -152,9 +151,10 @@ void SimWindow::load_model(int i)
   if (!scene)
     return;
 
-  scene->scale(scale);
+  scene->normalize_model();
   scene->rotate(angle_x, Vector3f::UnitX());
   scene->rotate(angle_y, Vector3f::UnitY());
+  scene->flatten();
   scene->normalize_model(ext_x, ext_y, ext_z);
   scene->flatten();
   scene->cube_bbox();
@@ -181,6 +181,7 @@ void SimWindow::reset_viewmode()
   if (m_viewmode == ViewMode::PARTICLE) 
   {
     glDisable(GL_DEPTH_TEST);
+    glDepthFunc(GL_NEVER);
 	  glDisable(GL_CULL_FACE);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_PROGRAM_POINT_SIZE);
@@ -200,6 +201,19 @@ void SimWindow::make_static()
   set_animating(false);
 }
 
+void SimWindow::toggle_halos()
+{
+  for ( const GLPrimitivePtr &prim_ptr : m_glprims )
+  {
+    GLPrimitive *glprim = prim_ptr.get();
+    if (!glprim->is_pointcloud())
+      continue;
+
+    GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
+    glpc->toggle_halos();
+  }
+}
+
 void SimWindow::make_dynamic()
 {
   clear_threads();
@@ -215,7 +229,7 @@ void SimWindow::make_dynamic()
     GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
     DynamicPointCloud *dpc = glpc->make_dynamic(
         /*density = */1000.0f,
-        /*viscosity = */1000.0f,
+        /*viscosity = */100.0f,
         /*surface tension coefficient = */0.0728f);
 
     // run simulation
@@ -275,14 +289,19 @@ void SimWindow::render()
       glprim->get_program()->setUniformValue("pt_scale", float(14.5*window_dim()[1]*m_near));
       if (glprim->is_pointcloud())
       {
-        PointCloud *pc = static_cast<GLPointCloud *>(glprim)->get_pointcloud();
+        GLPointCloud * glpc = static_cast<GLPointCloud *>(glprim);
+        PointCloud *pc = glpc->get_pointcloud();
         glprim->get_program()->setUniformValue( "pt_radius", GLfloat(pc->get_radius()));
         if (pc->is_dynamic())
         {
-          glprim->get_program()->setUniformValue(
-              "pt_halo",
-              GLfloat(static_cast<DynamicPointCloud *>(pc)->get_kernel_radius())
-              );
+          if (glpc->is_halos())
+          {
+            glprim->get_program()->setUniformValue(
+                "pt_halo",
+                GLfloat(static_cast<DynamicPointCloud *>(pc)->get_kernel_radius()));
+          }
+          else
+            glprim->get_program()->setUniformValue( "pt_halo", GLfloat(pc->get_radius()));
         }
         else
           glprim->get_program()->setUniformValue("pt_halo", GLfloat(pc->get_radius()));
@@ -312,11 +331,14 @@ void SimWindow::keyPressEvent(QKeyEvent *event)
   m_context->makeCurrent(this);
   switch (key)
   {
-    case Qt::Key_H:
+    case Qt::Key_T:
       toggle_shortcuts();
       break;
     case Qt::Key_D:
       make_dynamic();
+      break;
+    case Qt::Key_H:
+      toggle_halos();
       break;
     case Qt::Key_C:
       make_static();

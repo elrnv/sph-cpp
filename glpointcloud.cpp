@@ -17,6 +17,7 @@ GLPointCloudRS<REAL,SIZE>::GLPointCloudRS(
   , m_pc(pc)
   , m_vertices(3, get_num_vertices())
   , m_insync(true)
+  , m_halos(false)
 {
   m_vertices = m_pc->get_pos().template cast<float>();
   this->m_vao.create();
@@ -26,6 +27,8 @@ GLPointCloudRS<REAL,SIZE>::GLPointCloudRS(
   this->m_pos.setUsagePattern( QOpenGLBuffer::StaticDraw );
   this->m_pos.bind();
   this->m_pos.allocate( m_vertices.data(), sizeof( GLfloat ) * m_vertices.size() );
+
+  this->m_vao.release();
 
   update_shader(ShaderManager::PARTICLE);
 }
@@ -54,7 +57,7 @@ void GLPointCloudRS<REAL,SIZE>::sort_by_depth(const AffineCompact3f &mvtrans)
   std::lock_guard<std::mutex> guard(this->m_lock); // prevent others from reading buffers
 
   // Sort all vertices by the z value
-  Matrix3Xf mvpos = mvtrans * m_vertices;
+  Matrix3XR<GLfloat> mvpos = mvtrans * m_vertices; // TODO: mem alloc expensive?
   SIZE num_verts = get_num_vertices();
   VectorXT<SIZE> perm_vec(num_verts);
   for (SIZE i = 0; i < num_verts; ++i)
@@ -66,6 +69,8 @@ void GLPointCloudRS<REAL,SIZE>::sort_by_depth(const AffineCompact3f &mvtrans)
       [mvpos](SIZE i, SIZE j) { return mvpos.col(i)[2] < mvpos.col(j)[2]; });
 
   m_vertices = m_vertices * PermutationMatrix<Dynamic, Dynamic, SIZE>(perm_vec);
+
+  m_insync = false;
 }
 
 template<typename REAL, typename SIZE>
@@ -106,6 +111,8 @@ void GLPointCloudRS<REAL,SIZE>::update_shader(ShaderManager::ShaderType type)
   this->m_pos.bind();
   this->m_prog->enableAttributeArray( "pos" );
   this->m_prog->setAttributeBuffer( "pos", GL_FLOAT, 0, 3 );
+
+  this->m_vao.release();
 
   this->m_ubo.bindToProg(this->m_prog->programId(), "Globals");
 }

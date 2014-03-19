@@ -38,13 +38,18 @@ public:
 
   void update_data();
 
+  bool is_halos() const { return m_halos; }
+  void toggle_halos() { m_halos = !m_halos; }
+
 protected:
   PointCloudRS<REAL, SIZE> *m_pc; // reference to the native mesh object
 
   // intermediate buffer between pc and glbuffer
-  Matrix3Xf m_vertices;
+  Matrix3XR<GLfloat> m_vertices;
 
   bool m_insync;
+
+  bool m_halos; // show kernel influence visually
 };
 
 // defaults

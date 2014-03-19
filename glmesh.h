@@ -27,7 +27,7 @@ public:
   SIZE get_num_vertices() const { return m_mesh->get_verts().size();   }
 
   void update_data();
-  void sort_by_depth(const AffineCompact3f &mvtrans) { }
+  void sort_by_depth(const AffineCompact3f &mvtrans);
   void update_glbuf();
   void update_shader(ShaderManager::ShaderType type);
   
@@ -37,9 +37,9 @@ protected:
   MeshRS<REAL,SIZE> *m_mesh; // reference to the native mesh object
 
   // intermediate buffers between mesh and glbuffers
-  std::vector<GLfloat> m_vertices; 
-  std::vector<GLfloat> m_normals;
-  bool                 m_insync;
+  Matrix3XR<GLfloat> m_vertices; 
+  Matrix3XR<GLfloat> m_normals;
+  bool               m_insync;
 };
 
 // defaults

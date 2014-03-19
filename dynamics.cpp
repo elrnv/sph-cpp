@@ -50,15 +50,9 @@ void UniformGridRS<REAL,SIZE>::init()
   glprintf_tr("grid size: %d %d %d\n", m_gridsize[0], m_gridsize[1], m_gridsize[2]);
 
   m_grid.resize( boost::extents[m_gridsize[0]][m_gridsize[1]][m_gridsize[2]] );
-
-  SIZE num_vtx = m_dpc->get_num_vertices();
-  for ( SIZE i = 0; i < num_vtx; ++i )
-  {
-    Vector3R<REAL> pos( m_dpc->m_pos.col(i) );
-    Vector3R<REAL> vel( m_dpc->m_vel.col(i) );
-    Array3Index idx = get_voxel_index(pos);
-    m_grid(idx).push_back( ParticleDataR<REAL>(pos, vel, m_dpc->accel_at(i)) );
-  }
+  
+  populate_fluid_data(); // populate grid with particles
+  populate_bound_data();
 
   compute_initial_density();
 
@@ -71,36 +65,101 @@ void UniformGridRS<REAL,SIZE>::init()
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::update()
 {
-#if 1
-  int size = 0;
-  int count = 0;
-#endif
-  SIZE nx = m_gridsize[0];
-  SIZE ny = m_gridsize[1];
-  SIZE nz = m_gridsize[2];
-  for (SIZE i = 0; i < nx; ++i)
-  {
-    for (SIZE j = 0; j < ny; ++j)
-    {
-      for (SIZE k = 0; k < nz; ++k)
-      {
-        DataVec &datavec = m_grid[i][j][k];
-        datavec.clear();
-      } // for k
-    } // for j
-  } // for i
+  clear_fluid_data();
+  populate_fluid_data(); // populate grid with particles
+}
 
+template<typename REAL, typename SIZE>
+void UniformGridRS<REAL,SIZE>::clear_fluid_data()
+{
+  for (SIZE i = 0; i < m_gridsize[0]; ++i)
+    for (SIZE j = 0; j < m_gridsize[1]; ++j)
+      for (SIZE k = 0; k < m_gridsize[2]; ++k)
+        m_grid[i][j][k].fluidvec.clear();
+}
 
+template<typename REAL, typename SIZE>
+void UniformGridRS<REAL,SIZE>::populate_fluid_data()
+{
   SIZE num_vtx = m_dpc->get_num_vertices();
   for ( SIZE i = 0; i < num_vtx; ++i )
   {
     Vector3R<REAL> pos( m_dpc->m_pos.col(i) );
     Vector3R<REAL> vel( m_dpc->m_vel.col(i) );
     Array3Index idx = get_voxel_index(pos);
-    m_grid(idx).push_back( ParticleDataR<REAL>(pos, vel, m_dpc->accel_at(i)) );
+    m_grid(idx).fluidvec.push_back( DynamicParticleR<REAL>(pos, vel, m_dpc->accel_at(i)) );
   }
-  //qDebug() << "avg particles per cell:" << size / count;
 }
+
+template<typename REAL, typename SIZE>
+void UniformGridRS<REAL,SIZE>::populate_bound_data()
+{
+  // walk through all boundary cells
+  SIZE nx = m_gridsize[0];
+  SIZE ny = m_gridsize[1];
+  SIZE nz = m_gridsize[2];
+  REAL h = 1/m_hinv; // TODO: save and use actual gridsize
+  Vector3R<REAL> bmin = m_bmin.template cast<REAL>();
+
+  SIZE i = 0;
+  for (SIZE j = 0; j < ny; ++j)
+    for (SIZE k = 0; k < nz; ++k)
+    {
+      StaticParticles &boundvec = m_grid[i][j][k].boundvec;
+      boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(0, j, k) + bmin) );
+      if (k == nz-1)
+        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(0, j, nz) + bmin) );
+      if (j == ny-1)
+        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(0, ny, k) + bmin) );
+      if (j == ny-1 && k == nz-1)
+        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(0, ny, nz) + bmin) );
+    }
+
+  for (i = 1; i < nx; ++i)
+  {
+    SIZE j = 0;
+    for (SIZE k = 0; k < nz; ++k)
+    {
+      StaticParticles &boundvec = m_grid[i][j][k].boundvec;
+      boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(i, 0, k) + bmin) );
+      if (k == nz-1)
+        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(i, 0, nz) + bmin) );
+    }
+
+    for (j = 1; j < ny; ++j)
+    {
+      m_grid[i][j][0].boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(i, j, 0) + bmin) );
+
+      m_grid[i][j][nz-1].boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(i, j, nz) + bmin) );
+    }
+
+    j = ny-1;
+    for (SIZE k = 0; k < nz; ++k)
+    {
+      StaticParticles &boundvec = m_grid[i][j][k].boundvec;
+      boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(i, ny, k) + bmin) );
+      if (k == nz-1)
+        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(i, ny, nz) + bmin) );
+    }
+
+  } // for i
+
+  i = nx-1; // cap off the top
+  for (SIZE j = 0; j < ny; ++j)
+    for (SIZE k = 0; k < nz; ++k)
+    {
+      StaticParticles &boundvec = m_grid[i][j][k].boundvec;
+      boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(nx, j, k) + bmin) );
+      if (k == nz-1)
+        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(nx, j, nz) + bmin) );
+      if (j == ny-1)
+        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(nx, ny, k) + bmin) );
+      if (j == ny-1 && k == nz-1)
+        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(nx, ny, nz) + bmin) );
+    }
+}
+
+
 
 template<typename REAL>
 class ProcessInitialDensityR
@@ -110,17 +169,18 @@ public:
     : kern(h), mass(m), rest_density(rd) { }
   ~ProcessInitialDensityR() { }
 
-  inline void init(ParticleDataR<REAL> &p)
+  inline void init(ParticleR<REAL> &p)
   {
+    qDebug() << p.pos[0] << p.pos[1] << p.pos[2];
     p.dinv = 0.0f;
   }
 
-  inline void operator()(ParticleDataR<REAL> &p, ParticleDataR<REAL> &near_p)
+  inline void operator()(ParticleR<REAL> &p, ParticleR<REAL> &near_p)
   {
     p.dinv += kern[ p.pos - near_p.pos ];
   }
 
-  inline void finish(ParticleDataR<REAL> &p)
+  inline void finish(ParticleR<REAL> &p)
   {
     REAL density = p.dinv * mass * kern.coef;
     p.dinv = 1.0f/density;
@@ -136,9 +196,11 @@ private:
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::compute_initial_density()
 {
-  m_dpc->m_rest_density = 0.0f;
   ProcessInitialDensityR<REAL> proc(m_h, m_dpc->m_mass, m_dpc->m_rest_density);
-  compute_quantity(proc);
+  compute_bound_quantity(proc);
+
+  m_dpc->m_rest_density = 0.0f;
+  compute_fluid_quantity(proc);
   m_dpc->m_rest_density /= m_dpc->m_num_vertices;
   glprintf_tr("rest density: %.2f\n", m_dpc->m_rest_density);
 }
@@ -146,31 +208,33 @@ void UniformGridRS<REAL,SIZE>::compute_initial_density()
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::compute_pressure()
 {
-  compute_quantity(m_proc_pressure);
+  compute_bound_quantity(m_proc_pressure);
+  compute_fluid_quantity(m_proc_pressure);
 }
 
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::compute_accel()
 {
   m_dpc->reset_accel();     // now may assume all accelerations are zero
-  compute_quantity< ProcessAccelR<REAL> >( m_proc_accel );
+  compute_fluid_quantity< ProcessAccelR<REAL> >( m_proc_accel );
 }
 
+// TODO: refactor the following two routines
 template<typename REAL, typename SIZE>
-template<typename ProcessFunc>
-void UniformGridRS<REAL,SIZE>::compute_quantity(ProcessFunc process)
+template<typename ProcessPairFunc>
+void UniformGridRS<REAL,SIZE>::compute_bound_quantity(ProcessPairFunc process)
 {
-  SIZE nx = m_grid.shape()[0];
-  SIZE ny = m_grid.shape()[1];
-  SIZE nz = m_grid.shape()[2];
+  SIZE nx = m_gridsize[0];
+  SIZE ny = m_gridsize[1];
+  SIZE nz = m_gridsize[2];
   for (SIZE i = 0; i < nx; ++i)
   {
     for (SIZE j = 0; j < ny; ++j)
     {
       for (SIZE k = 0; k < nz; ++k)
       {
-        DataVec &datavec = m_grid[i][j][k];
-        if (datavec.empty())
+        StaticParticles &boundvec = m_grid[i][j][k].boundvec;
+        if (boundvec.empty())
           continue;
 
         IndexRange xrange = range3(i,nx);
@@ -178,7 +242,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity(ProcessFunc process)
         IndexRange zrange = range3(k,nz);
         GridView neigh_view = m_grid[ boost::indices[xrange][yrange][zrange] ];
 
-        for ( ParticleDataR<REAL> &p : datavec )  // prepare data
+        for ( ParticleR<REAL> &p : boundvec )  // prepare data
           process.init(p);
 
         SIZE xrange_size = xrange.finish() - xrange.start();
@@ -190,9 +254,16 @@ void UniformGridRS<REAL,SIZE>::compute_quantity(ProcessFunc process)
           {
             for (SIZE near_k = 0; near_k < zrange_size; ++near_k)
             {
-              for ( ParticleDataR<REAL> &p : datavec )
+              Cell &cell = neigh_view[near_i][near_j][near_k];
+              DynamicParticles &neigh_fluidvec = cell.fluidvec;
+              StaticParticles  &neigh_boundvec = cell.boundvec;
+              for ( ParticleR<REAL> &p : boundvec )
               {
-                for ( ParticleDataR<REAL> &near_p : neigh_view[near_i][near_j][near_k])
+                for ( DynamicParticleR<REAL> &near_p : neigh_fluidvec )
+                {
+                  process(p, near_p); // process data
+                }
+                for ( ParticleR<REAL> &near_p : neigh_boundvec )
                 {
                   process(p, near_p); // process data
                 }
@@ -201,7 +272,67 @@ void UniformGridRS<REAL,SIZE>::compute_quantity(ProcessFunc process)
           }
         }
 
-        for ( ParticleDataR<REAL> &p : datavec )  // finalize data
+        for ( ParticleR<REAL> &p : boundvec )  // finalize data
+          process.finish(p);
+      } // for k
+    } // for j
+  } // for i
+
+}
+
+template<typename REAL, typename SIZE>
+template<typename ProcessPairFunc>
+void UniformGridRS<REAL,SIZE>::compute_fluid_quantity(ProcessPairFunc process)
+{
+  SIZE nx = m_gridsize[0];
+  SIZE ny = m_gridsize[1];
+  SIZE nz = m_gridsize[2];
+  for (SIZE i = 0; i < nx; ++i)
+  {
+    for (SIZE j = 0; j < ny; ++j)
+    {
+      for (SIZE k = 0; k < nz; ++k)
+      {
+        DynamicParticles &fluidvec = m_grid[i][j][k].fluidvec;
+        if (fluidvec.empty())
+          continue;
+
+        IndexRange xrange = range3(i,nx);
+        IndexRange yrange = range3(j,ny);
+        IndexRange zrange = range3(k,nz);
+        GridView neigh_view = m_grid[ boost::indices[xrange][yrange][zrange] ];
+
+        for ( DynamicParticleR<REAL> &p : fluidvec )  // prepare data
+          process.init(p);
+
+        SIZE xrange_size = xrange.finish() - xrange.start();
+        SIZE yrange_size = yrange.finish() - yrange.start();
+        SIZE zrange_size = zrange.finish() - zrange.start();
+        for (SIZE near_i = 0; near_i < xrange_size; ++near_i)
+        {
+          for (SIZE near_j = 0; near_j < yrange_size; ++near_j)
+          {
+            for (SIZE near_k = 0; near_k < zrange_size; ++near_k)
+            {
+              Cell &cell = neigh_view[near_i][near_j][near_k];
+              DynamicParticles &neigh_fluidvec = cell.fluidvec;
+              StaticParticles  &neigh_boundvec = cell.boundvec;
+              for ( DynamicParticleR<REAL> &p : fluidvec )
+              {
+                for ( DynamicParticleR<REAL> &near_p : neigh_fluidvec )
+                {
+                  process(p, near_p); // process data
+                }
+                for ( ParticleR<REAL> &near_p : neigh_boundvec )
+                {
+                  process(p, near_p); // process data
+                }
+              }
+            }
+          }
+        }
+
+        for ( DynamicParticleR<REAL> &p : fluidvec )  // finalize data
           process.finish(p);
       } // for k
     } // for j
@@ -211,7 +342,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity(ProcessFunc process)
 // DynamicPointCloud stuff
 
 // inflating the size of the grid
-#define INFLATE 2.0 
+#define INFLATE 3.0 
 
 template<typename REAL, typename SIZE>
 DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
@@ -219,14 +350,14 @@ DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
     REAL density, REAL viscosity, REAL st)
   : PointCloudRS<REAL,SIZE>(*glpc->get_pointcloud())
   , m_num_vertices(this->get_num_vertices())
-  , m_c2(2.2e4)
+  , m_c2(2.2e2)
   , m_rest_density(density)
   , m_viscosity(viscosity)
   , m_st(st) // surface tension
   , m_bmin(this->m_bbox.corner(Eigen::AlignedBox3f::BottomLeftFloor))
   , m_bmax(this->m_bbox.corner(Eigen::AlignedBox3f::TopRightCeil))
   , m_kernel_radius(INFLATE*this->get_radius())
-  , m_grid(this, m_kernel_radius, 2.0f, m_bmin)
+  , m_grid(this, m_kernel_radius, m_bmin)
   , m_glpc(glpc)
   , m_stop_requested(false)
 {
@@ -281,7 +412,7 @@ void DynamicPointCloudRS<REAL,SIZE>::resolve_collisions()
     {
       if (clamp(pos_at(i)[j], m_bmin[j], m_bmax[j]))
       {
-        vel_at(i)[j] *= -0.1;
+        vel_at(i)[j] *= -1.0;
       }
     }
   }
@@ -291,7 +422,7 @@ template<typename REAL, typename SIZE>
 void DynamicPointCloudRS<REAL,SIZE>::run()
 {
   m_grid.init();
-  float dt = 0.000217;
+  float dt = 0.00217;
   glprintf_tr("step: %.2es\n", dt);
 
   m_grid.compute_pressure();
@@ -305,7 +436,7 @@ void DynamicPointCloudRS<REAL,SIZE>::run()
   for ( ; ; )
   {
     this->m_pos = (this->m_pos + dt*m_vel).eval();
-    resolve_collisions();
+    //resolve_collisions();
     m_grid.update();
 
     if (m_glpc)
