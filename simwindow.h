@@ -29,7 +29,7 @@ public:
   void make_dynamic();
   void toggle_halos();
 
-  void clear_threads();
+  void clear_dynamics();
 
   inline void toggle_shortcuts();
 
@@ -56,6 +56,8 @@ private:
     Vector4f options; // only the first value is used
   } m_udata;
 
+  UnfiromGrid *m_grid; // simulation grid
+
   GLPrimVec m_glprims;
 
   ViewMode m_viewmode;
@@ -63,7 +65,7 @@ private:
 
   ShaderManager m_shaderman;
 
-  std::vector<std::thread> m_sim_threads;
+  std::thread m_sim_thread;
 };
 
 #endif // SIMWINDOW_H

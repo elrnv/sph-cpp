@@ -21,15 +21,15 @@ public:
   explicit PointCloudRS(const aiMesh *pc);
   ~PointCloudRS();
 
-  Matrix3XR<REAL> &get_pos() { return m_pos; }
+  inline REAL get_radius() const       { return 0.5*compute_mindist(); }
   inline SIZE get_num_vertices() const { return m_pos.cols(); }
+  inline Matrix3XR<REAL> &get_pos() { return m_pos; }
   inline bool is_pointcloud() const { return true; }
 
   inline void transform_in_place(const AffineCompact3f &trans);
   inline AlignedBox3f &compute_bbox();
   REAL compute_mindist();
   REAL compute_mindist_brute();
-  REAL get_radius() { return 0.5*compute_mindist(); }
 
   friend std::ostream& operator<< <>(std::ostream& out, const PointCloudRS<REAL,SIZE>& pc);
 

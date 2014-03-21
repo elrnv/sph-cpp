@@ -4,12 +4,22 @@
 #include <cmath>
 #include "eigen.h"
 
+template<typename OutputType, class KernelType>
 class Kernel
 {
 public:
   Kernel(float h) 
     : h(h), h2(h*h), h3(h2*h), h4(h3*h) { } 
-  ~Kernel() { }
+
+  // by convention operator[] -> don't premultiply by coef
+  inline OutputType operator[](const Vector3d &r)
+  {
+    return static_cast<KernelType*>(this)->kern(r);
+  }
+  inline OutputType operator()(const Vector3d &r)
+  {
+    return coef * static_cast<KernelType*>(this)->kern(r);
+  }
 
   // main coefficient
   float coef;
@@ -22,34 +32,18 @@ protected:
   float h, h2, h3, h4;
 };
 
-// two types of kernel functions ( scalar and vector ) for convenience
-struct KernelScalar : public Kernel
+template<typename KernelType>
+using Kerneld = Kernel<double, KernelType>;
+
+template<typename KernelType>
+using Kernel3d = Kernel<Vector3d, KernelType>;
+
+
+struct MKI04Kernel : public Kerneld<MKI04Kernel>
 {
-  KernelScalar(float h) : Kernel(h) { }
-  ~KernelScalar() {}
-  // by convention operator[] -> don't premultiply by coef
-  virtual inline double operator[](const Vector3d &r) = 0;
-  virtual inline double operator()(const Vector3d &r) = 0;
-};
-
-struct KernelVector : public Kernel
-{
-  KernelVector(float h) : Kernel(h) { }
-  ~KernelVector() {}
-  // by convention operator[] -> don't premultiply by coef
-  virtual inline Vector3d operator[](const Vector3d &r) = 0;
-  virtual inline Vector3d operator()(const Vector3d &r) = 0;
-};
-
-
-
-struct LeonardJonesKernel : public KernelScalar
-{
-  LeonardJonesKernel(float h) : KernelScalar(h) { coef = 0.02; }
-  ~LeonardJonesKernel() {}
+  MKI04Kernel(float h) : Kerneld<MKI04Kernel>(h) { coef = 0.02; }
   
-  // main kernel without coefficient
-  inline double operator[](const Vector3d &r)
+  inline double kern(const Vector3d &r)
   {
     double r2 = r.squaredNorm();
     double rn = std::sqrt(r2);
@@ -68,114 +62,78 @@ struct LeonardJonesKernel : public KernelScalar
     return 0;
   }
 
-  // main kernel
-  inline double operator()(const Vector3d &r)
-  {
-    return coef * operator[](r);
-  }
-}; // Poly6Kernel
-struct Poly6Kernel : public KernelScalar
+}; // MKI04Kernel
+
+
+
+struct Poly6Kernel : public Kerneld<Poly6Kernel>
 {
-  Poly6Kernel(float h) : KernelScalar(h) { coef = 315.0f/(64*M_PI*h3*h3*h3); }
-  ~Poly6Kernel() {}
+  Poly6Kernel(float h) : Kerneld<Poly6Kernel>(h) { coef = 315.0f/(64*M_PI*h3*h3*h3); }
   
   // main kernel without coefficient
-  inline double operator[](const Vector3d &r)
+  inline double kern(const Vector3d &r)
   {
     double r2 = r.squaredNorm();
     return r2 <= h2 ? pow3(h2 - r2) : 0;
   }
-
-  // main kernel
-  inline double operator()(const Vector3d &r)
-  {
-    double r2 = r.squaredNorm();
-    return r2 <= h2 ? coef*pow3(h2 - r2) : 0;
-  }
 }; // Poly6Kernel
 
-struct Poly6GradKernel : public KernelVector
+struct Poly6GradKernel : public Kernel3d<Poly6GradKernel>
 {
-  Poly6GradKernel(float h) : KernelVector(h) { coef = 1890.0f/(64*M_PI*h3*h3*h3); }
-  ~Poly6GradKernel() { }
+  Poly6GradKernel(float h) : Kernel3d<Poly6GradKernel>(h) { coef = 1890.0f/(64*M_PI*h3*h3*h3); }
 
-  inline Vector3d operator[](const Vector3d &r)
+  inline Vector3d kern(const Vector3d &r)
   {
     double r2 = r.squaredNorm();
-    return r2 <= h2 ? -r*pow2(h2-r2) : Vector3d(0.0f, 0.0f, 0.0f);
-  }
-
-  inline Vector3d operator()(const Vector3d &r)
-  {
-    double r2 = r.squaredNorm();
-    return r2 <= h2 ? -r*coef*pow2(h2-r2) : Vector3d(0.0f, 0.0f, 0.0f);
+    return r2 <= h2 ? -r*pow2(h2-r2) : Vector3d(0,0,0);
   }
 }; // Poly6GradKernel
 
-struct Poly6LapKernel : public KernelScalar
+struct Poly6LapKernel : public Kerneld<Poly6LapKernel>
 {
-  Poly6LapKernel(float h) : KernelScalar(h) { coef = 1890.0f/(64*M_PI*h3*h3*h3); }
-  ~Poly6LapKernel() {}
+  Poly6LapKernel(float h) : Kerneld<Poly6LapKernel>(h) { coef = 1890.0f/(64*M_PI*h3*h3*h3); }
 
-  inline double operator[](const Vector3d &r)
+  inline double kern(const Vector3d &r)
   {
     double r2 = r.squaredNorm();
     return r2 <= h2 ? (h2-r2)*(7*r2 - 3*h2) : 0;
-  }
-  inline double operator()(const Vector3d &r)
-  {
-    double r2 = r.squaredNorm();
-    return r2 <= h2 ? coef*(h2-r2)*(7*r2 - 3*h2) : 0;
   }
 }; // Poly6LapKernel
 
 
 
-struct SpikyKernel : public KernelScalar
+struct SpikyKernel : public Kerneld<SpikyKernel>
 {
-  SpikyKernel(float h) : KernelScalar(h) { coef = 15.0f/(M_PI*h3*h3); }
-  ~SpikyKernel() {}
+  SpikyKernel(float h) : Kerneld<SpikyKernel>(h) { coef = 15.0f/(M_PI*h3*h3); }
 
-  inline double operator[](const Vector3d &r)
+  inline double kern(const Vector3d &r)
   {
     double r2 = r.squaredNorm();
     return r2 <= h2 ? pow3(h - std::sqrt(r2)) : 0;
   }
-
-  inline double operator()(const Vector3d &r)
-  {
-    double r2 = r.squaredNorm();
-    return r2 <= h2 ? coef*pow3(h - std::sqrt(r2)) : 0;
-  }
 }; // SpikyKernel
 
-struct SpikyGradKernel : public KernelVector
+struct SpikyGradKernel : public Kernel3d<SpikyGradKernel>
 {
-  SpikyGradKernel(float h) : KernelVector(h) { coef = 45.0f/(M_PI*h3*h3); }
-  ~SpikyGradKernel() { }
+  SpikyGradKernel(float h) : Kernel3d<SpikyGradKernel>(h) { coef = 45.0f/(M_PI*h3*h3); }
 
   // gradient of kernel
-  inline Vector3d operator[](const Vector3d &r)
+  inline Vector3d kern(const Vector3d &r)
   {
     double rn = r.norm();
     if (rn == 0.0f) // handle degeneracy
-      return Vector3d(h2, h2, h2); // chose one sided limit
+      return Vector3d(h2,h2,h2); // chose one sided limit
 
-    return rn <= h ? Vector3d((-pow2(h - rn) / rn)*r) : Vector3d(0.0f, 0.0f, 0.0f);
-  }
-  inline Vector3d operator()(const Vector3d &r)
-  {
-    return coef*operator[](r);
+    return rn <= h ? -r*(pow2(h - rn) / rn) : Vector3d(0,0,0);
   }
 }; // SpikyGradKernel
 
 // laplacian of spiky kernel
-struct SpikyLapKernel : public KernelScalar
+struct SpikyLapKernel : public Kerneld<SpikyLapKernel>
 {
-  SpikyLapKernel(float h) : KernelScalar(h) { coef = 90.0f/(M_PI*h3*h3); }
-  ~SpikyLapKernel() {}
+  SpikyLapKernel(float h) : Kerneld<SpikyLapKernel>(h) { coef = 90.0f/(M_PI*h3*h3); }
 
-  inline double operator[](const Vector3d &r)
+  inline double kern(const Vector3d &r)
   {
     double r2 = r.squaredNorm();
     if (r2 > h2)
@@ -186,27 +144,15 @@ struct SpikyLapKernel : public KernelScalar
       return (h-rn)*(2-h/rn);
     }
   }
-  inline double operator()(const Vector3d &r)
-  {
-    double r2 = r.squaredNorm();
-    if (r2 > h2)
-      return 0;
-    else
-    { 
-      double rn = std::sqrt(r2);
-      return coef*(h-rn)*(2-h/rn);
-    }
-  }
 }; // SpikyLapKern
 
 
 
-struct ViscKernel : public KernelScalar
+struct ViscKernel : public Kerneld<ViscKernel>
 {
-  ViscKernel(float h) : KernelScalar(h) { coef = 15.0f/(2*M_PI*h3); }
-  ~ViscKernel() {}
+  ViscKernel(float h) : Kerneld<ViscKernel>(h) { coef = 15.0f/(2*M_PI*h3); }
 
-  inline double operator[](const Vector3d &r)
+  inline double kern(const Vector3d &r)
   {
     double r2 = r.squaredNorm();
     if (r2 >= h2)
@@ -217,55 +163,29 @@ struct ViscKernel : public KernelScalar
       return (rn*2*h*(r2-h2) - r2*r2 + h4)/(2*h3*rn);
     }
   }
-
-  inline double operator()(const Vector3d &r)
-  {
-    double r2 = r.squaredNorm();
-    if (r2 >= h2)
-      return 0;
-    else
-    { 
-      double rn = std::sqrt(r2);
-      return coef*(rn*2*h*(r2-h2) - r2*r2 + h4)/(2*h3*rn);
-    }
-  }
 }; // ViscKernel
 
-struct ViscGradKernel : public KernelVector
+struct ViscGradKernel : public Kernel3d<ViscGradKernel>
 {
-  ViscGradKernel(float h) : KernelVector(h) { coef = 15.0f/(2*M_PI*h3); }
-  ~ViscGradKernel() { }
+  ViscGradKernel(float h) : Kernel3d<ViscGradKernel>(h) { coef = 15.0f/(2*M_PI*h3); }
 
-  inline Vector3d operator[](const Vector3d &r)
+  inline Vector3d kern(const Vector3d &r)
   {
     double r2 = r.squaredNorm();
     double rn = std::sqrt(r2);
     double r3 = r2*rn;
-    return r2 < h2 ? r*(4*h*r3 - 3*r2*r2 - h4) / (2*h3*r3) : Vector3d(0.0f, 0.0f, 0.0f);
-  }
-  inline Vector3d operator()(const Vector3d &r)
-  {
-    double r2 = r.squaredNorm();
-    double rn = std::sqrt(r2);
-    double r3 = r2*rn;
-    return r2 < h2 ? r*coef*(4*h*r3 - 3*r2*r2 - h4) / (2*h3*r3) : Vector3d(0.0f, 0.0f, 0.0f);
+    return r2 < h2 ? Vector3d(r*((4.0f*h*r3 - 3.f*r2*r2 - h4) / (2.f*h3*r3))) : Vector3d(0,0,0);
   }
 }; // ViscGradKernel
 
-struct ViscLapKernel : public KernelScalar
+struct ViscLapKernel : public Kerneld<ViscLapKernel>
 {
-  ViscLapKernel(float h) : KernelScalar(h) { coef = 45.0f/(M_PI*h3*h3); }
-  ~ViscLapKernel() { }
+  ViscLapKernel(float h) : Kerneld<ViscLapKernel>(h) { coef = 45.0f/(M_PI*h3*h3); }
 
-  inline double operator[](const Vector3d &r)
+  inline double kern(const Vector3d &r)
   {
     double r2 = r.squaredNorm();
     return r2 <= h2 ? (h-std::sqrt(r2)) : 0;
-  }
-  inline double operator()(const Vector3d &r)
-  {
-    double r2 = r.squaredNorm();
-    return r2 <= h2 ? coef*(h-std::sqrt(r2)) : 0;
   }
 }; // ViscLapKernel
 

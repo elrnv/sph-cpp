@@ -48,31 +48,14 @@ SimWindow::SimWindow()
 
 SimWindow::~SimWindow()
 {
-  clear_threads();
+  clear_dynamics();
 }
 
-void SimWindow::clear_threads()
+void SimWindow::clear_dynamics()
 {
-  for ( const GLPrimitivePtr &prim_ptr : m_glprims )
-  {
-    GLPrimitive *glprim = prim_ptr.get();
-    if (!glprim->is_pointcloud())
-      continue;
-
-    GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
-    PointCloud *pc = glpc->get_pointcloud();
-
-    if (!pc->is_dynamic())
-      continue;
-
-    DynamicPointCloud *dpc = static_cast<DynamicPointCloud *>(pc);
-    dpc->request_stop(); // stop threads
-  }
-
-  for ( auto & thread : m_sim_threads )
-    thread.join();
-
-  m_sim_threads.clear();
+  m_grid->request_stop(); // stop thread
+  m_sim_thread.join();
+  delete m_grid; m_grid = 0;
 }
 
 void SimWindow::init()
@@ -92,7 +75,7 @@ void SimWindow::init()
 
 void SimWindow::load_model(int i)
 {
-  clear_threads();
+  clear_dynamics();
   std::string filename;
 
   // optionally extend centered container box on load
@@ -197,7 +180,7 @@ void SimWindow::reset_viewmode()
 
 void SimWindow::make_static()
 {
-  clear_threads();
+  clear_dynamics();
   set_animating(false);
 }
 
@@ -216,7 +199,11 @@ void SimWindow::toggle_halos()
 
 void SimWindow::make_dynamic()
 {
-  clear_threads();
+  clear_dynamics();
+
+  // Create simulation grid
+  m_grid = new UniformGrid();
+
   for ( const GLPrimitivePtr &prim_ptr : m_glprims )
   {
     GLPrimitive *glprim = prim_ptr.get();
@@ -227,14 +214,17 @@ void SimWindow::make_dynamic()
     glclear_tr(); // so clear it
 
     GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
-    DynamicPointCloud *dpc = glpc->make_dynamic(
+    Fluid *dpc = glpc->make_dynamic(
         /*density = */1000.0f,
-        /*viscosity = */100.0f,
+        /*viscosity = */0.2f,
         /*surface tension coefficient = */0.0728f);
 
-    // run simulation
-    m_sim_threads.push_back(std::thread(&DynamicPointCloud::run, dpc));
+    m_grid.add_fluid(dpc);
   }
+
+  // run simulation
+  m_sim_thread = std::thread(&UniformGrid::run, m_grid);
+
   set_animating(true);
 }
 
