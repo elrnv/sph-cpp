@@ -181,7 +181,7 @@ void SimWindow::reset_viewmode()
   if (m_viewmode == ViewMode::PARTICLE) 
   {
     glDisable(GL_DEPTH_TEST);
-    glDepthFunc(GL_NEVER);
+    //glDepthFunc(GL_NEVER);
 	  glDisable(GL_CULL_FACE);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_PROGRAM_POINT_SIZE);
@@ -189,7 +189,7 @@ void SimWindow::reset_viewmode()
   else
   {
     glEnable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_PROGRAM_POINT_SIZE);
   }
