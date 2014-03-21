@@ -43,6 +43,37 @@ struct KernelVector : public Kernel
 
 
 
+struct LeonardJonesKernel : public KernelScalar
+{
+  LeonardJonesKernel(float h) : KernelScalar(h) { coef = 0.02; }
+  ~LeonardJonesKernel() {}
+  
+  // main kernel without coefficient
+  inline double operator[](const Vector3d &r)
+  {
+    double r2 = r.squaredNorm();
+    double rn = std::sqrt(r2);
+    double q = 3.0f*rn/h;
+
+    if (q > 0 && q < 2)
+    {
+      if (q < 2.0f/3.0f)
+        return 2.0f/(r2*3.0f);
+      if (q < 1)
+        return (2*q - 3.0f*q*q/2.0f)/r2;
+
+      return 0.5*pow2(2 - q)/r2;
+    }
+
+    return 0;
+  }
+
+  // main kernel
+  inline double operator()(const Vector3d &r)
+  {
+    return coef * operator[](r);
+  }
+}; // Poly6Kernel
 struct Poly6Kernel : public KernelScalar
 {
   Poly6Kernel(float h) : KernelScalar(h) { coef = 315.0f/(64*M_PI*h3*h3*h3); }

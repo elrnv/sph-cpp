@@ -33,70 +33,185 @@ struct ParticleR
 template<typename REAL>
 struct DynamicParticleR : public ParticleR<REAL>
 {
-  DynamicParticleR(Vector3R<REAL> p, Vector3R<REAL> v, REAL *a)
-    : ParticleR<REAL>(p), vel(v), accel(a){ }
+  DynamicParticleR(Vector3R<REAL> p, Vector3R<REAL> v, REAL *a, REAL *ea)
+    : ParticleR<REAL>(p), vel(v), accel(a), extern_accel(ea) { }
   ~DynamicParticleR() { }
 
   Vector3R<REAL> vel;
-  REAL *accel;    // 3 array to which we will write
+  REAL *accel;    // 3 array to which we will write total acceleration
+  REAL *extern_accel;    // 3 array to which we will write acceleration due to external forces
+  REAL temp;      // store temporary values at the particle during computation
+  REAL vol;       // volume estimate
 };
 
 
-// process routines used to compute SPH quantities
+// From [Solenthaler and Pajarola 2008], an alternative density
+// (number_density * mass) is used
 template<typename REAL>
-class ProcessPressureR
+class ComputeBoundaryVolumeR
 {
 public:
-  ProcessPressureR(float h) : kern(h) { }
-  ~ProcessPressureR() { }
-  void init(REAL m, REAL rd, REAL c) 
-  { mass = m; rest_density = rd; constant = c; }
+  ComputeBoundaryVolumeR(float h) : kern(h) { }
+  ~ComputeBoundaryVolumeR() { }
 
-  inline void init(ParticleR<REAL> &p) { p.dinv = 0.0f; }
+  inline void init_particle(ParticleR<REAL> &p) { p.dinv = 0.0f; }
 
-  inline void operator()(ParticleR<REAL> &p, ParticleR<REAL> &near_p)
+  inline void fluid(ParticleR<REAL> &p, DynamicParticleR<REAL> &near_p)
+  { }
+
+  inline void bound(ParticleR<REAL> &p, ParticleR<REAL> &near_p)
   {
     p.dinv += kern[ p.pos - near_p.pos ];
-    //qDebug() << "temp p.dinv" << p.dinv;
   }
 
-  inline REAL pow7(REAL x) { return x*x*x*x*x*x*x; }
-
-  inline void finish(ParticleR<REAL> &p)
+  inline void finish_particle(ParticleR<REAL> &p)
   {
-    REAL density = p.dinv * mass * kern.coef;
-    p.dinv = 1.0f/density;
-    p.pressure = constant * (pow7(density / rest_density) - 1);
-    qDebug() << p.pressure;
+    p.dinv = 1.0f/(p.dinv * kern.coef);
+  }
+
+private:
+  Poly6Kernel kern; // used to compute pressure force
+};
+
+template<typename REAL>
+class ComputeFluidDensityR
+{
+public:
+  ComputeFluidDensityR(float h) : kern(h) { }
+  ~ComputeFluidDensityR() { }
+
+  void init(REAL m, REAL rd, REAL r, REAL &mv, REAL &av)
+  {
+    mass = m; rest_density = rd; radius = r; 
+    max_var = &mv; avg_var = &av;
+  }
+
+  inline void init_particle(DynamicParticleR<REAL> &p)
+  { 
+    p.dinv = 0.0f; p.vol = 0.0f;
+  }
+  inline void fluid(DynamicParticleR<REAL> &p, DynamicParticleR<REAL> &near_p)
+  {
+    p.dinv += kern[ p.pos - near_p.pos ];
+    p.vol += kern[ p.pos - near_p.pos ];
+  }
+  inline void bound(DynamicParticleR<REAL> &p, ParticleR<REAL> &near_p)
+  {
+    p.dinv += rest_density * near_p.dinv * kern[ p.pos - near_p.pos ];
+    p.vol += kern[ p.pos - near_p.pos ];
+  }
+  inline void finish_particle(DynamicParticleR<REAL> &p)
+  {
+    //qDebug() << (mass * p.dinv) << "/" <<(8*radius*radius*radius*p.vol) << " = " << (mass * p.dinv)/(8*radius*radius*radius*p.vol);
+    p.dinv = (8*radius*radius*radius*p.vol)/(mass * p.dinv);
+    REAL var = std::abs(1.0f/p.dinv - rest_density);
+    if ( var > *max_var )
+      *max_var = var;
+    *avg_var += var;
   }
 
 private:
   Poly6Kernel kern; // used to compute pressure force
   REAL mass;
   REAL rest_density;
-  REAL constant;
+  REAL radius;
+  REAL *max_var; // max variation
+  REAL *avg_var; // average variation
+};
+
+template<typename REAL>
+class ComputeFluidDensityUpdateR
+{
+public:
+  ComputeFluidDensityUpdateR(float h) : kern(h) { }
+  ~ComputeFluidDensityUpdateR() { }
+
+  void init(REAL m, float ts) 
+  { mass = m; timestep = ts; }
+
+  inline void init_particle(DynamicParticleR<REAL> &p) { p.temp = 0.0f; }
+
+  inline void fluid(DynamicParticleR<REAL> &p, DynamicParticleR<REAL> &near_p)
+  {
+    p.temp += (near_p.vel - p.vel).dot(kern[ p.pos - near_p.pos ]);
+  }
+  inline void bound(DynamicParticleR<REAL> &p, ParticleR<REAL> &near_p)
+  {
+    p.temp += (-p.vel).dot(kern[ p.pos - near_p.pos ]);
+    //p.dinv += rest_density * near_p.dinv * kern[ p.pos - near_p.pos ];
+  }
+
+  inline void finish_particle(DynamicParticleR<REAL> &p)
+  {
+    p.dinv += timestep * p.dinv * p.dinv * p.temp * kern.coef;
+  }
+
+private:
+  Poly6GradKernel kern; // used to compute pressure force
+  REAL mass;
+  float timestep;
+};
+
+// process routines used to compute SPH quantities
+template<typename REAL>
+class ComputePressureR
+{
+public:
+  ComputePressureR(float h) : kern(h) { }
+  ~ComputePressureR() { }
+  void init(REAL m, REAL rd, REAL c2) 
+  { mass = m; rest_density = rd; cs2 = c2; }
+
+  inline void init_particle(ParticleR<REAL> &p) { p.dinv = 0.0f; }
+
+  inline void fluid(ParticleR<REAL> &p, DynamicParticleR<REAL> &near_p)
+  {
+    p.dinv += kern[ p.pos - near_p.pos ];
+  }
+
+  inline void bound(ParticleR<REAL> &p, ParticleR<REAL> &near_p)
+  {
+    p.dinv += rest_density * near_p.dinv * kern[ p.pos - near_p.pos ];
+  }
+
+  inline REAL pow7(REAL x) { return x*x*x*x*x*x*x; }
+
+  inline void finish_particle(ParticleR<REAL> &p)
+  {
+    REAL density = mass * p.dinv * kern.coef;
+    p.dinv = 1.0f/density;
+    p.pressure = rest_density * cs2 * 0.14285714285714 * (pow7(density / rest_density) - 1);
+    //qDebug() << p.pressure;
+  }
+
+private:
+  Poly6Kernel kern; // used to compute pressure force
+  REAL mass;
+  REAL rest_density;
+  REAL cs2;
 };
 
 
 template<typename REAL>
-class ProcessAccelR
+class ComputePressureAccelR
 {
 public:
-  ProcessAccelR(float h) : p_kern(h), v_kern(h) { }
-  ~ProcessAccelR() { }
+  ComputePressureAccelR(float h) : b_kern(h), p_kern(h), v_kern(h) { }
+  ~ComputePressureAccelR() { }
 
-  void init(REAL m, REAL v, REAL s) {  mass = m; viscosity = v; st = s; }
+  void init(REAL m, REAL rd, REAL v, REAL s, REAL c2)
+  {  mass = m; rest_density = rd; viscosity = v; st = s; const2 = c2; }
 
-  inline void init(DynamicParticleR<REAL> &p) {
+  inline void init_particle(DynamicParticleR<REAL> &p) {
     Q_UNUSED(p); 
   }
 
-  inline void operator()(DynamicParticleR<REAL> &p, ParticleR<REAL> &near_p)
+  inline void fluid(DynamicParticleR<REAL> &p, DynamicParticleR<REAL> &near_p)
   {
     if (&p == &near_p)
       return;
     Vector3R<REAL> res(
-        -(p.pressure*p.dinv*p.dinv + near_p.pressure*near_p.dinv*near_p.dinv)*p_kern(p.pos - near_p.pos) // pressure contribution
+        -mass*(p.pressure*p.dinv*p.dinv + near_p.pressure*near_p.dinv*near_p.dinv)*p_kern(p.pos - near_p.pos) // pressure contribution
        // + viscosity*near_p.dinv*(near_p.vel - p.vel)*v_kern(p.pos - near_p.pos) // viscosity contribution
         );
 
@@ -104,11 +219,27 @@ public:
       p.accel[i] += res[i]; // copy intermediate result
   }
 
-  inline void finish(DynamicParticleR<REAL> &p)
+  inline void bound(DynamicParticleR<REAL> &p, ParticleR<REAL> &near_p)
   {
+   // Vector3R<REAL> res(
+   //     -rest_density*near_p.dinv*p.pressure*p.dinv*p.dinv*p_kern[p.pos - near_p.pos] // pressure contribution
+   //    // + viscosity*near_p.dinv*(near_p.vel - p.vel)*v_kern(p.pos - near_p.pos) // viscosity contribution
+   //     );
+    float massb = rest_density * near_p.dinv;
+    Vector3R<REAL> res(
+        const2*(massb/(mass*(mass + massb))) * (p.pos - near_p.pos) * b_kern(p.pos - near_p.pos)  // pressure contribution
+       // + viscosity*near_p.dinv*(near_p.vel - p.vel)*v_kern(p.pos - near_p.pos) // viscosity contribution
+        );
+
     for (unsigned char i = 0; i < 3; ++i)
-      p.accel[i] = mass*p.dinv*p.accel[i];
-    p.accel[1] -= M_G;
+      p.extern_accel[i] += res[i]; // copy intermediate result
+  }
+
+  inline void finish_particle(DynamicParticleR<REAL> &p)
+  {
+    p.extern_accel[1] -= M_G;
+    for (unsigned char i = 0; i < 3; ++i)
+      p.accel[i] = p.accel[i] + p.extern_accel[i];
 
 //    qDebug() << "p.dinv:" << p.dinv;
     //qDebug(" ac: % 10.5e % 10.5e % 10.5e", p.accel[0], p.accel[1], p.accel[2]);
@@ -116,11 +247,14 @@ public:
   }
 
 private:
+  LeonardJonesKernel b_kern; // used to compute boundary force
   SpikyGradKernel p_kern; // used to compute pressure force
   ViscLapKernel   v_kern; // used to compute viscosity force
   REAL mass;
+  REAL rest_density;
   REAL viscosity;
   REAL st;
+  REAL const2;
 };
 
 
@@ -171,6 +305,8 @@ public:
   void compute_accel();
   void compute_initial_density();
   void compute_pressure();
+  void compute_density();
+  void update_density(float timestep);
 
   template<typename ProcessPairFunc>
   inline void compute_bound_quantity(ProcessPairFunc process);
@@ -199,8 +335,10 @@ private:
   float m_h;    // kernel size
   float m_hinv; // 1 / grid_size
 
-  ProcessPressureR<REAL> m_proc_pressure;
-  ProcessAccelR<REAL> m_proc_accel;
+  ComputeFluidDensityR<REAL>   m_proc_fluid_density;
+  ComputeBoundaryVolumeR<REAL> m_proc_bound_volume;
+  ComputePressureR<REAL>       m_proc_pressure;
+  ComputePressureAccelR<REAL>  m_proc_pressure_accel;
 
   const Vector3f &m_bmin;
 }; // class UniformGridRS
@@ -219,6 +357,7 @@ public:
   inline REAL *pos_at(SIZE i)    { return this->m_pos.data() + i*3; }
   inline REAL *vel_at(SIZE i)    { return m_vel.data() + i*3; }
   inline REAL *accel_at(SIZE i)  { return m_accel.data() + i*3; }
+  inline REAL *extern_accel_at(SIZE i)  { return m_extern_accel.data() + i*3; }
 
   inline const Vector3f &get_bmin() const { return m_bmin; }
   inline const Vector3f &get_bmax() const { return m_bmax; }
@@ -227,7 +366,7 @@ public:
 
   inline bool is_dynamic() const { return true; }
 
-  inline void reset_accel() { m_accel.setZero(); }
+  inline void reset_accel() { m_accel.setZero(); m_extern_accel.setZero(); }
 
   inline bool clamp(REAL &d, REAL min, REAL max);
   inline void resolve_collisions();
@@ -246,6 +385,7 @@ protected:
   REAL m_st;
   Matrix3XR<REAL> m_vel; // velocities
   Matrix3XR<REAL> m_accel; // accelerations
+  Matrix3XR<REAL> m_extern_accel; // accelerations
 
   Vector3f m_bmin;
   Vector3f m_bmax;

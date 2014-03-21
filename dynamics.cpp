@@ -2,6 +2,8 @@
 #include "glpointcloud.h"
 #include "gltext.h"
 #include <ctime>
+#include <algorithm>
+#include <limits>
 
 // UniformGrid stuff
 
@@ -14,8 +16,10 @@ UniformGridRS<REAL,SIZE>::UniformGridRS(
   : m_dpc(dpc)
   , m_h(h)
   , m_hinv(1.0f/grid_h)
+  , m_proc_fluid_density(m_h)
+  , m_proc_bound_volume(m_h)
   , m_proc_pressure(m_h)
-  , m_proc_accel(m_h)
+  , m_proc_pressure_accel(m_h)
   , m_bmin(bmin)
 {
   glprintf_tr("radius: %.2f\n", h);
@@ -26,8 +30,10 @@ UniformGridRS<REAL,SIZE>::UniformGridRS(DynamicPointCloudRS<REAL,SIZE> *dpc, flo
   : m_dpc(dpc)
   , m_h(h)
   , m_hinv(1.0f/h)
+  , m_proc_fluid_density(m_h)
+  , m_proc_bound_volume(m_h)
   , m_proc_pressure(m_h)
-  , m_proc_accel(m_h)
+  , m_proc_pressure_accel(m_h)
   , m_bmin(bmin)
 {
   glprintf_tr("radius: %.2f\n", h);
@@ -54,12 +60,17 @@ void UniformGridRS<REAL,SIZE>::init()
   populate_fluid_data(); // populate grid with particles
   populate_bound_data();
 
-  compute_initial_density();
+  //compute_initial_density();
 
+  glprintf_tr("c2: %.2es\n", m_dpc->m_c2);
+  glprintf_tr("rest density: %.2f\n", m_dpc->m_rest_density);
   glprintf_tr("mass: %.2f\n", m_dpc->m_mass);
 
+  compute_bound_quantity(m_proc_bound_volume);
+
+  //m_proc_fluid_density.init(m_dpc->m_mass, m_dpc->m_rest_density, m_dpc->get_radius());
   m_proc_pressure.init(m_dpc->m_mass, m_dpc->m_rest_density, m_dpc->m_c2);
-  m_proc_accel.init(m_dpc->m_mass, m_dpc->m_viscosity, m_dpc->m_st);
+  m_proc_pressure_accel.init(m_dpc->m_mass, m_dpc->m_rest_density, m_dpc->m_viscosity, m_dpc->m_st, m_dpc->m_c2);
 }
 
 template<typename REAL, typename SIZE>
@@ -87,7 +98,7 @@ void UniformGridRS<REAL,SIZE>::populate_fluid_data()
     Vector3R<REAL> pos( m_dpc->m_pos.col(i) );
     Vector3R<REAL> vel( m_dpc->m_vel.col(i) );
     Array3Index idx = get_voxel_index(pos);
-    m_grid(idx).fluidvec.push_back( DynamicParticleR<REAL>(pos, vel, m_dpc->accel_at(i)) );
+    m_grid(idx).fluidvec.push_back( DynamicParticleR<REAL>(pos, vel, m_dpc->accel_at(i), m_dpc->extern_accel_at(i)) );
   }
 }
 
@@ -98,92 +109,190 @@ void UniformGridRS<REAL,SIZE>::populate_bound_data()
   SIZE nx = m_gridsize[0];
   SIZE ny = m_gridsize[1];
   SIZE nz = m_gridsize[2];
-  REAL h = 1/m_hinv; // TODO: save and use actual gridsize
+  float h = 1/m_hinv; // TODO: save and use actual gridsize
   Vector3R<REAL> bmin = m_bmin.template cast<REAL>();
+
+  unsigned char inflate = 3;
+  float d = h/inflate;
 
   SIZE i = 0;
   for (SIZE j = 0; j < ny; ++j)
     for (SIZE k = 0; k < nz; ++k)
     {
       StaticParticles &boundvec = m_grid[i][j][k].boundvec;
-      boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(0, j, k) + bmin) );
+      for (unsigned char n = 0; n < inflate; ++n)
+        for (unsigned char m = 0; m < inflate; ++m)
+          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0, h*j+d*n, h*k+d*m) + bmin) );
+
       if (k == nz-1)
-        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(0, j, nz) + bmin) );
+        for (unsigned char n = 0; n < inflate; ++n)
+          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0, h*j+d*n, h*nz) + bmin) );
       if (j == ny-1)
-        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(0, ny, k) + bmin) );
+        for (unsigned char n = 0; n < inflate; ++n)
+          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0, h*ny, h*k + d*n) + bmin) );
       if (j == ny-1 && k == nz-1)
-        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(0, ny, nz) + bmin) );
+        boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0, h*ny, h*nz) + bmin) );
     }
 
+  // cover strip near i=0
+  for (SIZE k = 0; k < nz; ++k)
+  {
+    for (unsigned char n = 1; n < inflate; ++n)
+      for (unsigned char m = 0; m < inflate; ++m)
+      {
+        m_grid[0][0][k].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*n, 0, h*k + d*m) + bmin) );
+        m_grid[0][ny-1][k].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*n, h*ny, h*k + d*m) + bmin) );
+      }
+  }
+
+  for (unsigned char n = 1; n < inflate; ++n)
+  {
+    m_grid[0][0][nz-1].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*n, 0, h*nz) + bmin) );
+    m_grid[0][ny-1][nz-1].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*n, h*ny, h*nz) + bmin) );
+  }
+
+  // two blocks near i=0, j=0
+  for (unsigned char n = 1; n < inflate; ++n)
+    for (unsigned char m = 1; m < inflate; ++m)
+    {
+      m_grid[0][0][0].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*m, 0+d*n, 0) + bmin) );
+      m_grid[0][0][nz-1].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*m, 0+d*n, h*nz) + bmin) );
+    }
+
+  for (SIZE j = 1; j < ny; ++j)
+  {
+    for (unsigned char n = 0; n < inflate; ++n)
+      for (unsigned char m = 1; m < inflate; ++m)
+      {
+        m_grid[i][j][0].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*m, h*j+d*n, 0) + bmin) );
+        m_grid[i][j][nz-1].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*m, h*j+d*n, h*nz) + bmin) );
+      }
+  }
+  
   for (i = 1; i < nx; ++i)
   {
     SIZE j = 0;
     for (SIZE k = 0; k < nz; ++k)
     {
       StaticParticles &boundvec = m_grid[i][j][k].boundvec;
-      boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(i, 0, k) + bmin) );
+      for (unsigned char n = 0; n < inflate; ++n)
+        for (unsigned char m = 0; m < inflate; ++m)
+          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i + d*n, 0, h*k + d*m) + bmin) );
+
       if (k == nz-1)
-        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(i, 0, nz) + bmin) );
+        for (unsigned char n = 0; n < inflate; ++n)
+          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i + d*n, 0, h*nz) + bmin) );
     }
+
+    // cover strip where j=0
+    for (unsigned char n = 0; n < inflate; ++n)
+      for (unsigned char m = 1; m < inflate; ++m)
+      {
+        m_grid[i][j][0].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i + d*n, 0 + d*m, 0) + bmin) );
+        m_grid[i][j][nz-1].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i + d*n, 0 + d*m, h*nz) + bmin) );
+      }
 
     for (j = 1; j < ny; ++j)
     {
-      m_grid[i][j][0].boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(i, j, 0) + bmin) );
-
-      m_grid[i][j][nz-1].boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(i, j, nz) + bmin) );
+      for (unsigned char n = 0; n < inflate; ++n)
+      {
+        for (unsigned char m = 0; m < inflate; ++m)
+        {
+          m_grid[i][j][0].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i+d*n, h*j+d*m, 0) + bmin) );
+          m_grid[i][j][nz-1].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i+d*n, h*j+d*m, h*nz) + bmin) );
+        }
+      }
     }
 
     j = ny-1;
     for (SIZE k = 0; k < nz; ++k)
     {
       StaticParticles &boundvec = m_grid[i][j][k].boundvec;
-      boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(i, ny, k) + bmin) );
+      for (unsigned char n = 0; n < inflate; ++n)
+        for (unsigned char m = 0; m < inflate; ++m)
+          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i+d*n, h*ny, h*k+d*m) + bmin) );
       if (k == nz-1)
-        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(i, ny, nz) + bmin) );
+        for (unsigned char n = 0; n < inflate; ++n)
+          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i+d*n, h*ny, h*nz) + bmin) );
     }
 
   } // for i
 
-  i = nx-1; // cap off the top
+  i = nx-1; // cap off the right side
   for (SIZE j = 0; j < ny; ++j)
     for (SIZE k = 0; k < nz; ++k)
     {
       StaticParticles &boundvec = m_grid[i][j][k].boundvec;
-      boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(nx, j, k) + bmin) );
+      for (unsigned char n = 0; n < inflate; ++n)
+        for (unsigned char m = 0; m < inflate; ++m)
+          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*nx, h*j+d*n, h*k+d*m) + bmin) );
       if (k == nz-1)
-        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(nx, j, nz) + bmin) );
+        for (unsigned char n = 0; n < inflate; ++n)
+          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*nx, h*j+d*n, h*nz) + bmin) );
       if (j == ny-1)
-        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(nx, ny, k) + bmin) );
+        for (unsigned char n = 0; n < inflate; ++n)
+          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*nx, h*ny, h*k+d*n) + bmin) );
       if (j == ny-1 && k == nz-1)
-        boundvec.push_back( ParticleR<REAL>(h*Vector3R<REAL>(nx, ny, nz) + bmin) );
+        boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*nx, h*ny, h*nz) + bmin) );
     }
+
+  // check for consistency
+  #if 0
+  for (SIZE i = 0; i < nx; ++i)
+    for (SIZE j = 0; j < ny; ++j)
+      for (SIZE k = 0; k < nz; ++k)
+      {
+        StaticParticles &bv1 = m_grid[i][j][k].boundvec;
+        for (SIZE ni = 0; ni < nx; ++ni)
+          for (SIZE nj = 0; nj < ny; ++nj)
+            for (SIZE nk = 0; nk < nz; ++nk)
+            {
+              StaticParticles &bv2 = m_grid[ni][nj][nk].boundvec;
+              for (auto &p1 : bv1)
+              {
+                for (auto &p2 : bv2)
+                {
+                  if (&p1 == &p2)
+                    continue;
+                  if (p1.pos[0] == p2.pos[0] && p1.pos[1] == p2.pos[1] && p1.pos[2] == p2.pos[2])
+                    qDebug() << "cells " << i << j << k << " and " << ni << nj << nk;
+
+                }
+              }
+            }
+      }
+#endif
 }
 
 
-
 template<typename REAL>
-class ProcessInitialDensityR
+class ComputeInitialDensityR
 {
 public:
-  ProcessInitialDensityR(float h, REAL m, REAL &rd) 
+  ComputeInitialDensityR(float h, REAL m, REAL &rd) 
     : kern(h), mass(m), rest_density(rd) { }
-  ~ProcessInitialDensityR() { }
+  ~ComputeInitialDensityR() { }
 
-  inline void init(ParticleR<REAL> &p)
+  inline void init_particle(ParticleR<REAL> &p)
   {
-    qDebug() << p.pos[0] << p.pos[1] << p.pos[2];
+//    qDebug() << "v" << p.pos[0] << p.pos[1] << p.pos[2];
     p.dinv = 0.0f;
   }
 
-  inline void operator()(ParticleR<REAL> &p, ParticleR<REAL> &near_p)
+  inline void fluid(ParticleR<REAL> &p, DynamicParticleR<REAL> &near_p)
+  {
+    p.dinv += kern[ p.pos - near_p.pos ];
+  }
+  inline void bound(ParticleR<REAL> &p, ParticleR<REAL> &near_p)
   {
     p.dinv += kern[ p.pos - near_p.pos ];
   }
 
-  inline void finish(ParticleR<REAL> &p)
+  inline void finish_particle(ParticleR<REAL> &p)
   {
     REAL density = p.dinv * mass * kern.coef;
     p.dinv = 1.0f/density;
+//    qDebug() << density;
     rest_density += density;
   }
 
@@ -196,19 +305,40 @@ private:
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::compute_initial_density()
 {
-  ProcessInitialDensityR<REAL> proc(m_h, m_dpc->m_mass, m_dpc->m_rest_density);
+  ComputeInitialDensityR<REAL> proc(m_h, m_dpc->m_mass, m_dpc->m_rest_density);
   compute_bound_quantity(proc);
 
   m_dpc->m_rest_density = 0.0f;
   compute_fluid_quantity(proc);
   m_dpc->m_rest_density /= m_dpc->m_num_vertices;
-  glprintf_tr("rest density: %.2f\n", m_dpc->m_rest_density);
+}
+
+
+template<typename REAL, typename SIZE>
+void UniformGridRS<REAL,SIZE>::update_density(float timestep)
+{
+  ComputeFluidDensityUpdateR<REAL> proc(m_h);
+  proc.init(m_dpc->m_mass, timestep );
+  compute_fluid_quantity(proc);
+}
+template<typename REAL, typename SIZE>
+void UniformGridRS<REAL,SIZE>::compute_density()
+{
+  ComputeFluidDensityR<REAL> proc(m_h);
+  REAL max_var = 0.0f;
+  REAL avg_var = 0.0f;
+  proc.init(m_dpc->m_mass, m_dpc->m_rest_density, m_dpc->get_radius(), max_var, avg_var );
+  compute_fluid_quantity(proc);
+  avg_var = avg_var/m_dpc->m_num_vertices;
+  qDebug() << "max:" << max_var << 100.00f*max_var/m_dpc->m_rest_density << "%;  avg:" << avg_var << 100.00f*avg_var/m_dpc->m_rest_density << "%";
 }
 
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::compute_pressure()
 {
-  compute_bound_quantity(m_proc_pressure);
+  // will be needed when we use alternative pressure methods (pressure projection)
+  //compute_fluid_quantity(m_proc_fluid_density);
+
   compute_fluid_quantity(m_proc_pressure);
 }
 
@@ -216,7 +346,7 @@ template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::compute_accel()
 {
   m_dpc->reset_accel();     // now may assume all accelerations are zero
-  compute_fluid_quantity< ProcessAccelR<REAL> >( m_proc_accel );
+  compute_fluid_quantity( m_proc_pressure_accel );
 }
 
 // TODO: refactor the following two routines
@@ -243,7 +373,7 @@ void UniformGridRS<REAL,SIZE>::compute_bound_quantity(ProcessPairFunc process)
         GridView neigh_view = m_grid[ boost::indices[xrange][yrange][zrange] ];
 
         for ( ParticleR<REAL> &p : boundvec )  // prepare data
-          process.init(p);
+          process.init_particle(p);
 
         SIZE xrange_size = xrange.finish() - xrange.start();
         SIZE yrange_size = yrange.finish() - yrange.start();
@@ -261,11 +391,11 @@ void UniformGridRS<REAL,SIZE>::compute_bound_quantity(ProcessPairFunc process)
               {
                 for ( DynamicParticleR<REAL> &near_p : neigh_fluidvec )
                 {
-                  process(p, near_p); // process data
+                  process.fluid(p, near_p); // process neighbouring fluid data
                 }
                 for ( ParticleR<REAL> &near_p : neigh_boundvec )
                 {
-                  process(p, near_p); // process data
+                  process.bound(p, near_p); // process neighbouring boundary data
                 }
               }
             }
@@ -273,7 +403,7 @@ void UniformGridRS<REAL,SIZE>::compute_bound_quantity(ProcessPairFunc process)
         }
 
         for ( ParticleR<REAL> &p : boundvec )  // finalize data
-          process.finish(p);
+          process.finish_particle(p);
       } // for k
     } // for j
   } // for i
@@ -303,7 +433,7 @@ void UniformGridRS<REAL,SIZE>::compute_fluid_quantity(ProcessPairFunc process)
         GridView neigh_view = m_grid[ boost::indices[xrange][yrange][zrange] ];
 
         for ( DynamicParticleR<REAL> &p : fluidvec )  // prepare data
-          process.init(p);
+          process.init_particle(p);
 
         SIZE xrange_size = xrange.finish() - xrange.start();
         SIZE yrange_size = yrange.finish() - yrange.start();
@@ -321,11 +451,11 @@ void UniformGridRS<REAL,SIZE>::compute_fluid_quantity(ProcessPairFunc process)
               {
                 for ( DynamicParticleR<REAL> &near_p : neigh_fluidvec )
                 {
-                  process(p, near_p); // process data
+                  process.fluid(p, near_p); // process neighbouring fluid data
                 }
                 for ( ParticleR<REAL> &near_p : neigh_boundvec )
                 {
-                  process(p, near_p); // process data
+                  process.bound(p, near_p); // process neighbouring boundary data
                 }
               }
             }
@@ -333,7 +463,7 @@ void UniformGridRS<REAL,SIZE>::compute_fluid_quantity(ProcessPairFunc process)
         }
 
         for ( DynamicParticleR<REAL> &p : fluidvec )  // finalize data
-          process.finish(p);
+          process.finish_particle(p);
       } // for k
     } // for j
   } // for i
@@ -350,7 +480,6 @@ DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
     REAL density, REAL viscosity, REAL st)
   : PointCloudRS<REAL,SIZE>(*glpc->get_pointcloud())
   , m_num_vertices(this->get_num_vertices())
-  , m_c2(2.2e2)
   , m_rest_density(density)
   , m_viscosity(viscosity)
   , m_st(st) // surface tension
@@ -361,13 +490,21 @@ DynamicPointCloudRS<REAL,SIZE>::DynamicPointCloudRS(
   , m_glpc(glpc)
   , m_stop_requested(false)
 {
+  // heuristic to compute speed of sound when objects have 0 initial velocity
+  // at the start of simulation.
+  // (WARNING: if this assumption changes, the heuristic becomes invalid!)
+
+  float eta = 0.01; // precent of density variation allowed
+  m_c2 = 2*M_G*(m_bmax[1] - m_bmin[1]) / eta;
+
   m_accel.resizeLike(this->m_pos);
+  m_extern_accel.resizeLike(this->m_pos);
   m_vel.resizeLike(this->m_pos);
   m_vel.setZero();
   reset_accel();
 
   REAL h = this->compute_mindist();
-  m_mass = m_rest_density * h * h * h * 1.1f;
+  m_mass = m_rest_density * h * h * h*2;
 
   //const clock_t begin_time = clock();
   //float d1 = PointCloudRS<REAL,SIZE>::compute_mindist();
@@ -410,9 +547,9 @@ void DynamicPointCloudRS<REAL,SIZE>::resolve_collisions()
   {
     for (unsigned char j = 0; j < 3; ++j)
     {
-      if (clamp(pos_at(i)[j], m_bmin[j], m_bmax[j]))
+      if (clamp(pos_at(i)[j], m_bmin[j]+0.02, m_bmax[j]-0.02))
       {
-        vel_at(i)[j] *= -1.0;
+       // vel_at(i)[j] *= -0.1;
       }
     }
   }
@@ -422,9 +559,11 @@ template<typename REAL, typename SIZE>
 void DynamicPointCloudRS<REAL,SIZE>::run()
 {
   m_grid.init();
-  float dt = 0.00217;
+  float dt = 4.52e-4;
   glprintf_tr("step: %.2es\n", dt);
+  float rdt = dt;
 
+  m_grid.compute_density();
   m_grid.compute_pressure();
   m_grid.compute_accel(); // update m_accel
 
@@ -435,7 +574,28 @@ void DynamicPointCloudRS<REAL,SIZE>::run()
   unsigned int count=0;
   for ( ; ; )
   {
+    // testing adaptive time step
+    float fdt = std::numeric_limits<float>::infinity();
+    float cvdt = std::numeric_limits<float>::infinity();
+    for (SIZE i = 0; i < m_num_vertices; ++i)
+    {
+      fdt = std::min(fdt, float(this->get_radius()/(m_mass*Vector3R<REAL>(m_extern_accel.col(i)).norm())));
+      cvdt = std::min(cvdt, float(this->get_radius()/(m_c2*(1+0.6*0.08))));
+      // check for nan and infs
+      if (!std::isfinite(m_vel.col(i)[0]) || !std::isfinite(m_vel.col(i)[1]) || !std::isfinite(m_vel.col(i)[2]))
+        qDebug() << "Found NaN at " << i;
+    }
+    float new_rdt = std::min(0.25*fdt, 0.4*cvdt);
+    if (new_rdt != rdt)
+    {
+      glprintf_tl("\rrecommended step: %.2es", new_rdt);
+      rdt = new_rdt;
+    }
+
+    // end of adaptive timestep test
+
     this->m_pos = (this->m_pos + dt*m_vel).eval();
+    
     //resolve_collisions();
     m_grid.update();
 
@@ -447,6 +607,10 @@ void DynamicPointCloudRS<REAL,SIZE>::run()
 
     m_vel = m_vel + 0.5*dt*m_accel;
 
+    if (count % 100)
+      m_grid.update_density(dt);
+    else
+      m_grid.compute_density();
     m_grid.compute_pressure();
     m_grid.compute_accel(); // update m_accel
 

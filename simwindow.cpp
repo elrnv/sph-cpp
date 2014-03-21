@@ -121,25 +121,25 @@ void SimWindow::load_model(int i)
       break;
     case 4:
       filename = "sparsesphere.obj";
-      ext_x = Vector2f(1.0f, 1.0f);
-      ext_y = Vector2f(2.0f, 0.0f);
-      ext_z = Vector2f(1.0f, 1.0f);
+      ext_x = Vector2f(0.5f, 0.5f);
+      ext_y = Vector2f(0.5f, 0.5f);
+      ext_z = Vector2f(0.5f, 0.5f);
       angle_x = 40.0f;
       angle_y = 40.0f;
       break;
     case 5:
       filename = "sphere.obj";
-      ext_x = Vector2f(1.0f, 1.0f);
-      ext_y = Vector2f(2.0f, 0.0f);
-      ext_z = Vector2f(1.0f, 1.0f);
+      ext_x = Vector2f(0.5f, 0.5f);
+      ext_y = Vector2f(0.5f, 0.5f);
+      ext_z = Vector2f(0.5f, 0.5f);
       angle_x = 40.0f;
       angle_y = 40.0f;
       break;
     case 6:
       filename = "densesphere.obj";
-      ext_x = Vector2f(1.0f, 1.0f);
-      ext_y = Vector2f(2.0f, 0.0f);
-      ext_z = Vector2f(1.0f, 1.0f);
+      ext_x = Vector2f(0.5f, 0.5f);
+      ext_y = Vector2f(0.5f, 0.5f);
+      ext_z = Vector2f(0.5f, 0.5f);
       angle_x = 40.0f;
       angle_y = 40.0f;
       break;
@@ -189,7 +189,7 @@ void SimWindow::reset_viewmode()
   else
   {
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
+    glDisable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_PROGRAM_POINT_SIZE);
   }
@@ -242,6 +242,8 @@ void SimWindow::render()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
+  reset_viewmode();
+
   for ( const GLPrimitivePtr &prim_ptr : m_glprims )
   {
     GLPrimitive *glprim = prim_ptr.get();
@@ -283,7 +285,6 @@ void SimWindow::render()
     glprim->get_program()->setUniformValue("lights[1].col", QVector4D(0.0, 0.0, 0.0, 0.0));
 
     glprim->get_vao().bind();
-    reset_viewmode();
     if (m_viewmode == ShaderManager::PARTICLE)
     {
       glprim->get_program()->setUniformValue("pt_scale", float(14.5*window_dim()[1]*m_near));
