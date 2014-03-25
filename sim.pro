@@ -14,9 +14,10 @@ SOURCES += \
   material.cpp \
   uniformbuffer.cpp \
   shadermanager.cpp \
+  fluid.cpp \
   dynamics.cpp \
   glmesh.cpp \
-  glpointcloud.cpp
+  glpointcloud.cpp \
 
 HEADERS += \
   gltext.h \
@@ -29,10 +30,13 @@ HEADERS += \
   material.h \
   uniformbuffer.h \
   shadermanager.h \
+  quantityprocessor.h \
+  fluid.h \
   dynamics.h \
   glmesh.h \
   glpointcloud.h \
   glprimitive.h \
+  particle.h \
   eigen.h \
   util.h \
   kernel.h

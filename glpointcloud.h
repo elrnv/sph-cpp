@@ -7,7 +7,7 @@
 #include "glprimitive.h"
 
 template<typename REAL, typename SIZE>
-class DynamicPointCloudRS;
+class FluidRS;
 
 // A point cloud representation for OpenGL applications
 template<typename REAL, typename SIZE>
@@ -32,7 +32,7 @@ public:
   void update_glbuf();
   void update_shader(ShaderManager::ShaderType type);
 
-  DynamicPointCloudRS<REAL,SIZE> *make_dynamic(REAL d, REAL v, REAL st);
+  FluidRS<REAL,SIZE> *make_dynamic(REAL d, REAL v, REAL st);
 
   void print() const { std::cerr << *m_pc << std::endl; }
 

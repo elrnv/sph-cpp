@@ -8,6 +8,7 @@
 void OpenGLWindow::toggle_text()
 {
   m_show_text = !m_show_text;
+  gltoggle_text();
   renderLater();
 }
 

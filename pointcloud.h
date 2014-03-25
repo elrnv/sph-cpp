@@ -21,7 +21,7 @@ public:
   explicit PointCloudRS(const aiMesh *pc);
   ~PointCloudRS();
 
-  inline REAL get_radius() const       { return 0.5*compute_mindist(); }
+  inline REAL get_radius() { return 0.5*compute_mindist(); }
   inline SIZE get_num_vertices() const { return m_pos.cols(); }
   inline Matrix3XR<REAL> &get_pos() { return m_pos; }
   inline bool is_pointcloud() const { return true; }

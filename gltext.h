@@ -77,7 +77,10 @@ namespace gl
   extern GLTextBuffer topright;
   extern GLTextBuffer bottomleft;
   extern GLTextBuffer bottomright;
+  extern bool enable_text;
 };
+
+inline void gltoggle_text() { gl::enable_text = !gl::enable_text; }
 
 inline void _glclear(gl::Corner corner)
 {
@@ -96,26 +99,11 @@ inline void _glclear(gl::Corner corner)
 #define glclear_br() _glclear(gl::BOTTOM_RIGHT)
 #define glclear_bl() _glclear(gl::BOTTOM_LEFT)
 
-inline void _glprintf(gl::Corner corner, gl::Color color, const char *fmt, ...)
+inline void _glprintf_impl(
+    gl::Corner corner,
+    const Vector3f &c,
+    char *buffer)
 {
-  char buffer[256];
-  va_list args;
-  va_start (args, fmt);
-  vsprintf (buffer, fmt, args);
-  va_end (args);
-
-  Vector3f c;
-  switch (color)
-  {
-    case gl::RED:   c = Vector3f(1.0f, 0.0f, 0.0f); break;
-    case gl::YELLOW: c = Vector3f(1.0f, 1.0f, 0.0f); break;
-    case gl::GREEN: c = Vector3f(0.0f, 1.0f, 0.0f); break;
-    case gl::CYAN:  c = Vector3f(0.0f, 1.0f, 1.0f); break;
-    case gl::BLUE:  c = Vector3f(0.3f, 0.4f, 1.0f); break;
-    case gl::BLACK: c = Vector3f(0.0f, 0.0f, 0.0f); break;
-    case gl::WHITE: // FALL THROUGH
-    default: c = Vector3f(1.0f, 1.0f, 1.0f); break;
-  }
   std::deque<std::string> strs;
   std::string text = std::string(buffer);
   boost::split(strs, text , boost::is_any_of("\n"));
@@ -127,7 +115,9 @@ inline void _glprintf(gl::Corner corner, gl::Color color, const char *fmt, ...)
     size_t found = s.find_last_of("\r");
     if (found == std::string::npos)
       continue;
+//    qDebug() << "before" << QString(s);
     s = s.substr(found+1);
+ //   qDebug() << " after" << QString(s);
     if(!strs.front().empty())
       pop = true;
   }
@@ -153,14 +143,14 @@ inline void _glprintf(gl::Corner corner, gl::Color color, const char *fmt, ...)
       break;
     case gl::BOTTOM_LEFT:
       if (pop)
-        while(!gl::bottomleft.empty()  && gl::bottomright.front().text.find_first_of("\n") == std::string::npos )
+        while(!gl::bottomleft.empty()  && gl::bottomleft.front().text.find_first_of("\n") == std::string::npos )
           gl::bottomleft.pop_front();
       for ( auto &s : strs )
         gl::bottomleft.push_front(gl::TextBlock(s + extra, c));
       break;
     case gl::TOP_RIGHT: 
       if (pop)
-        while(!gl::topright.empty()    && gl::bottomright.back().text.find_first_of("\n") == std::string::npos )
+        while(!gl::topright.empty()    && gl::topright.back().text.find_first_of("\n") == std::string::npos )
           gl::topright.pop_back();
       for ( auto &s : strs )
         gl::topright.push_back(gl::TextBlock(extra + s, c));
@@ -168,7 +158,7 @@ inline void _glprintf(gl::Corner corner, gl::Color color, const char *fmt, ...)
     case gl::TOP_LEFT:  // FALL THROUGH
     default: 
       if (pop)
-        while(!gl::topleft.empty()     && gl::bottomright.back().text.find_first_of("\n") == std::string::npos )
+        while(!gl::topleft.empty()     && gl::topleft.back().text.find_first_of("\n") == std::string::npos )
            gl::topleft.pop_back();
       for ( auto &s : strs )
         gl::topleft.push_back(gl::TextBlock( s + extra, c)); 
@@ -176,15 +166,63 @@ inline void _glprintf(gl::Corner corner, gl::Color color, const char *fmt, ...)
   }
 }
 
-// printing routines
-#define glprintf_trc(color, fmt, ...) _glprintf(gl::TOP_RIGHT, gl::color, fmt, ##__VA_ARGS__)
-#define glprintf_tlc(color, fmt, ...) _glprintf(gl::TOP_LEFT, gl::color, fmt, ##__VA_ARGS__)
-#define glprintf_brc(color, fmt, ...) _glprintf(gl::BOTTOM_RIGHT, gl::color, fmt, ##__VA_ARGS__)
-#define glprintf_blc(color, fmt, ...) _glprintf(gl::BOTTOM_LEFT, gl::color, fmt, ##__VA_ARGS__)
+inline void _glprintf(gl::Corner corner, const Vector3f &c, const char *fmt, ...)
+{
+  if (!gl::enable_text)
+    return;
+  char buffer[256];
+  va_list args;
+  va_start (args, fmt);
+  vsprintf (buffer, fmt, args);
+  va_end (args);
 
-#define glprintf_tr(fmt, ...) _glprintf(gl::TOP_RIGHT, gl::WHITE, fmt, ##__VA_ARGS__)
-#define glprintf_tl(fmt, ...) _glprintf(gl::TOP_LEFT,  gl::WHITE, fmt, ##__VA_ARGS__)
-#define glprintf_br(fmt, ...) _glprintf(gl::BOTTOM_RIGHT, gl::WHITE, fmt, ##__VA_ARGS__)
-#define glprintf_bl(fmt, ...) _glprintf(gl::BOTTOM_LEFT,  gl::WHITE, fmt, ##__VA_ARGS__)
+  _glprintf_impl (corner, c, buffer);
+}
+
+inline void _glprintfc(gl::Corner corner, gl::Color color, const char *fmt, ...)
+{
+  if (!gl::enable_text)
+    return;
+  Vector3f c;
+  switch (color)
+  {
+    case gl::RED:   c = Vector3f(1.0f, 0.0f, 0.0f); break;
+    case gl::YELLOW: c = Vector3f(1.0f, 1.0f, 0.0f); break;
+    case gl::GREEN: c = Vector3f(0.0f, 1.0f, 0.0f); break;
+    case gl::CYAN:  c = Vector3f(0.0f, 1.0f, 1.0f); break;
+    case gl::BLUE:  c = Vector3f(0.3f, 0.4f, 1.0f); break;
+    case gl::BLACK: c = Vector3f(0.0f, 0.0f, 0.0f); break;
+    case gl::WHITE: // FALL THROUGH
+    default: c = Vector3f(1.0f, 1.0f, 1.0f); break;
+  }
+
+  char buffer[256];
+  va_list args;
+  va_start (args, fmt);
+  vsprintf (buffer, fmt, args);
+  va_end (args);
+
+  _glprintf_impl (corner, c, buffer);
+}
+
+// printing routines
+
+// with color
+#define glprintf_trc(color, fmt, ...) _glprintfc(gl::TOP_RIGHT, gl::color, fmt, ##__VA_ARGS__)
+#define glprintf_tlc(color, fmt, ...) _glprintfc(gl::TOP_LEFT, gl::color, fmt, ##__VA_ARGS__)
+#define glprintf_brc(color, fmt, ...) _glprintfc(gl::BOTTOM_RIGHT, gl::color, fmt, ##__VA_ARGS__)
+#define glprintf_blc(color, fmt, ...) _glprintfc(gl::BOTTOM_LEFT, gl::color, fmt, ##__VA_ARGS__)
+
+// with color vector
+#define glprintf_trcv(color, fmt, ...) _glprintf(gl::TOP_RIGHT, color, fmt, ##__VA_ARGS__)
+#define glprintf_tlcv(color, fmt, ...) _glprintf(gl::TOP_LEFT, color, fmt, ##__VA_ARGS__)
+#define glprintf_brcv(color, fmt, ...) _glprintf(gl::BOTTOM_RIGHT, color, fmt, ##__VA_ARGS__)
+#define glprintf_blcv(color, fmt, ...) _glprintf(gl::BOTTOM_LEFT, color, fmt, ##__VA_ARGS__)
+
+// no color
+#define glprintf_tr(fmt, ...) _glprintfc(gl::TOP_RIGHT, gl::WHITE, fmt, ##__VA_ARGS__)
+#define glprintf_tl(fmt, ...) _glprintfc(gl::TOP_LEFT,  gl::WHITE, fmt, ##__VA_ARGS__)
+#define glprintf_br(fmt, ...) _glprintfc(gl::BOTTOM_RIGHT, gl::WHITE, fmt, ##__VA_ARGS__)
+#define glprintf_bl(fmt, ...) _glprintfc(gl::BOTTOM_LEFT,  gl::WHITE, fmt, ##__VA_ARGS__)
 
 #endif // GLTEXT_H

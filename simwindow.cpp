@@ -5,40 +5,42 @@
 #include "util.h"
 #include "mesh.h"
 #include "simwindow.h"
-#include "dynamics.h"
+#include "fluid.h"
 
 void SimWindow::toggle_shortcuts()
 {
   m_show_shortcuts = !m_show_shortcuts;
+  glclear_bl();
+
   if (!m_show_shortcuts)
   {
-    glclear_bl();
+    glprintf_blc(BLUE, "T - show/hide shortcuts\n");
     return;
   }
-
   glprintf_bl("Shortcuts:\n");
-  glprintf_blc(BLUE, "  Y: show/hide text\n");
-  glprintf_blc(BLUE, "  T: show/hide shortcuts\n");
-  glprintf_blc(BLUE, "  R: reset view\n");
+  glprintf_blc(BLUE, "  Y - enable/disable text\n");
+  glprintf_blc(BLUE, "  T - show/hide shortcuts\n");
+  glprintf_blc(BLUE, "  R - reset view\n");
   glprintf_bl("  View Modes: \n");
-  glprintf_blc(GREEN, "    W: wireframe\n");
-  glprintf_blc(RED,   "    S: phong\n");
-  glprintf_blc(BLUE, "    P: particles\n");
+  glprintf_blc(GREEN, "    W - wireframe\n");
+  glprintf_blc(RED,   "    S - phong\n");
+  glprintf_blc(BLUE,  "    P - particles\n");
   glprintf_bl("  Models: \n");
-  glprintf_blc(GREEN, "    1: cube\n");
-  glprintf_blc(GREEN, "    2: cow\n");
-  glprintf_blc(GREEN, "    3: bunny\n");
-  glprintf_blc(BLUE,  "    4: sparse point cloud\n");
-  glprintf_blc(BLUE,  "    5: normal point cloud\n");
-  glprintf_blc(BLUE,  "    6: dense point cloud\n");
+  glprintf_blc(GREEN, "    1 - cube\n");
+  glprintf_blc(GREEN, "    2 - cow\n");
+  glprintf_blc(GREEN, "    3 - bunny\n");
+  glprintf_blc(BLUE,  "    4 - sparse point cloud\n");
+  glprintf_blc(BLUE,  "    5 - normal point cloud\n");
+  glprintf_blc(BLUE,  "    6 - dense point cloud\n");
   glprintf_bl("  Dynamics: \n");
-  glprintf_blc(RED,  "    D: enable\n");
-  glprintf_blc(RED,  "    C: disable\n");
-  glprintf_blc(CYAN, "    H: show/hide halos\n");
+  glprintf_blc(RED,  "    D - enable\n");
+  glprintf_blc(RED,  "    C - disable\n");
+  glprintf_blc(CYAN, "    H - show/hide halos\n");
 }
 
 SimWindow::SimWindow()
-  : m_show_shortcuts(false) // immediately toggled below
+  : m_show_shortcuts(true) // immediately toggled below
+  , m_grid(NULL)
   , m_viewmode(ShaderManager::PARTICLE)
   , m_change_prog(true)
   , m_shaderman(this)
@@ -53,9 +55,17 @@ SimWindow::~SimWindow()
 
 void SimWindow::clear_dynamics()
 {
+  if (!m_grid)
+  {
+    glclear_tr(); // clear dynamics text buffer
+    return;
+  }
+
   m_grid->request_stop(); // stop thread
   m_sim_thread.join();
   delete m_grid; m_grid = 0;
+
+  glclear_tr(); // clear dynamics text buffer
 }
 
 void SimWindow::init()
@@ -202,24 +212,21 @@ void SimWindow::make_dynamic()
   clear_dynamics();
 
   // Create simulation grid
-  m_grid = new UniformGrid();
+  m_grid = new UniformGrid(Vector3f(-1,-1,-1), Vector3f(1,1,1));
 
   for ( const GLPrimitivePtr &prim_ptr : m_glprims )
   {
     GLPrimitive *glprim = prim_ptr.get();
     if (!glprim->is_pointcloud())
       continue;
-  
-    // use right text buffer for dynamic properties
-    glclear_tr(); // so clear it
 
     GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
-    Fluid *dpc = glpc->make_dynamic(
+    Fluid *fl = glpc->make_dynamic(
         /*density = */1000.0f,
-        /*viscosity = */0.2f,
+        /*viscosity = */4.0f,
         /*surface tension coefficient = */0.0728f);
 
-    m_grid.add_fluid(dpc);
+    m_grid->add_fluid(fl);
   }
 
   // run simulation
@@ -270,7 +277,7 @@ void SimWindow::render()
     
     Vector4f l1 = m_udata.vinvmtx * Vector4f(0.0, 0.0, 10.0, 1.0);
     glprim->get_program()->setUniformValue("lights[0].pos", QVector4D(l1[0], l1[1], l1[2], l1[3]));
-    glprim->get_program()->setUniformValue("lights[0].col", QVector4D(0.2, 0.9, 0.9, 1.0));
+    glprim->get_program()->setUniformValue("lights[0].col", QVector4D(0.9, 0.9, 0.9, 1.0));
     glprim->get_program()->setUniformValue("lights[1].pos", QVector4D(0.0, 0.0, 0.0, 0.0));
     glprim->get_program()->setUniformValue("lights[1].col", QVector4D(0.0, 0.0, 0.0, 0.0));
 
@@ -289,7 +296,7 @@ void SimWindow::render()
           {
             glprim->get_program()->setUniformValue(
                 "pt_halo",
-                GLfloat(static_cast<DynamicPointCloud *>(pc)->get_kernel_radius()));
+                GLfloat(static_cast<Fluid *>(pc)->get_kernel_radius()));
           }
           else
             glprim->get_program()->setUniformValue( "pt_halo", GLfloat(pc->get_radius()));

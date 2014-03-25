@@ -7,6 +7,7 @@
 #include "uniformbuffer.h"
 #include "shadermanager.h"
 #include "glprimitive.h"
+#include "dynamics.h"
 
 typedef boost::shared_ptr<GLPrimitive> GLPrimitivePtr;
 typedef std::vector< GLPrimitivePtr > GLPrimVec;
@@ -56,7 +57,7 @@ private:
     Vector4f options; // only the first value is used
   } m_udata;
 
-  UnfiromGrid *m_grid; // simulation grid
+  UniformGrid *m_grid; // simulation grid
 
   GLPrimVec m_glprims;
 

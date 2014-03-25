@@ -15,6 +15,7 @@ namespace gl
   GLTextBuffer topright;
   GLTextBuffer bottomleft;
   GLTextBuffer bottomright;
+  bool enable_text = false;
 };
 
 static uint32_t
@@ -160,7 +161,7 @@ void GLTextPainter::draw_text(int xcur, int ycur)
   GLfloat top(2.0f);
   GLfloat bottom(m_screen_size[1] - 2.0f - m_height);
 
-  float opacity = 0.5f;
+  float opacity = 0.7f;
 
   // print top left buffer
   GLfloat x = left;

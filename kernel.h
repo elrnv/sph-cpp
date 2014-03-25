@@ -9,7 +9,8 @@ class Kernel
 {
 public:
   Kernel(float h) 
-    : h(h), h2(h*h), h3(h2*h), h4(h3*h) { } 
+    : h(h), h2(h*h), h3(h2*h), h4(h3*h)
+  { static_cast<KernelType*>(this)->init_coef(); } 
 
   // by convention operator[] -> don't premultiply by coef
   inline OutputType operator[](const Vector3d &r)
@@ -41,7 +42,8 @@ using Kernel3d = Kernel<Vector3d, KernelType>;
 
 struct MKI04Kernel : public Kerneld<MKI04Kernel>
 {
-  MKI04Kernel(float h) : Kerneld<MKI04Kernel>(h) { coef = 0.02; }
+  MKI04Kernel(float h) : Kerneld<MKI04Kernel>(h) { }
+  inline void init_coef() { coef = 0.02; }
   
   inline double kern(const Vector3d &r)
   {
@@ -68,7 +70,8 @@ struct MKI04Kernel : public Kerneld<MKI04Kernel>
 
 struct Poly6Kernel : public Kerneld<Poly6Kernel>
 {
-  Poly6Kernel(float h) : Kerneld<Poly6Kernel>(h) { coef = 315.0f/(64*M_PI*h3*h3*h3); }
+  Poly6Kernel(float h) : Kerneld<Poly6Kernel>(h) { }
+  inline void init_coef() { coef = 315.0f/(64*M_PI*h3*h3*h3); }
   
   // main kernel without coefficient
   inline double kern(const Vector3d &r)
@@ -80,7 +83,8 @@ struct Poly6Kernel : public Kerneld<Poly6Kernel>
 
 struct Poly6GradKernel : public Kernel3d<Poly6GradKernel>
 {
-  Poly6GradKernel(float h) : Kernel3d<Poly6GradKernel>(h) { coef = 1890.0f/(64*M_PI*h3*h3*h3); }
+  Poly6GradKernel(float h) : Kernel3d<Poly6GradKernel>(h) { }
+  inline void init_coef() { coef = 1890.0f/(64*M_PI*h3*h3*h3); }
 
   inline Vector3d kern(const Vector3d &r)
   {
@@ -91,7 +95,8 @@ struct Poly6GradKernel : public Kernel3d<Poly6GradKernel>
 
 struct Poly6LapKernel : public Kerneld<Poly6LapKernel>
 {
-  Poly6LapKernel(float h) : Kerneld<Poly6LapKernel>(h) { coef = 1890.0f/(64*M_PI*h3*h3*h3); }
+  Poly6LapKernel(float h) : Kerneld<Poly6LapKernel>(h) { }
+  inline void init_coef() { coef = 1890.0f/(64*M_PI*h3*h3*h3); }
 
   inline double kern(const Vector3d &r)
   {
@@ -104,7 +109,8 @@ struct Poly6LapKernel : public Kerneld<Poly6LapKernel>
 
 struct SpikyKernel : public Kerneld<SpikyKernel>
 {
-  SpikyKernel(float h) : Kerneld<SpikyKernel>(h) { coef = 15.0f/(M_PI*h3*h3); }
+  SpikyKernel(float h) : Kerneld<SpikyKernel>(h) { }
+  inline void init_coef() { coef = 15.0f/(M_PI*h3*h3); }
 
   inline double kern(const Vector3d &r)
   {
@@ -115,7 +121,8 @@ struct SpikyKernel : public Kerneld<SpikyKernel>
 
 struct SpikyGradKernel : public Kernel3d<SpikyGradKernel>
 {
-  SpikyGradKernel(float h) : Kernel3d<SpikyGradKernel>(h) { coef = 45.0f/(M_PI*h3*h3); }
+  SpikyGradKernel(float h) : Kernel3d<SpikyGradKernel>(h) { }
+  inline void init_coef() { coef = 45.0f/(M_PI*h3*h3); }
 
   // gradient of kernel
   inline Vector3d kern(const Vector3d &r)
@@ -131,7 +138,8 @@ struct SpikyGradKernel : public Kernel3d<SpikyGradKernel>
 // laplacian of spiky kernel
 struct SpikyLapKernel : public Kerneld<SpikyLapKernel>
 {
-  SpikyLapKernel(float h) : Kerneld<SpikyLapKernel>(h) { coef = 90.0f/(M_PI*h3*h3); }
+  SpikyLapKernel(float h) : Kerneld<SpikyLapKernel>(h) { }
+  inline void init_coef() { coef = 90.0f/(M_PI*h3*h3); }
 
   inline double kern(const Vector3d &r)
   {
@@ -150,7 +158,8 @@ struct SpikyLapKernel : public Kerneld<SpikyLapKernel>
 
 struct ViscKernel : public Kerneld<ViscKernel>
 {
-  ViscKernel(float h) : Kerneld<ViscKernel>(h) { coef = 15.0f/(2*M_PI*h3); }
+  ViscKernel(float h) : Kerneld<ViscKernel>(h) { }
+  inline void init_coef() { coef = 15.0f/(2*M_PI*h3); }
 
   inline double kern(const Vector3d &r)
   {
@@ -167,7 +176,8 @@ struct ViscKernel : public Kerneld<ViscKernel>
 
 struct ViscGradKernel : public Kernel3d<ViscGradKernel>
 {
-  ViscGradKernel(float h) : Kernel3d<ViscGradKernel>(h) { coef = 15.0f/(2*M_PI*h3); }
+  ViscGradKernel(float h) : Kernel3d<ViscGradKernel>(h) { }
+  inline void init_coef() { coef = 15.0f/(2*M_PI*h3); }
 
   inline Vector3d kern(const Vector3d &r)
   {
@@ -180,7 +190,8 @@ struct ViscGradKernel : public Kernel3d<ViscGradKernel>
 
 struct ViscLapKernel : public Kerneld<ViscLapKernel>
 {
-  ViscLapKernel(float h) : Kerneld<ViscLapKernel>(h) { coef = 45.0f/(M_PI*h3*h3); }
+  ViscLapKernel(float h) : Kerneld<ViscLapKernel>(h) { }
+  inline void init_coef() { coef = 45.0f/(M_PI*h3*h3); }
 
   inline double kern(const Vector3d &r)
   {
