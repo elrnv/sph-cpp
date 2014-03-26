@@ -136,6 +136,12 @@ void SimWindow::load_model(int i)
       angle_x = 40.0f;
       angle_y = 40.0f;
       break;
+    case 7:
+      filename = "block.obj";
+      break;
+    case 8:
+      filename = "sparseblock.obj";
+      break;
     default:
       glprintf_trc(RED, "model not found\n");
       return;

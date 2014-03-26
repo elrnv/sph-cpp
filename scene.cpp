@@ -4,6 +4,7 @@
 #include "scene.h"
 #include "mesh.h"
 #include "pointcloud.h"
+#include "fluid.h"
 
 SceneNode::SceneNode(const std::string& name)
   : m_name(name)
@@ -143,14 +144,20 @@ GeometryNode::GeometryNode(const std::string& name, Primitive* primitive)
 {
 }
 
-GeometryNode::GeometryNode(const aiMesh *mesh, const aiMaterial *mat)
+GeometryNode::GeometryNode(
+    const aiMesh *mesh, 
+    const aiMaterial *mat,
+    const DynParams &dyn_params)
   : SceneNode(mesh->mName.C_Str())
   , m_primitive(NULL)
   , m_material(&DEFAULT_MATERIAL)
 {
   if ( mesh->mPrimitiveTypes & aiPrimitiveType_POINT )
   {
-    m_primitive = new PointCloud(mesh); // interpret as point cloud
+    if ( dyn_params.type == DynParams::FLUID )
+      m_primitive = new Fluid(mesh); // interpret as point cloud
+    else
+      m_primitive = new PointCloud(mesh); // interpret as point cloud
   }
   else if ( mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)
   {

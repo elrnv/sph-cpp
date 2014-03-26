@@ -7,6 +7,7 @@
 #include "eigen.h"
 #include "primitive.h"
 #include "material.h"
+#include "util.h"
 
 class SceneNode;
 typedef std::vector<SceneNode*> NodeList;
@@ -99,7 +100,10 @@ public:
   GeometryNode(const std::string& name, Primitive* primitive);
 
   // Construct a geometry node and mesh from given assimp mesh
-  GeometryNode(const aiMesh *mesh, const aiMaterial *mat);
+  GeometryNode(
+      const aiMesh *mesh,
+      const aiMaterial *mat,
+      const DynParams &dyn_params);
 
   // copy constructor
   GeometryNode(const GeometryNode &orig);

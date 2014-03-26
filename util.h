@@ -3,6 +3,7 @@
 #include <QDebug>
 #include <vector>
 #include <boost/shared_ptr.hpp>
+#include <boost/algorithm/string/trim.hpp>
 #include <string>
 #include <iostream>
 #include <assimp/Importer.hpp>
@@ -15,8 +16,38 @@
 namespace Util
 {
 
+struct DynParams
+{
+  enum Type
+  {
+    NONE,
+    FLUID,
+    RIGID,
+    STATIC
+  } type;
+
+  float density;
+  float viscosity;
+  float surface_tension;
+  float sound_speed;
+  Vector3f velocity;
+  Vector3f angular_velocity;
+
+  DynParams() // Default values:
+   : type(NONE)
+   , density(1000.0f)
+   , viscosity(0.5f)
+   , surface_tension(0.0728f)
+   , sound_speed(8.0f)
+   , velocity(0,0,0)
+   , angular_velocity(0,0,0)
+  { }
+
+  ~DynParams() { }
+};
+
 SceneNode *
-processScene( const aiScene *scene, const aiNode *node )
+processScene( const aiScene *scene, const aiNode *node, const DynParams &dyn_params )
 {
   SceneNode *scene_node = new SceneNode(node);
 
@@ -28,17 +59,71 @@ processScene( const aiScene *scene, const aiNode *node )
   {
     aiMesh *aimesh = scene->mMeshes[meshidx[i]];
     aiMaterial *aimat = scene->mMaterials[aimesh->mMaterialIndex];
-    GeometryNode *geo_node = new GeometryNode(aimesh, aimat);
+    GeometryNode *geo_node = new GeometryNode(aimesh, aimat, dyn_params);
     scene_node->add_child(geo_node);
   }
 
   // Continue for all child nodes
   unsigned int num_children = node->mNumChildren;
   for (unsigned int i = 0; i < num_children; ++i)
-    scene_node->add_child(processScene(scene, node->mChildren[i]));
+    scene_node->add_child(processScene(scene, node->mChildren[i], dyn_params));
 
   return scene_node;
 }
+
+DynParams
+loadDynamics( const std::string &filename )
+{
+  // parse the dynamics file
+  string line;
+  ifstream file;
+  file.open(filename);
+  if (!file.is_open())
+  {
+    qWarning() << "Could not open dynamics file:" << filename;
+    return DynParams();
+  }
+
+  DynParams params;
+
+  while (getline(file, line))
+  {
+    if (boost::trim(line).compare("fluid") == 0)
+    {
+      params.type = DynParams::FLUID;
+      continue;
+    }
+
+    istringstream iss(line);
+    string var_name;
+    iss >> var_name;
+
+    if (var_name.compare("d") == 0)
+      iss >> params.density;
+    else if (var_name.compare("v") == 0)
+      iss >> params.viscosity;
+    else if (var_name.compare("s") == 0)
+      iss >> params.surface_tension;
+    else if (var_name.compare("c") == 0)
+      iss >> params.sound_speed;
+    else if (var_name.compare("vel") == 0)
+    {
+      iss >> params.velocity[0];
+      iss >> params.velocity[1];
+      iss >> params.velocity[2];
+    }
+    else if (var_name.compare("angvel") == 0)
+    {
+      iss >> params.angular_velocity[0];
+      iss >> params.angular_velocity[1];
+      iss >> params.angular_velocity[2];
+    }
+  }
+
+  file.close();
+  return params;
+}
+
 
 SceneNode *
 loadScene( const std::string &filename )
@@ -65,7 +150,30 @@ loadScene( const std::string &filename )
     return NULL;
   }
 
-  return processScene(scene, scene->mRootNode);
+  // check for dynamics
+  string line;
+  ifstream file;
+  file.open(filename);
+  if (!file.is_open())
+  {
+    qWarning() << "Could not open input file:" << filename;
+    return NULL;
+  }
+
+  DynParams params;
+
+  while (getline(file, line))
+  {
+    if (line.compare(0, 6, "dynlib") == 0)
+    {
+      params = loadDynamics( boost::trim(line.substr(7)) );
+      break;
+    }
+  }
+
+  file.close();
+
+  return processScene(scene, scene->mRootNode, params);
 }
 
 // PRE: we must have the current GL context

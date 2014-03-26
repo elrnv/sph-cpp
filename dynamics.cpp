@@ -60,6 +60,7 @@ void UniformGridRS<REAL,SIZE>::init()
   for (auto &fl : m_fluids)
   {
     glprintf_trcv(fl->get_color(), "--- Fluid %d ---\n", ++count);
+    glprintf_trcv(fl->get_color(), "# of particles: %.2f  \n", fl->get_num_vertices());
     glprintf_trcv(fl->get_color(), "rest density: %.2f  \n", fl->get_rest_density());
     glprintf_trcv(fl->get_color(), "particle mass: %.2f  \n", fl->get_mass());
     glprintf_trcv(fl->get_color(), "viscosity: %.2f  \n", fl->get_viscosity());
