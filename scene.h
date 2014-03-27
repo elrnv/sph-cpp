@@ -7,7 +7,7 @@
 #include "eigen.h"
 #include "primitive.h"
 #include "material.h"
-#include "util.h"
+#include "dynparams.h"
 
 class SceneNode;
 typedef std::vector<SceneNode*> NodeList;
@@ -103,7 +103,7 @@ public:
   GeometryNode(
       const aiMesh *mesh,
       const aiMaterial *mat,
-      const DynParams &dyn_params);
+      DynParamsPtr dyn_params);
 
   // copy constructor
   GeometryNode(const GeometryNode &orig);

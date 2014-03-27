@@ -68,7 +68,8 @@ void UniformGridRS<REAL,SIZE>::init()
     glprintf_trcv(fl->get_color(), "sound speed: %.2e  \n", std::sqrt(fl->get_sound_speed2()));
   }
 
-  CBVolumeR<REAL> proc(m_h);
+  CBVolumeR<REAL> proc;
+  proc.init_kernel(m_h);
   m_bound_volume_proc = &proc;
   compute_bound_quantity< CBVolumeR<REAL> >();
   m_bound_volume_proc = NULL;
@@ -512,10 +513,9 @@ void UniformGridRS<REAL,SIZE>::run()
     for (auto &fl : m_fluids)
       fl->get_pos() = (fl->get_pos() + dt*fl->get_vel()).eval();
     
-#ifdef BOUNDARY_IMPULSE
     for (auto &fl : m_fluids)
       fl->resolve_collisions();
-#endif
+
     update_grid();
 
     for (auto &fl : m_fluids)

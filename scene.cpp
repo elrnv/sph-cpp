@@ -147,15 +147,16 @@ GeometryNode::GeometryNode(const std::string& name, Primitive* primitive)
 GeometryNode::GeometryNode(
     const aiMesh *mesh, 
     const aiMaterial *mat,
-    const DynParams &dyn_params)
+    DynParamsPtr dyn_params)
   : SceneNode(mesh->mName.C_Str())
   , m_primitive(NULL)
   , m_material(&DEFAULT_MATERIAL)
 {
   if ( mesh->mPrimitiveTypes & aiPrimitiveType_POINT )
   {
-    if ( dyn_params.type == DynParams::FLUID )
-      m_primitive = new Fluid(mesh); // interpret as point cloud
+    if ( dyn_params.get() && dyn_params->type == DynParams::FLUID )
+      m_primitive = // interpret as fluid
+        new Fluid(mesh, boost::static_pointer_cast<FluidParams>(dyn_params)); 
     else
       m_primitive = new PointCloud(mesh); // interpret as point cloud
   }

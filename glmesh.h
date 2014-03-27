@@ -21,7 +21,8 @@ public:
 
   MeshRS<REAL,SIZE> *get_mesh() { return m_mesh; }
 
-  bool is_mesh() const { return true; }
+  inline bool is_mesh()    const { return true; }
+  inline bool is_dynamic() const { return m_mesh->is_dynamic(); }
 
   SIZE get_num_indices()  const { return m_mesh->get_faces().size()*3; }
   SIZE get_num_vertices() const { return m_mesh->get_verts().size();   }

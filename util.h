@@ -2,52 +2,26 @@
 #define UTIL_H
 #include <QDebug>
 #include <vector>
-#include <boost/shared_ptr.hpp>
 #include <boost/algorithm/string/trim.hpp>
+#include <boost/algorithm/string.hpp>
+#include <boost/shared_ptr.hpp>
 #include <string>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include "scene.h"
 #include "glmesh.h"
 #include "glpointcloud.h"
+#include "dynparams.h"
 
 namespace Util
 {
 
-struct DynParams
-{
-  enum Type
-  {
-    NONE,
-    FLUID,
-    RIGID,
-    STATIC
-  } type;
-
-  float density;
-  float viscosity;
-  float surface_tension;
-  float sound_speed;
-  Vector3f velocity;
-  Vector3f angular_velocity;
-
-  DynParams() // Default values:
-   : type(NONE)
-   , density(1000.0f)
-   , viscosity(0.5f)
-   , surface_tension(0.0728f)
-   , sound_speed(8.0f)
-   , velocity(0,0,0)
-   , angular_velocity(0,0,0)
-  { }
-
-  ~DynParams() { }
-};
-
 SceneNode *
-processScene( const aiScene *scene, const aiNode *node, const DynParams &dyn_params )
+processScene( const aiScene *scene, const aiNode *node, DynParamsPtr dyn_params )
 {
   SceneNode *scene_node = new SceneNode(node);
 
@@ -71,59 +45,98 @@ processScene( const aiScene *scene, const aiNode *node, const DynParams &dyn_par
   return scene_node;
 }
 
-DynParams
+DynParamsPtr
 loadDynamics( const std::string &filename )
 {
   // parse the dynamics file
-  string line;
-  ifstream file;
-  file.open(filename);
+  std::string line;
+  std::ifstream file(filename, std::ifstream::in);
+
   if (!file.is_open())
   {
-    qWarning() << "Could not open dynamics file:" << filename;
-    return DynParams();
+    qWarning() << "Could not open dynamics file:" << QString(filename.c_str());
+    return DynParamsPtr(NULL);
   }
 
-  DynParams params;
+  DynParamsPtr params_ptr;
 
+  // determine type of dynamics
   while (getline(file, line))
   {
-    if (boost::trim(line).compare("fluid") == 0)
+    std::istringstream iss(line);
+    std::string var_name;
+    iss >> var_name;
+
+    if (boost::iequals(var_name, std::string("fluid")))
     {
-      params.type = DynParams::FLUID;
+      params_ptr = FluidParamsPtr(new FluidParams());
       continue;
     }
 
-    istringstream iss(line);
-    string var_name;
-    iss >> var_name;
+    if (!params_ptr.get())
+      continue;
 
-    if (var_name.compare("d") == 0)
-      iss >> params.density;
-    else if (var_name.compare("v") == 0)
-      iss >> params.viscosity;
-    else if (var_name.compare("s") == 0)
-      iss >> params.surface_tension;
-    else if (var_name.compare("c") == 0)
-      iss >> params.sound_speed;
-    else if (var_name.compare("vel") == 0)
+    if (boost::iequals(var_name, "vel"))
     {
-      iss >> params.velocity[0];
-      iss >> params.velocity[1];
-      iss >> params.velocity[2];
+      iss >> params_ptr->velocity[0];
+      iss >> params_ptr->velocity[1];
+      iss >> params_ptr->velocity[2];
     }
-    else if (var_name.compare("angvel") == 0)
+    else if (boost::iequals(var_name, "angvel"))
     {
-      iss >> params.angular_velocity[0];
-      iss >> params.angular_velocity[1];
-      iss >> params.angular_velocity[2];
+      iss >> params_ptr->angular_velocity[0];
+      iss >> params_ptr->angular_velocity[1];
+      iss >> params_ptr->angular_velocity[2];
+    }
+  }
+
+  if (params_ptr.get() && params_ptr->type == DynParams::FLUID)
+  {
+    FluidParamsPtr fparams_ptr = boost::static_pointer_cast<FluidParams>(params_ptr);
+
+    file.clear();
+    file.seekg(0); // rewind
+
+    while (getline(file, line))
+    {
+      std::istringstream iss(line);
+      std::string var_name;
+      iss >> var_name;
+
+      if (params_ptr->type == DynParams::FLUID)
+      {
+        if (boost::iequals(var_name, "t") == 0)
+        {
+          std::string fluid_type;
+          iss >> fluid_type;
+          if (boost::iequals(fluid_type, "mcg03"))
+            fparams_ptr->fluid_type = FluidParams::MCG03;
+          else if (boost::iequals(fluid_type, "bt07"))
+            fparams_ptr->fluid_type = FluidParams::BT07;
+          else if (boost::iequals(fluid_type, "aiast12"))
+            fparams_ptr->fluid_type = FluidParams::AIAST12;
+        }
+        else if (boost::iequals(var_name, "d"))
+          iss >> fparams_ptr->density;
+        else if (boost::iequals(var_name, "v"))
+          iss >> fparams_ptr->viscosity;
+        else if (boost::iequals(var_name, "st"))
+          iss >> fparams_ptr->surface_tension;
+        else if (boost::iequals(var_name, "cs"))
+          iss >> fparams_ptr->sound_speed;
+        else if (boost::iequals(var_name, "c"))
+          iss >> fparams_ptr->compressibility;
+        else if (boost::iequals(var_name, "ki"))
+          iss >> fparams_ptr->kernel_inflation;
+        else if (boost::iequals(var_name, "rvd"))
+          iss >> fparams_ptr->recoil_velocity_damping;
+      }
     }
   }
 
   file.close();
-  return params;
+  return params_ptr;
 }
-
 
 SceneNode *
 loadScene( const std::string &filename )
@@ -134,7 +147,7 @@ loadScene( const std::string &filename )
 
   // Read the file into an assimp scene data structure
   const aiScene *scene = 
-    importer.ReadFile( "data/" + filename, 0
+    importer.ReadFile( filename, 0
       | aiProcess_CalcTangentSpace     
       | aiProcess_GenSmoothNormals // or GenNormals
       | aiProcess_JoinIdenticalVertices
@@ -151,29 +164,36 @@ loadScene( const std::string &filename )
   }
 
   // check for dynamics
-  string line;
-  ifstream file;
+  std::string line;
+  std::ifstream file;
   file.open(filename);
+
   if (!file.is_open())
   {
-    qWarning() << "Could not open input file:" << filename;
+    qWarning() << "Could not open input file:" << QString(filename.c_str());
     return NULL;
   }
 
-  DynParams params;
+  DynParamsPtr params_ptr;
 
   while (getline(file, line))
   {
     if (line.compare(0, 6, "dynlib") == 0)
     {
-      params = loadDynamics( boost::trim(line.substr(7)) );
+      // search for dynamics file in the same directory
+      std::string dyn_filename = boost::trim_copy(line.substr(7));
+      size_t pos = filename.find_last_of("/");
+      if (pos == std::string::npos)
+        params_ptr = loadDynamics( dyn_filename );
+      else
+        params_ptr = loadDynamics( filename.substr(0,pos+1) + dyn_filename );
       break;
     }
   }
 
   file.close();
 
-  return processScene(scene, scene->mRootNode, params);
+  return processScene(scene, scene->mRootNode, params_ptr);
 }
 
 // PRE: we must have the current GL context

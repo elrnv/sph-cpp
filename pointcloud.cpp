@@ -34,7 +34,7 @@ PointCloudRS<REAL,SIZE>::~PointCloudRS()
 template<typename REAL, typename SIZE>
 void PointCloudRS<REAL,SIZE>::transform_in_place(const AffineCompact3f &trans)
 {
-  m_pos = trans.template cast<REAL>() * m_pos;;
+  m_pos = trans.template cast<REAL>() * m_pos;
 }
 
 template<typename REAL, typename SIZE>

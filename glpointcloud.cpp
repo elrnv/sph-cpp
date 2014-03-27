@@ -25,7 +25,8 @@ GLPointCloudRS<REAL,SIZE>::GLPointCloudRS(
   this->m_vao.bind();
 
   this->m_pos.create();
-  this->m_pos.setUsagePattern( QOpenGLBuffer::StaticDraw );
+  this->m_pos.setUsagePattern( 
+      is_dynamic() ? QOpenGLBuffer::StreamDraw : QOpenGLBuffer::StaticDraw );
   this->m_pos.bind();
   this->m_pos.allocate( m_vertices.data(), sizeof( GLfloat ) * m_vertices.size() );
 
@@ -119,17 +120,29 @@ void GLPointCloudRS<REAL,SIZE>::update_shader(ShaderManager::ShaderType type)
 }
 
 template<typename REAL, typename SIZE>
-FluidRS<REAL,SIZE> *GLPointCloudRS<REAL,SIZE>::make_dynamic(
-    REAL density, REAL viscosity, REAL st)
+FluidRS<REAL,SIZE> *GLPointCloudRS<REAL,SIZE>::make_dynamic(FluidParamsPtr params)
 {
   this->m_pos.setUsagePattern( QOpenGLBuffer::StreamDraw );
 
   FluidRS<REAL,SIZE> *dpc =
-    new FluidRS<REAL, SIZE>(this, density, viscosity, st);
+    new FluidRS<REAL, SIZE>(m_pc, params);
 
   delete m_pc; // delete the old point cloud
   m_pc = dpc;  // set new dynamic point cloud as a member
   return dpc;  // return new dynamic point cloud
+}
+
+template<typename REAL, typename SIZE>
+FluidRS<REAL,SIZE> *GLPointCloudRS<REAL,SIZE>::init_dynamics()
+{ 
+  if (m_pc->is_dynamic())
+  {
+    FluidRS<REAL,SIZE> *fl = static_cast<FluidRS<REAL,SIZE> *>(m_pc);
+    fl->init(this);
+    return fl;
+  }
+
+  return NULL;
 }
 
 template class GLPointCloudRS<double, unsigned int>;

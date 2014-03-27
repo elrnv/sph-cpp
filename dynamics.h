@@ -18,8 +18,6 @@ template<typename REAL>
 class CBVolumeR : public CBQPoly6R<REAL, CBVolumeR<REAL> >
 {
 public:
-  CBVolumeR(float h) : CBQPoly6R<REAL, CBVolumeR<REAL> >(h) { }
-
   inline void init_particle(ParticleR<REAL> &p) 
   { p.dinv = 0.0f; }
   inline void fluid(ParticleR<REAL> &p, FluidParticleR<REAL> &near_p)

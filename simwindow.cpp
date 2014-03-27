@@ -33,8 +33,8 @@ void SimWindow::toggle_shortcuts()
   glprintf_blc(BLUE,  "    5 - normal point cloud\n");
   glprintf_blc(BLUE,  "    6 - dense point cloud\n");
   glprintf_bl("  Dynamics: \n");
-  glprintf_blc(RED,  "    D - enable\n");
-  glprintf_blc(RED,  "    C - disable\n");
+  glprintf_blc(RED,  "    D - start\n");
+  glprintf_blc(RED,  "    C - stop\n");
   glprintf_blc(CYAN, "    H - show/hide halos\n");
 }
 
@@ -146,7 +146,7 @@ void SimWindow::load_model(int i)
       glprintf_trc(RED, "model not found\n");
       return;
   }
-  SceneNode *scene = Util::loadScene(filename);
+  SceneNode *scene = Util::loadScene("data/" + filename);
   if (!scene)
     return;
 
@@ -194,7 +194,7 @@ void SimWindow::reset_viewmode()
   }
 }
 
-void SimWindow::make_static()
+void SimWindow::stop_dynamics()
 {
   clear_dynamics();
   set_animating(false);
@@ -213,7 +213,7 @@ void SimWindow::toggle_halos()
   }
 }
 
-void SimWindow::make_dynamic()
+void SimWindow::start_dynamics()
 {
   clear_dynamics();
 
@@ -227,12 +227,8 @@ void SimWindow::make_dynamic()
       continue;
 
     GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
-    Fluid *fl = glpc->make_dynamic(
-        /*density = */1000.0f,
-        /*viscosity = */4.0f,
-        /*surface tension coefficient = */0.0728f);
-
-    m_grid->add_fluid(fl);
+    if (glpc->is_dynamic())
+      m_grid->add_fluid(glpc->init_dynamics());
   }
 
   // run simulation
@@ -339,13 +335,13 @@ void SimWindow::keyPressEvent(QKeyEvent *event)
       toggle_shortcuts();
       break;
     case Qt::Key_D:
-      make_dynamic();
+      start_dynamics();
       break;
     case Qt::Key_H:
       toggle_halos();
       break;
     case Qt::Key_C:
-      make_static();
+      stop_dynamics();
       break;
     case Qt::Key_W:
       change_viewmode(ViewMode::WIREFRAME);

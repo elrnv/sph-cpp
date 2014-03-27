@@ -53,7 +53,8 @@ public:
         float     get_reflectivity() const { return m_reflectivity; }
 
   virtual bool is_pointcloud() const { return false; }
-  virtual bool is_mesh() const { return false; }
+  virtual bool is_mesh()       const { return false; }
+  virtual bool is_dynamic()    const { return false; }
 
   virtual inline SIZE get_num_indices()  const = 0;
   virtual inline SIZE get_num_vertices() const = 0;

@@ -5,6 +5,7 @@
 #include <assimp/mesh.h>
 #include "pointcloud.h"
 #include "glprimitive.h"
+#include "dynparams.h"
 
 template<typename REAL, typename SIZE>
 class FluidRS;
@@ -24,6 +25,9 @@ public:
   PointCloudRS<REAL, SIZE> *get_pointcloud() { return m_pc; }
 
   inline bool is_pointcloud() const { return true; }
+  inline bool is_dynamic()    const { return m_pc->is_dynamic(); }
+
+  inline FluidRS<REAL,SIZE> *init_dynamics();
 
   inline SIZE get_num_indices()  const { return get_num_vertices(); }
   inline SIZE get_num_vertices() const { return m_pc->get_num_vertices(); }
@@ -32,7 +36,7 @@ public:
   void update_glbuf();
   void update_shader(ShaderManager::ShaderType type);
 
-  FluidRS<REAL,SIZE> *make_dynamic(REAL d, REAL v, REAL st);
+  FluidRS<REAL,SIZE> *make_dynamic(FluidParamsPtr params);
 
   void print() const { std::cerr << *m_pc << std::endl; }
 

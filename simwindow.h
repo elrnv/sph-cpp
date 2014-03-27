@@ -26,8 +26,8 @@ public:
   typedef ShaderManager::ShaderType ViewMode;
   void change_viewmode(ViewMode vm);
   void reset_viewmode();
-  void make_static();
-  void make_dynamic();
+  void stop_dynamics();
+  void start_dynamics();
   void toggle_halos();
 
   void clear_dynamics();
