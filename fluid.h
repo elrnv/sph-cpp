@@ -29,16 +29,21 @@ template<typename REAL, typename SIZE>
 class GLPointCloudRS;
 
 // A dynamic cloud of points
-template<typename REAL, typename SIZE, FluidType FT>
-class FluidRST : public PointCloudRS<REAL,SIZE>
+template<typename REAL, typename SIZE>
+class FluidRS : public PointCloudRS<REAL,SIZE>
 {
 public:
   // dynamic point cloud from a regular updatable gl point cloud
-  explicit FluidRST(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params);
-  explicit FluidRST(const aiMesh *pc, FluidParamsPtr params);
-  ~FluidRST();
+  explicit FluidRS(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params);
+  explicit FluidRS(const aiMesh *pc, FluidParamsPtr params);
+  ~FluidRS();
 
-  inline void init(GLPointCloudRS<REAL, SIZE> *glpc);
+  // explicitly state that we use some base class members (convenience)
+  using PointCloudRS<REAL,SIZE>::get_radius();
+  using PointCloudRS<REAL,SIZE>::m_pos;
+  using PointCloudRS<REAL,SIZE>::m_box;
+
+  void init(GLPointCloudRS<REAL, SIZE> *glpc);
 
   // get pointers to be able to externally evolve data
   inline REAL *pos_at(SIZE i)    { return this->m_pos.data() + i*3; }
@@ -53,8 +58,6 @@ public:
   // boundary getters
   inline const Vector3f &get_bmin() const { return m_bmin; }
   inline const Vector3f &get_bmax() const { return m_bmax; }
-
-  inline FluidType get_type() const { return FT; }
 
   // kernel support radius
   inline REAL get_kernel_radius() const { return m_kernel_radius; }
@@ -100,8 +103,21 @@ protected:
   Matrix3XR<REAL> m_extern_accel; // accelerations
 
   GLPointCloudRS<REAL,SIZE> *m_glpc; // should only used for callback
+}; // class FluidRS
 
+
+// Typed Fluid
+template<typename REAL, typename SIZE, FluidType FT>
+class FluidRST : public FluidRS<REAL,SIZE>
+{
 public:
+  explicit FluidRST(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params);
+  explicit FluidRST(const aiMesh *pc, FluidParamsPtr params);
+  ~FluidRST();
+
+  inline FluidType init_processors();
+  inline FluidType get_type() const { return FT; }
+
   // Quantity Processors
   CFDensityRST<REAL,SIZE,FT>              m_fluid_density_proc;
   CFDensityUpdateRST<REAL,SIZE,FT>        m_fluid_density_update_proc;
@@ -140,7 +156,7 @@ public:
   GET_PROC( CFSurfaceTensionAccelRST )
   { return m_fluid_surface_tension_accel_proc; }
 
-}; // class FluidRST
+}; // FluidRST
 
 // defaults
 typedef FluidRST<double, unsigned int, DEFAULT> Fluid;

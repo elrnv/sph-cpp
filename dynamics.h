@@ -34,11 +34,16 @@ public:
 };
 
 // forward declarations
+template<typename REAL, typename SIZE>
+class FluidRS;
 template<typename REAL, typename SIZE, FluidType FT>
 class FluidRST;
-
 template<typename REAL, typename SIZE>
 class GLPointCloudRS;
+
+
+// Define a set of different types of fluids
+typedef std::vector< FluidRS<REAL,SIZE> * > FluidVec;
 
 // Grid structure used to optimize computing particle properties using kernels
 template <typename REAL, typename SIZE>
@@ -61,8 +66,8 @@ public:
              std::vector< ParticleType > >::type &get_vec() { return boundvec; }
 
     template <typename ParticleType>
-    typename std::enable_if<std::is_same< ParticleType, FluidParticleR<REAL> >::value,
-             std::vector< ParticleType > >::type &get_vec() { return fluidvec; }
+    typename std::enable_if<std::is_base_of< FluidParticleR<REAL>, ParticleType >::value,
+             std::vector< FluidParticleR<REAL> > >::type &get_vec() { return fluidvec; }
   };
 
   typedef boost::multi_array< Cell, 3 > Array3;
@@ -71,9 +76,6 @@ public:
   typedef typename Array3::index_range  IndexRange;
 
   typedef typename Array3::template array_view<3>::type GridView;
-
-  template <FluidType FT>
-  using FluidVecT = std::vector< FluidRST<REAL,SIZE,FT> * >;
 
   // Constructors/Destructor
   UniformGridRS(const Vector3f &bmin, const Vector3f &bmax);
@@ -146,29 +148,31 @@ public:
              return *m_bound_volume_proc;
            }
 
-  template <typename ProcessPairFunc, FluidType FT>
-  ProcessPairFunc &determine_proc(const ParticleR<REAL> &p)
+  template <typename ProcessPairFunc, typename ParticleType>
+  typename std::enable_if< std::is_same< ParticleType, ParticleR<REAL> >::value,
+           ProcessPairFunc & >::type determine_proc(const ParticleType &p)
            {
              Q_UNUSED(p); return get_proc<ProcessPairFunc>();
            }
 
-  template <typename ProcessPairFunc, FluidType FT>
-  ProcessPairFunc &determine_proc(const FluidParticleR<REAL>  &p)
+  template <typename ProcessPairFunc, typename ParticleType>
+  typename std::enable_if< std::is_base_of< FluidParticleR<REAL>, ParticleType >::value,
+           ProcessPairFunc & >::type determine_proc(const FluidParticleR<REAL> &p)
            {
-             return get_fluid_vec<FT>()[p.id]->template get_proc<ProcessPairFunc>();
+             return get_fluid(p)->template get_proc<ProcessPairFunc>();
            }
 
   // Low level quantity processing functions
-  template<typename ProcessPairFunc, typename ParticleType, FluidType FT>
+  template<typename ProcessPairFunc, typename ParticleType>
   inline void compute_quantity();
 
   template<typename Func>
   inline void compute_bound_quantity()
-  { compute_quantity<Func, ParticleR<REAL>, NOTFLUID >(); }
+  { compute_quantity<Func, ParticleR<REAL> >(); }
 
   template<typename Func, FluidType FT>
   inline void compute_fluid_quantity()
-  { compute_quantity<Func, FluidParticleR<REAL>, FT >(); }
+  { compute_quantity<Func, FluidParticleRT<REAL, FT> >(); }
 
   template<FluidType FT>
   inline void compute_pressure_accelT()
@@ -230,10 +234,7 @@ private: // member functions
 
 private: // member variables
   // array of simulated interacting fluids
-  FluidVecT<MCG03>    m_fluids_MCG03;
-  FluidVecT<BT07>     m_fluids_BT07;
-  FluidVecT<AIAST12>  m_fluids_AIAST12;
-  FluidVecT<DEFAULT>  m_fluids_DEFAULT;
+  FluidVec m_fluids;
 
   unsigned int m_num_fluids;
 

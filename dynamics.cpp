@@ -101,7 +101,7 @@ void UniformGridRS<REAL,SIZE>::populate_fluid_data()
       Vector3R<REAL> vel( fl->get_vel().col(i) );
       Array3Index idx = get_voxel_index(pos);
       m_grid(idx).fluidvec.push_back( 
-          FluidParticleR<REAL>(
+          FluidParticleRT<REAL,MCG03>(
             pos, vel, fl->accel_at(i), fl->extern_accel_at(i), id));
     }
     id++;
@@ -377,7 +377,7 @@ void UniformGridRS<REAL,SIZE>::compute_accel()
 }
 
 template<typename REAL, typename SIZE>
-template<typename ProcessPairFunc, typename ParticleType, FluidType FT>
+template<typename ProcessPairFunc, typename ParticleType>
 void UniformGridRS<REAL,SIZE>::compute_quantity()
 {
   SIZE nx = m_gridsize[0];
@@ -389,7 +389,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity()
     {
       for (SIZE k = 0; k < nz; ++k)
       {
-        std::vector<ParticleType> &pvec = 
+        auto &pvec = 
           m_grid[i][j][k].template get_vec<ParticleType>();
         if (pvec.empty())
           continue;
@@ -401,7 +401,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity()
 
         for ( auto &p : pvec )  // prepare data
         {
-          ProcessPairFunc &process = determine_proc< ProcessPairFunc, FT >(p);
+          ProcessPairFunc &process = determine_proc< ProcessPairFunc, ParticleType >(p);
           process.init_particle(p);
         }
 
@@ -419,7 +419,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity()
               StaticParticles  &neigh_boundvec = cell.boundvec;
               for ( auto &p : pvec )
               {
-                ProcessPairFunc &process = determine_proc< ProcessPairFunc, FT >(p);
+                ProcessPairFunc &process = determine_proc< ProcessPairFunc, ParticleType>(p);
                 for ( FluidParticleR<REAL> &near_p : neigh_fluidvec )
                 {
                   process.fluid(p, near_p); // process neighbouring fluid data
@@ -435,7 +435,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity()
 
         for ( auto &p : pvec )  // finalize data
         {
-          ProcessPairFunc &process = determine_proc< ProcessPairFunc, FT >(p);
+          ProcessPairFunc &process = determine_proc< ProcessPairFunc, ParticleType >(p);
           process.finish_particle(p);
         }
       } // for k
@@ -541,13 +541,6 @@ void UniformGridRS<REAL,SIZE>::run()
     {
       fl->get_vel() = fl->get_vel() + dt*fl->get_accel();
     });
-
-//    if (count == 0)
-//    {
-//      for (int i = 0; i < 10; ++i)
-//        qDebug() << m_accel.col(i)[0] << m_accel.col(i)[1] << m_accel.col(i)[2] ;
-//      return;
-//    }
 
     clock_t cur_t = clock();
     t += float(cur_t - prev_t) / CLOCKS_PER_SEC;
