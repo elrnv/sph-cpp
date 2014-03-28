@@ -7,40 +7,42 @@
 
 // Fluid stuff
 
-template<typename REAL, typename SIZE>
-FluidRS<REAL,SIZE>::FluidRS(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params)
+template<typename REAL, typename SIZE, FluidType FT>
+FluidRST<REAL,SIZE,FT>::FluidRST(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params)
   : PointCloudRS<REAL,SIZE>(*pc)
   , m_params(params)
 { }
 
-template<typename REAL, typename SIZE>
-FluidRS<REAL,SIZE>::FluidRS(const aiMesh *pc, FluidParamsPtr params)
+template<typename REAL, typename SIZE, FluidType FT>
+FluidRST<REAL,SIZE,FT>::FluidRST(const aiMesh *pc, FluidParamsPtr params)
   : PointCloudRS<REAL,SIZE>(pc)
   , m_params(params)
 { }
 
-template<typename REAL, typename SIZE>
-FluidRS<REAL,SIZE>::~FluidRS()
+template<typename REAL, typename SIZE, FluidType FT>
+FluidRST<REAL,SIZE,FT>::~FluidRST()
 { }
 
 // the fluid must be initialized before being simulated
-template<typename REAL, typename SIZE>
-inline void FluidRS<REAL,SIZE>::init(GLPointCloudRS<REAL, SIZE> *glpc)
+template<typename REAL, typename SIZE, FluidType FT>
+void FluidRST<REAL,SIZE,FT>::init(GLPointCloudRS<REAL, SIZE> *glpc)
 {
   m_bmin = this->m_bbox.corner(Eigen::AlignedBox3f::BottomLeftFloor);
   m_bmax = this->m_bbox.corner(Eigen::AlignedBox3f::TopRightCeil);
 
   REAL r = this->get_radius();
+  qDebug() << "radius is" << r;
   m_kernel_radius = m_params->kernel_inflation * r;
+  qDebug() << "kernel radius is" << m_kernel_radius;
   m_rest_density = m_params->density;
   m_viscosity = m_params->viscosity;
   m_st = m_params->surface_tension;
   m_mass = m_params->density*8*r*r*r;
   m_recoil_velocity_damping = m_params->recoil_velocity_damping;
 
-  if ( m_params->fluid_type == FluidParams::MCG03 )
+  if ( m_params->fluid_type == MCG03 )
     m_c2 = m_params->sound_speed * m_params->sound_speed;
-  else if ( m_params->fluid_type == FluidParams::BT07 )
+  else if ( m_params->fluid_type == BT07 )
   {
     // a heuristic to determine the speed of sound based on the maximum
     // possible velocity of a particle in the fluid
@@ -78,9 +80,9 @@ inline void FluidRS<REAL,SIZE>::init(GLPointCloudRS<REAL, SIZE> *glpc)
 
 }
 
-template<typename REAL, typename SIZE>
+template<typename REAL, typename SIZE, FluidType FT>
 template<class OutputType, class KernelType, class ComputeType>
-inline void FluidRS<REAL,SIZE>::copy_properties_to_proc(
+inline void FluidRST<REAL,SIZE,FT>::copy_properties_to_proc(
     CFQ<REAL,SIZE,OutputType,KernelType,ComputeType> &cfq_proc)
 {
   cfq_proc.m_mass = get_mass();
@@ -93,8 +95,8 @@ inline void FluidRS<REAL,SIZE>::copy_properties_to_proc(
 }
 
 // clamp value d to min and max boundaries + epsilon,
-template<typename REAL, typename SIZE>
-inline bool FluidRS<REAL,SIZE>::clamp(REAL &d, REAL min, REAL max)
+template<typename REAL, typename SIZE, FluidType FT>
+inline bool FluidRST<REAL,SIZE,FT>::clamp(REAL &d, REAL min, REAL max)
 {
   if ( d < min )
   {
@@ -110,10 +112,10 @@ inline bool FluidRS<REAL,SIZE>::clamp(REAL &d, REAL min, REAL max)
 }
 
 
-template<typename REAL, typename SIZE>
-void FluidRS<REAL,SIZE>::resolve_collisions()
+template<typename REAL, typename SIZE, FluidType FT>
+void FluidRST<REAL,SIZE,FT>::resolve_collisions()
 {
-  if (m_params->fluid_type != FluidParams::MCG03)
+  if (m_params->fluid_type != MCG03)
     return;
 
   for (SIZE i = 0; i < this->get_num_vertices(); ++i) // TODO: vectorize this
@@ -129,11 +131,14 @@ void FluidRS<REAL,SIZE>::resolve_collisions()
 }
 
 
-template<typename REAL, typename SIZE>
-void FluidRS<REAL,SIZE>::update_data()
+template<typename REAL, typename SIZE, FluidType FT>
+void FluidRST<REAL,SIZE,FT>::update_data()
 {
   if (m_glpc)
     m_glpc->update_data();
 }
 
-template class FluidRS<double, unsigned int>;
+template class FluidRST<double, unsigned int, MCG03>;
+template class FluidRST<double, unsigned int, BT07>;
+template class FluidRST<double, unsigned int, AIAST12>;
+template class FluidRST<double, unsigned int, DEFAULT>;

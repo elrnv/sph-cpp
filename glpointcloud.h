@@ -27,7 +27,7 @@ public:
   inline bool is_pointcloud() const { return true; }
   inline bool is_dynamic()    const { return m_pc->is_dynamic(); }
 
-  inline FluidRS<REAL,SIZE> *init_dynamics();
+  //inline PointCloudRS<REAL,SIZE> *init_dynamics();
 
   inline SIZE get_num_indices()  const { return get_num_vertices(); }
   inline SIZE get_num_vertices() const { return m_pc->get_num_vertices(); }
@@ -36,7 +36,7 @@ public:
   void update_glbuf();
   void update_shader(ShaderManager::ShaderType type);
 
-  FluidRS<REAL,SIZE> *make_dynamic(FluidParamsPtr params);
+  //FluidRS<REAL,SIZE> *make_dynamic(FluidParamsPtr params);
 
   void print() const { std::cerr << *m_pc << std::endl; }
 

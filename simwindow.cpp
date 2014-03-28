@@ -228,7 +228,7 @@ void SimWindow::start_dynamics()
 
     GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
     if (glpc->is_dynamic())
-      m_grid->add_fluid(glpc->init_dynamics());
+      m_grid->add_fluid(glpc);
   }
 
   // run simulation
@@ -292,19 +292,12 @@ void SimWindow::render()
         GLPointCloud * glpc = static_cast<GLPointCloud *>(glprim);
         PointCloud *pc = glpc->get_pointcloud();
         glprim->get_program()->setUniformValue( "pt_radius", GLfloat(pc->get_radius()));
-        if (pc->is_dynamic())
+        if (pc->is_dynamic() && !glpc->is_halos())
         {
-          if (glpc->is_halos())
-          {
-            glprim->get_program()->setUniformValue(
-                "pt_halo",
-                GLfloat(static_cast<Fluid *>(pc)->get_kernel_radius()));
-          }
-          else
-            glprim->get_program()->setUniformValue( "pt_halo", GLfloat(pc->get_radius()));
+          glprim->get_program()->setUniformValue( "pt_halo", GLfloat(pc->get_radius()));
         }
         else
-          glprim->get_program()->setUniformValue("pt_halo", GLfloat(pc->get_radius()));
+          glprim->get_program()->setUniformValue("pt_halo", GLfloat(pc->get_halo_radius()));
       }
       else
       {

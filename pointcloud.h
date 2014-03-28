@@ -4,6 +4,7 @@
 #include <iostream>
 #include <assimp/mesh.h>
 #include "primitive.h"
+#include "dynparams.h"
 
 // Partially resolve matrix template for convenience
 
@@ -22,9 +23,11 @@ public:
   ~PointCloudRS();
 
   inline REAL get_radius() { return 0.5*compute_mindist(); }
+  inline REAL get_halo_radius() { return get_radius(); }
   inline SIZE get_num_vertices() const { return m_pos.cols(); }
   inline Matrix3XR<REAL> &get_pos() { return m_pos; }
   inline bool is_pointcloud() const { return true; }
+  inline virtual FluidType get_type() const { return NOTFLUID; }
 
   inline void transform_in_place(const AffineCompact3f &trans);
   inline AlignedBox3f &compute_bbox();

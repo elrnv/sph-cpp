@@ -22,6 +22,7 @@ public:
   { p.dinv = 0.0f; }
   inline void fluid(ParticleR<REAL> &p, FluidParticleR<REAL> &near_p)
   { }
+
   inline void bound(ParticleR<REAL> &p, ParticleR<REAL> &near_p)
   {
     p.dinv += this->m_kern[ p.pos - near_p.pos ];
@@ -33,8 +34,8 @@ public:
 };
 
 // forward declarations
-template<typename REAL, typename SIZE>
-class FluidRS;
+template<typename REAL, typename SIZE, FluidType FT>
+class FluidRST;
 
 template<typename REAL, typename SIZE>
 class GLPointCloudRS;
@@ -71,13 +72,58 @@ public:
 
   typedef typename Array3::template array_view<3>::type GridView;
 
-  typedef std::vector< FluidRS<REAL, SIZE> * > FluidVec;
+  template <FluidType FT>
+  using FluidVecT = std::vector< FluidRST<REAL,SIZE,FT> * >;
 
   // Constructors/Destructor
   UniformGridRS(const Vector3f &bmin, const Vector3f &bmax);
   ~UniformGridRS();
   
-  void add_fluid(FluidRS<REAL,SIZE> *fl);
+  inline void add_fluid(GLPointCloudRS<REAL,SIZE> *glpc) 
+  { 
+    if (glpc->is_dynamic())
+    {
+      FLUID_TYPED_CALL(add_fluid_impl, glpc->get_pointcloud()->get_type(), glpc);
+    }
+  }
+
+#define ENABLE_GET_IF(fluid_type) \
+  inline typename std::enable_if<FT == fluid_type, FluidVecT<FT> &>::type
+
+  template<FluidType FT> 
+  ENABLE_GET_IF(MCG03) get_fluid_vec() { return m_fluids_MCG03; }
+  template<FluidType FT>
+  ENABLE_GET_IF(BT07) get_fluid_vec() { return m_fluids_BT07; }
+  template<FluidType FT>
+  ENABLE_GET_IF(AIAST12) get_fluid_vec() { return m_fluids_AIAST12; }
+  template<FluidType FT>
+  ENABLE_GET_IF(DEFAULT) get_fluid_vec() { return m_fluids_DEFAULT; }
+
+  // function iterating over fluids of all types
+  template <typename Func>
+  inline void for_each_fluid( Func f )
+  {
+    for (auto &fl : m_fluids_MCG03)   { f(fl); }
+    for (auto &fl : m_fluids_BT07)    { f(fl); }
+    for (auto &fl : m_fluids_AIAST12) { f(fl); }
+    for (auto &fl : m_fluids_DEFAULT) { f(fl); }
+  }
+  #define FOR_EACH_FLUID( func ) \
+  { \
+    for (auto &fl : m_fluids_MCG03)   { func; } \
+    for (auto &fl : m_fluids_BT07)    { func; } \
+    for (auto &fl : m_fluids_AIAST12) { func; } \
+    for (auto &fl : m_fluids_DEFAULT) { func; } \
+  }
+
+  #define FOR_EACH_FLUID_TYPE( f ) \
+  { \
+    f<MCG03>(); \
+    f<BT07>(); \
+    f<AIAST12>(); \
+    f<DEFAULT>(); \
+  }
+
   void init();
   inline void update_grid();
   inline void populate_fluid_data();
@@ -97,23 +143,6 @@ public:
       clamp(static_cast<Index>(m_hinv*(pos[2]-m_bmin[2])), 0, m_gridsize[2]-1) }};
   }
 
-#if 0
-  void compute_initial_density();
-#endif
-
-  void compute_accel();
-  void compute_pressure();
-  void compute_density();
-  void update_density(float timestep);
-
-#if 0
-  template<typename ProcessPairFunc>
-  inline void compute_bound_quantity(ProcessPairFunc process);
-
-  template<typename ProcessPairFunc>
-  inline void compute_fluid_quantity(ProcessPairFunc process);
-#endif
-
   template <typename ProcessPairFunc>
   typename std::enable_if< std::is_same< ProcessPairFunc, CBVolumeR<REAL> >::value,
            CBVolumeR<REAL> >::type &get_proc()
@@ -121,28 +150,63 @@ public:
              return *m_bound_volume_proc;
            }
 
-  template <typename ProcessPairFunc>
+  template <typename ProcessPairFunc, FluidType FT>
   ProcessPairFunc &determine_proc(const ParticleR<REAL> &p)
            {
              Q_UNUSED(p); return get_proc<ProcessPairFunc>();
            }
 
-  template <typename ProcessPairFunc>
+  template <typename ProcessPairFunc, FluidType FT>
   ProcessPairFunc &determine_proc(const FluidParticleR<REAL>  &p)
            {
-             return m_fluids[p.id]->template get_proc<ProcessPairFunc>();
+             return get_fluid_vec<FT>()[p.id]->template get_proc<ProcessPairFunc>();
            }
 
-  template<typename ProcessPairFunc, typename ParticleType>
+  // Low level quantity processing functions
+  template<typename ProcessPairFunc, typename ParticleType, FluidType FT>
   inline void compute_quantity();
 
   template<typename Func>
   inline void compute_bound_quantity()
-  { compute_quantity<Func, ParticleR<REAL> >(); }
+  { compute_quantity<Func, ParticleR<REAL>, NOTFLUID >(); }
 
-  template<typename Func>
+  template<typename Func, FluidType FT>
   inline void compute_fluid_quantity()
-  { compute_quantity<Func, FluidParticleR<REAL> >(); }
+  { compute_quantity<Func, FluidParticleR<REAL>, FT >(); }
+
+  template<FluidType FT>
+  inline void compute_pressure_accelT()
+  { compute_fluid_quantity< CFPressureAccelRST<REAL, SIZE, FT>, FT >(); }
+  
+  template<FluidType FT>
+  inline void compute_viscosity_accelT()
+  { compute_fluid_quantity< CFViscosityAccelRST<REAL, SIZE, FT>, FT >(); }
+
+  template<FluidType FT>
+  inline void compute_surface_tension_accelT()
+  { compute_fluid_quantity< CFSurfaceTensionAccelRST<REAL, SIZE, FT>, FT >(); }
+
+  template<FluidType FT>
+  inline void compute_densityT()
+  { compute_fluid_quantity< CFDensityRST<REAL,SIZE,FT>, FT >(); }
+
+  template<FluidType FT>
+  inline void compute_density_updateT()
+  { compute_fluid_quantity< CFDensityUpdateRST<REAL,SIZE,FT>, FT >(); }
+
+  template<FluidType FT>
+  inline void compute_pressureT()
+  { compute_fluid_quantity< CFPressureRST<REAL,SIZE,FT>, FT >(); }
+
+#if 0
+  void compute_initial_density();
+#endif
+
+  // high level processing (ones that should be called by the integrator)
+  void compute_accel();
+  void compute_pressure() { FOR_EACH_FLUID_TYPE(compute_pressureT); }
+  void compute_density();
+  void update_density(float timestep);
 
   // run dynamic simulation
   void run();
@@ -152,6 +216,15 @@ public:
 
 
 private: // member functions
+  template<FluidType FT> // convenience
+  inline void add_fluid_impl(GLPointCloudRS<REAL,SIZE> *glpc) 
+  { 
+    FluidRST<REAL,SIZE,FT> *fl = static_cast<FluidRST<REAL,SIZE,FT> *>(glpc->get_pointcloud());
+    fl->init(glpc);
+    get_fluid_vec<FT>().push_back(fl);
+    m_num_fluids += 1;
+  }
+
   // utility function used in the constructor to get a range of two elements
   // centered at x (or 2 if x is on the boundary)
   inline IndexRange range3(SIZE x, SIZE hi)
@@ -160,7 +233,13 @@ private: // member functions
   }
 
 private: // member variables
-  FluidVec m_fluids; // array of simulated interacting fluids
+  // array of simulated interacting fluids
+  FluidVecT<MCG03>    m_fluids_MCG03;
+  FluidVecT<BT07>     m_fluids_BT07;
+  FluidVecT<AIAST12>  m_fluids_AIAST12;
+  FluidVecT<DEFAULT>  m_fluids_DEFAULT;
+
+  unsigned int m_num_fluids;
 
   // array of cells containing xyzp (position and density) for each vertex
   Array3      m_grid;

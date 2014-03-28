@@ -3,7 +3,6 @@
 
 #include <vector>
 #include "pointcloud.h"
-#include "dynamics.h"
 #include "quantityprocessor.h"
 #include "dynparams.h"
 
@@ -30,14 +29,14 @@ template<typename REAL, typename SIZE>
 class GLPointCloudRS;
 
 // A dynamic cloud of points
-template<typename REAL, typename SIZE>
-class FluidRS : public PointCloudRS<REAL,SIZE>
+template<typename REAL, typename SIZE, FluidType FT>
+class FluidRST : public PointCloudRS<REAL,SIZE>
 {
 public:
   // dynamic point cloud from a regular updatable gl point cloud
-  explicit FluidRS(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params);
-  explicit FluidRS(const aiMesh *pc, FluidParamsPtr params);
-  ~FluidRS();
+  explicit FluidRST(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params);
+  explicit FluidRST(const aiMesh *pc, FluidParamsPtr params);
+  ~FluidRST();
 
   inline void init(GLPointCloudRS<REAL, SIZE> *glpc);
 
@@ -55,8 +54,11 @@ public:
   inline const Vector3f &get_bmin() const { return m_bmin; }
   inline const Vector3f &get_bmax() const { return m_bmax; }
 
+  inline FluidType get_type() const { return FT; }
+
   // kernel support radius
   inline REAL get_kernel_radius() const { return m_kernel_radius; }
+  inline REAL get_halo_radius()   const { return get_kernel_radius(); }
 
   inline REAL get_mass() const            { return m_mass; }
   inline REAL get_rest_density() const    { return m_rest_density; }
@@ -101,11 +103,12 @@ protected:
 
 public:
   // Quantity Processors
-  CFDensityRS<REAL,SIZE>        m_fluid_density_proc;
-  CFDensityUpdateRS<REAL,SIZE>  m_fluid_density_update_proc;
-  CFPressureRS<REAL,SIZE>       m_fluid_pressure_proc;
-  CFViscosityAccelRS<REAL,SIZE> m_fluid_viscosity_accel_proc;
-  CFPressureAccelRS<REAL,SIZE>  m_fluid_pressure_accel_proc;
+  CFDensityRST<REAL,SIZE,FT>              m_fluid_density_proc;
+  CFDensityUpdateRST<REAL,SIZE,FT>        m_fluid_density_update_proc;
+  CFPressureRST<REAL,SIZE,FT>             m_fluid_pressure_proc;
+  CFPressureAccelRST<REAL,SIZE,FT>        m_fluid_pressure_accel_proc;
+  CFViscosityAccelRST<REAL,SIZE,FT>       m_fluid_viscosity_accel_proc;
+  CFSurfaceTensionAccelRST<REAL,SIZE,FT>  m_fluid_surface_tension_accel_proc;
 
   // routine to copy fluid properties to processors above
   template<class OutputType, class KernelType, class ComputeType>
@@ -116,28 +119,33 @@ public:
 #define GET_PROC(proc_type) \
   template <typename ProcessPairFunc> \
     inline typename std::enable_if< \
-    std::is_same< ProcessPairFunc, proc_type<REAL,SIZE>  >::value, \
-    proc_type<REAL,SIZE> >::type &get_proc()
+    std::is_same< ProcessPairFunc, proc_type<REAL,SIZE,FT>  >::value, \
+    proc_type<REAL,SIZE,FT> >::type &get_proc()
 
-  GET_PROC( CFDensityRS )
+  GET_PROC( CFDensityRST )
   { return m_fluid_density_proc; }
 
-  GET_PROC( CFDensityUpdateRS )
+  GET_PROC( CFDensityUpdateRST )
   { return m_fluid_density_update_proc; }
 
-  GET_PROC( CFPressureRS )
+  GET_PROC( CFPressureRST )
   { return m_fluid_pressure_proc; }
 
-  GET_PROC( CFViscosityAccelRS )
-  { return m_fluid_viscosity_accel_proc; }
-
-  GET_PROC( CFPressureAccelRS )
+  GET_PROC( CFPressureAccelRST )
   { return m_fluid_pressure_accel_proc; }
 
+  GET_PROC( CFViscosityAccelRST )
+  { return m_fluid_viscosity_accel_proc; }
 
-}; // class FluidRS
+  GET_PROC( CFSurfaceTensionAccelRST )
+  { return m_fluid_surface_tension_accel_proc; }
+
+}; // class FluidRST
 
 // defaults
-typedef FluidRS<double, unsigned int> Fluid;
+typedef FluidRST<double, unsigned int, DEFAULT> Fluid;
+
+template<FluidType FT>
+using FluidT = FluidRST<double, unsigned int, FT>;
 
 #endif // FLUID_H

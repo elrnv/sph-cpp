@@ -13,7 +13,8 @@ template<typename REAL, typename SIZE>
 UniformGridRS<REAL,SIZE>::UniformGridRS(
     const Vector3f &bmin,
     const Vector3f &bmax ) 
-  : m_h(2e-3f) // minimum possible cell size
+  : m_num_fluids(0)
+  , m_h(2e-3f) // minimum possible cell size
   , m_hinv(500.0f)
   , m_bmin(bmin) // smallest boundary corner
   , m_bmax(bmax) // largest boundary corner
@@ -24,20 +25,16 @@ template<typename REAL, typename SIZE>
 UniformGridRS<REAL,SIZE>::~UniformGridRS() { }
   
 template<typename REAL, typename SIZE>
-void UniformGridRS<REAL,SIZE>::add_fluid( FluidRS<REAL,SIZE> *fl )
-{
-  m_fluids.push_back(fl);
-}
-
-template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::init()
 {
   // set cell size to be the maximum of the kernel support over all fluids;
-  for ( auto &fl : m_fluids )
+  FOR_EACH_FLUID(
   {
     if (m_h < fl->get_kernel_radius())
+    {
       m_h = fl->get_kernel_radius();
-  }
+    }
+  });
 
   m_hinv = 1.0f/m_h;
   glprintf_tr("cell size: %f\n", m_h);
@@ -57,7 +54,7 @@ void UniformGridRS<REAL,SIZE>::init()
   populate_bound_data();
 
   int count = 0;
-  for (auto &fl : m_fluids)
+  FOR_EACH_FLUID(
   {
     glprintf_trcv(fl->get_color(), "--- Fluid %d ---\n", ++count);
     glprintf_trcv(fl->get_color(), "# of particles: %.2f  \n", fl->get_num_vertices());
@@ -66,7 +63,7 @@ void UniformGridRS<REAL,SIZE>::init()
     glprintf_trcv(fl->get_color(), "viscosity: %.2f  \n", fl->get_viscosity());
     glprintf_trcv(fl->get_color(), "surface tension: %.2f  \n", fl->get_surface_tension());
     glprintf_trcv(fl->get_color(), "sound speed: %.2e  \n", std::sqrt(fl->get_sound_speed2()));
-  }
+  });
 
   CBVolumeR<REAL> proc;
   proc.init_kernel(m_h);
@@ -95,7 +92,7 @@ template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::populate_fluid_data()
 { 
   unsigned short id = 0; // generate ids
-  for ( auto &fl : m_fluids )
+  FOR_EACH_FLUID(
   {
     SIZE num_vtx = fl->get_num_vertices();
     for ( SIZE i = 0; i < num_vtx; ++i )
@@ -108,7 +105,7 @@ void UniformGridRS<REAL,SIZE>::populate_fluid_data()
             pos, vel, fl->accel_at(i), fl->extern_accel_at(i), id));
     }
     id++;
-  }
+  });
 }
 
 template<typename REAL, typename SIZE>
@@ -330,62 +327,57 @@ void UniformGridRS<REAL,SIZE>::compute_initial_density()
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::update_density(float timestep)
 {
-  for ( auto &fl : m_fluids )
-    fl->m_fluid_density_update_proc.init( timestep );
+  FOR_EACH_FLUID(
+  {  
+    fl->m_fluid_density_update_proc.init( timestep ); 
+  });
 
-  compute_fluid_quantity< CFDensityUpdateRS<REAL, SIZE> >();
+  FOR_EACH_FLUID_TYPE(compute_density_updateT);
 }
 
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::compute_density()
 {
-  REAL max_var[m_fluids.size()];
-  REAL avg_var[m_fluids.size()];
+  REAL max_var[m_num_fluids];
+  REAL avg_var[m_num_fluids];
   
   int i = 0;
-  for ( auto &fl : m_fluids )
+  FOR_EACH_FLUID(
   {
     max_var[i] = avg_var[i] = 0.0f;
     fl->m_fluid_density_proc.init( max_var[i], avg_var[i] );
     i++;
-  }
+  });
 
-  compute_fluid_quantity< CFDensityRS<REAL,SIZE> >();
+  FOR_EACH_FLUID_TYPE(compute_densityT);
 
 #ifdef REPORT_DENSITY_VARIATION
   i = 0;
-  for ( auto &fl : m_fluids )
+  FOR_EACH_FLUID(
   {
     avg_var[i] = avg_var[i]/fl->get_num_vertices();
     qDebug("Fluid %d:  max: %.0f, %.1f percent;    avg: %.0f, %.1f percent", i,
         max_var[i], 100.00f*max_var[i]/fl->get_rest_density(), 
         avg_var[i], 100.00f*avg_var[i]/fl->get_rest_density());
     i++;
-  }
+  });
 #endif
-}
-
-template<typename REAL, typename SIZE>
-void UniformGridRS<REAL,SIZE>::compute_pressure()
-{
-  // will be needed when we use alternative pressure methods (pressure projection)
-  //compute_fluid_quantity(m_proc_fluid_density);
-
-  compute_fluid_quantity< CFPressureRS<REAL, SIZE> >();
 }
 
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::compute_accel()
 {
-  for ( auto &fl : m_fluids )
+  FOR_EACH_FLUID(
+  {
     fl->reset_accel();     // now may assume all accelerations are zero
+  });
 
-  compute_fluid_quantity< CFPressureAccelRS<REAL, SIZE> >();
-  compute_fluid_quantity< CFViscosityAccelRS<REAL, SIZE> >();
+  FOR_EACH_FLUID_TYPE(compute_pressure_accelT);
+  FOR_EACH_FLUID_TYPE(compute_viscosity_accelT);
 }
 
 template<typename REAL, typename SIZE>
-template<typename ProcessPairFunc, typename ParticleType>
+template<typename ProcessPairFunc, typename ParticleType, FluidType FT>
 void UniformGridRS<REAL,SIZE>::compute_quantity()
 {
   SIZE nx = m_gridsize[0];
@@ -409,7 +401,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity()
 
         for ( auto &p : pvec )  // prepare data
         {
-          ProcessPairFunc &process = determine_proc< ProcessPairFunc >(p);
+          ProcessPairFunc &process = determine_proc< ProcessPairFunc, FT >(p);
           process.init_particle(p);
         }
 
@@ -427,7 +419,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity()
               StaticParticles  &neigh_boundvec = cell.boundvec;
               for ( auto &p : pvec )
               {
-                ProcessPairFunc &process = determine_proc< ProcessPairFunc >(p);
+                ProcessPairFunc &process = determine_proc< ProcessPairFunc, FT >(p);
                 for ( FluidParticleR<REAL> &near_p : neigh_fluidvec )
                 {
                   process.fluid(p, near_p); // process neighbouring fluid data
@@ -443,7 +435,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity()
 
         for ( auto &p : pvec )  // finalize data
         {
-          ProcessPairFunc &process = determine_proc< ProcessPairFunc >(p);
+          ProcessPairFunc &process = determine_proc< ProcessPairFunc, FT >(p);
           process.finish_particle(p);
         }
       } // for k
@@ -455,7 +447,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity()
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::run()
 {
-  if (m_fluids.size() < 1)
+  if (m_num_fluids < 1)
     return;
 
   init();
@@ -473,8 +465,10 @@ void UniformGridRS<REAL,SIZE>::run()
   compute_pressure();
   compute_accel(); // update m_accel
 
-  for ( auto &fl : m_fluids )
+  FOR_EACH_FLUID(
+  {
     fl->get_vel() = fl->get_vel() + 0.5*dt*fl->get_accel(); // initial half velocity
+  });
 
   clock_t prev_t = clock();
   float t = 0.0f;
@@ -484,7 +478,7 @@ void UniformGridRS<REAL,SIZE>::run()
     ///////// testing adaptive time step
     float fdt = std::numeric_limits<float>::infinity();
     float cvdt = std::numeric_limits<float>::infinity();
-    for (auto &fl : m_fluids)
+    FOR_EACH_FLUID(
     {
       for (SIZE i = 0; i < fl->get_num_vertices(); ++i)
       {
@@ -499,7 +493,7 @@ void UniformGridRS<REAL,SIZE>::run()
         //    !std::isfinite(fl->vel_at(i)[2]))
         //  qDebug() << "Found NaN at " << i;
       }
-    }
+    });
 
     float new_rdt = std::min(0.25*fdt, 0.4*cvdt);
     if (new_rdt != rdt)
@@ -510,22 +504,30 @@ void UniformGridRS<REAL,SIZE>::run()
     }
     //////// end of adaptive timestep test
 
-    for (auto &fl : m_fluids)
+    FOR_EACH_FLUID(
+    {
       fl->get_pos() = (fl->get_pos() + dt*fl->get_vel()).eval();
+    });
     
-    for (auto &fl : m_fluids)
+    FOR_EACH_FLUID(
+    {
       fl->resolve_collisions();
+    });
 
     update_grid();
 
-    for (auto &fl : m_fluids)
+    FOR_EACH_FLUID(
+    {
       fl->update_data(); // notify gl we have new positions
+    });
 
     if (m_stop_requested)
       break;
 
-    for (auto &fl : m_fluids)
+    FOR_EACH_FLUID(
+    {
       fl->get_vel() = fl->get_vel() + 0.5*dt*fl->get_accel();
+    });
 
     //if (count % 100)
     //  update_density(dt);
@@ -534,8 +536,10 @@ void UniformGridRS<REAL,SIZE>::run()
     compute_pressure();
     compute_accel(); // update m_accel
 
-    for (auto &fl : m_fluids)
+    FOR_EACH_FLUID(
+    {
       fl->get_vel() = fl->get_vel() + dt*fl->get_accel();
+    });
 
 //    if (count == 0)
 //    {

@@ -119,30 +119,29 @@ void GLPointCloudRS<REAL,SIZE>::update_shader(ShaderManager::ShaderType type)
   this->m_ubo.bindToProg(this->m_prog->programId(), "Globals");
 }
 
-template<typename REAL, typename SIZE>
-FluidRS<REAL,SIZE> *GLPointCloudRS<REAL,SIZE>::make_dynamic(FluidParamsPtr params)
-{
-  this->m_pos.setUsagePattern( QOpenGLBuffer::StreamDraw );
-
-  FluidRS<REAL,SIZE> *dpc =
-    new FluidRS<REAL, SIZE>(m_pc, params);
-
-  delete m_pc; // delete the old point cloud
-  m_pc = dpc;  // set new dynamic point cloud as a member
-  return dpc;  // return new dynamic point cloud
-}
-
-template<typename REAL, typename SIZE>
-FluidRS<REAL,SIZE> *GLPointCloudRS<REAL,SIZE>::init_dynamics()
-{ 
-  if (m_pc->is_dynamic())
-  {
-    FluidRS<REAL,SIZE> *fl = static_cast<FluidRS<REAL,SIZE> *>(m_pc);
-    fl->init(this);
-    return fl;
-  }
-
-  return NULL;
-}
+//template<typename REAL, typename SIZE>
+//FluidRST<REAL,SIZE,FT> *GLPointCloudRS<REAL,SIZE>::make_dynamic(FluidParamsPtr params)
+//{
+//  this->m_pos.setUsagePattern( QOpenGLBuffer::StreamDraw );
+//
+//  FluidRST<REAL,SIZE> *dpc =
+//    new FluidRST<REAL, SIZE>(m_pc, params);
+//
+//  delete m_pc; // delete the old point cloud
+//  m_pc = dpc;  // set new dynamic point cloud as a member
+//  return dpc;  // return new dynamic point cloud
+//}
+//
+//template<typename REAL, typename SIZE>
+//PointCloudRS<REAL,SIZE> *GLPointCloudRS<REAL,SIZE>::init_dynamics()
+//{ 
+//  if (m_pc->is_dynamic())
+//  {
+//    static_cast<FluidRST<REAL,SIZE,FT> *>(m_pc)->init(this);
+//    return m_pc;
+//  }
+//
+//  return NULL;
+//}
 
 template class GLPointCloudRS<double, unsigned int>;
