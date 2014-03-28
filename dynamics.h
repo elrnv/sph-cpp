@@ -109,20 +109,16 @@ public:
     for (auto &fl : m_fluids_DEFAULT) { f(fl); }
   }
   #define FOR_EACH_FLUID( func ) \
-  { \
-    for (auto &fl : m_fluids_MCG03)   { func; } \
-    for (auto &fl : m_fluids_BT07)    { func; } \
-    for (auto &fl : m_fluids_AIAST12) { func; } \
-    for (auto &fl : m_fluids_DEFAULT) { func; } \
-  }
+    for (auto &fl : m_fluids_MCG03)   func
+    //for (auto &fl : m_fluids_BT07)    func \
+    //for (auto &fl : m_fluids_AIAST12) func \
+    //for (auto &fl : m_fluids_DEFAULT) func \
 
   #define FOR_EACH_FLUID_TYPE( f ) \
-  { \
-    f<MCG03>(); \
-    f<BT07>(); \
-    f<AIAST12>(); \
-    f<DEFAULT>(); \
-  }
+    f<MCG03>(); 
+  //  f<BT07>(); \
+  //  f<AIAST12>(); \
+  //  f<DEFAULT>(); \
 
   void init();
   inline void update_grid();

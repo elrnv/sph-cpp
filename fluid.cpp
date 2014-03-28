@@ -57,12 +57,14 @@ void FluidRST<REAL,SIZE,FT>::init(GLPointCloudRS<REAL, SIZE> *glpc)
   m_fluid_pressure_proc.init_kernel(m_kernel_radius);
   m_fluid_viscosity_accel_proc.init_kernel(m_kernel_radius);
   m_fluid_pressure_accel_proc.init_kernel(m_kernel_radius);
+  m_fluid_surface_tension_accel_proc.init_kernel(m_kernel_radius);
 
   copy_properties_to_proc(m_fluid_density_proc);
   copy_properties_to_proc(m_fluid_density_update_proc);
   copy_properties_to_proc(m_fluid_pressure_proc);
   copy_properties_to_proc(m_fluid_viscosity_accel_proc);
   copy_properties_to_proc(m_fluid_pressure_accel_proc);
+  copy_properties_to_proc(m_fluid_surface_tension_accel_proc);
 
   m_accel.resizeLike(this->m_pos);
   m_extern_accel.resizeLike(this->m_pos);

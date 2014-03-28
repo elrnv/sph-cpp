@@ -451,6 +451,7 @@ void UniformGridRS<REAL,SIZE>::run()
     return;
 
   init();
+  qDebug() << "initialization done";
 
 #ifdef MCG03
   float dt = 2.5e-3;

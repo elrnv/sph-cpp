@@ -105,7 +105,7 @@ loadDynamics( const std::string &filename )
 
       if (params_ptr->type == DynParams::FLUID)
       {
-        if (boost::iequals(var_name, "t") == 0)
+        if (boost::iequals(var_name, "t"))
         {
           std::string fluid_type;
           iss >> fluid_type;
