@@ -55,17 +55,13 @@ SimWindow::~SimWindow()
 
 void SimWindow::clear_dynamics()
 {
+  glclear_tr(); // clear dynamics text buffer
   if (!m_grid)
-  {
-    glclear_tr(); // clear dynamics text buffer
     return;
-  }
 
   m_grid->request_stop(); // stop thread
   m_sim_thread.join();
   delete m_grid; m_grid = 0;
-
-  glclear_tr(); // clear dynamics text buffer
 }
 
 void SimWindow::init()
@@ -80,82 +76,27 @@ void SimWindow::init()
   m_ubo.bindToIndex();
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-  load_model(4);
+  load_model(0);
 }
 
 void SimWindow::load_model(int i)
 {
   clear_dynamics();
-  std::string filename;
-
-  // optionally extend centered container box on load
-  Vector2f ext_x(0.0f, 0.0f);
-  Vector2f ext_y(0.0f, 0.0f);
-  Vector2f ext_z(0.0f, 0.0f);
-
-  // optionally rotate (useful to change coordinates)
-  double angle_x = 0.0f;
-  double angle_y = 0.0f;
-
-  switch (i)
-  {
-    case 0:
-      filename = "boundary.obj";
-      break;
-    case 1:
-      filename = "cube.obj";
-      break;
-    case 2:
-      filename = "cow.obj";
-      angle_y = 180.0f;
-      break;
-    case 3:
-      filename = "bun_zipper.ply";
-      break;
-    case 4:
-      filename = "sparsesphere.obj";
-      ext_x = Vector2f(0.5f, 0.5f);
-      ext_y = Vector2f(0.5f, 0.5f);
-      ext_z = Vector2f(0.5f, 0.5f);
-      angle_x = 40.0f;
-      angle_y = 40.0f;
-      break;
-    case 5:
-      filename = "sphere.obj";
-      ext_x = Vector2f(0.5f, 0.5f);
-      ext_y = Vector2f(0.5f, 0.5f);
-      ext_z = Vector2f(0.5f, 0.5f);
-      angle_x = 40.0f;
-      angle_y = 40.0f;
-      break;
-    case 6:
-      filename = "densesphere.obj";
-      ext_x = Vector2f(0.5f, 0.5f);
-      ext_y = Vector2f(0.5f, 0.5f);
-      ext_z = Vector2f(0.5f, 0.5f);
-      angle_x = 40.0f;
-      angle_y = 40.0f;
-      break;
-    case 7:
-      filename = "block.obj";
-      break;
-    case 8:
-      filename = "sparseblock.obj";
-      break;
-    default:
-      glprintf_trc(RED, "model not found\n");
-      return;
-  }
-  SceneNode *scene = Util::loadScene("data/" + filename);
+  SceneNode *scene = Util::loadScene("data/scene" + std::to_string(i) + ".cfg");
   if (!scene)
     return;
 
   scene->normalize_model();
-  scene->rotate(angle_x, Vector3f::UnitX());
-  scene->rotate(angle_y, Vector3f::UnitY());
+  scene->rotate(global::sceneset.rotx, Vector3f::UnitX());
+  scene->rotate(global::sceneset.roty, Vector3f::UnitY());
   scene->flatten();
-  scene->normalize_model(ext_x, ext_y, ext_z);
+
+  scene->normalize_model(
+      global::sceneset.padx,
+      global::sceneset.pady,
+      global::sceneset.padz);
   scene->flatten();
+
   scene->cube_bbox();
   m_udata.modelmtx.setIdentity();
 

@@ -160,10 +160,10 @@ GeometryNode::GeometryNode(
       FluidParamsPtr fparams = boost::static_pointer_cast<FluidParams>(dyn_params);
       switch(fparams->fluid_type)
       {
-        case MCG03: m_primitive = new FluidT<MCG03>(mesh, fparams); break;
-        case BT07: m_primitive = new FluidT<BT07>(mesh, fparams); break;
-        case AIAST12: m_primitive = new FluidT<AIAST12>(mesh, fparams); break;
-        default: m_primitive = new FluidT<DEFAULT>(mesh, fparams); break;
+        case MCG03: m_primitive = new FluidT<int(MCG03)>(mesh, fparams); break;
+        case BT07: m_primitive = new FluidT<int(BT07)>(mesh, fparams); break;
+        case AIAST12: m_primitive = new FluidT<int(AIAST12)>(mesh, fparams); break;
+        default: m_primitive = new FluidT<int(DEFAULT)>(mesh, fparams); break;
       }
       //m_primitive = FLUID_TYPED_CALL(new FluidT, fparams->fluid_type, mesh, fparams);
     }

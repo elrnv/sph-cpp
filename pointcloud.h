@@ -27,7 +27,6 @@ public:
   inline SIZE get_num_vertices() const { return m_pos.cols(); }
   inline Matrix3XR<REAL> &get_pos() { return m_pos; }
   inline bool is_pointcloud() const { return true; }
-  inline virtual FluidType get_type() const { return NOTFLUID; }
 
   inline void transform_in_place(const AffineCompact3f &trans);
   inline AlignedBox3f &compute_bbox();

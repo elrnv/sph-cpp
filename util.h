@@ -12,10 +12,12 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <libconfig.h++>
 #include "scene.h"
 #include "glmesh.h"
 #include "glpointcloud.h"
 #include "dynparams.h"
+#include "settings.h"
 
 namespace Util
 {
@@ -49,18 +51,18 @@ DynParamsPtr
 loadDynamics( const std::string &filename )
 {
   // parse the dynamics file
-  std::string line;
   std::ifstream file(filename, std::ifstream::in);
 
   if (!file.is_open())
   {
-    qWarning() << "Could not open dynamics file:" << QString(filename.c_str());
+    qWarning() << "Could not open dynamics file:" << filename.c_str();
     return DynParamsPtr(NULL);
   }
 
   DynParamsPtr params_ptr;
 
   // determine type of dynamics
+  std::string line;
   while (getline(file, line))
   {
     std::istringstream iss(line);
@@ -139,7 +141,7 @@ loadDynamics( const std::string &filename )
 }
 
 SceneNode *
-loadScene( const std::string &filename )
+loadObject( const std::string &filename, DynParamsPtr params_ptr )
 {
   Assimp::Importer importer;
 
@@ -163,37 +165,98 @@ loadScene( const std::string &filename )
     return NULL;
   }
 
-  // check for dynamics
-  std::string line;
-  std::ifstream file;
-  file.open(filename);
+  return processScene(scene, scene->mRootNode, params_ptr);
+}
 
-  if (!file.is_open())
+SceneNode *
+loadScene( const std::string &filename )
+{
+  SceneNode *root = NULL;
+  libconfig::Config cfg;
+  try
   {
-    qWarning() << "Could not open input file:" << QString(filename.c_str());
-    return NULL;
-  }
+    cfg.readFile(filename.c_str());
 
-  DynParamsPtr params_ptr;
+    // Dynamic Settings
+    global::dynset.fps = 60;
+    global::dynset.frames = 250;
+    global::dynset.cachedir = "";
+    cfg.lookupValue("dynamics.fps", global::dynset.fps);
+    cfg.lookupValue("dynamics.frames", global::dynset.frames);
+    cfg.lookupValue("dynamics.cachedir", global::dynset.cachedir);
 
-  while (getline(file, line))
-  {
-    if (line.compare(0, 6, "dynlib") == 0)
+    global::sceneset.padx = Vector2f(0,0);
+    global::sceneset.pady = Vector2f(0,0);
+    global::sceneset.padz = Vector2f(0,0);
+    libconfig::Setting &padset = cfg.lookup("scene.padding");
+    global::sceneset.padx = Vector2f(padset["x"][0], padset["x"][1]);
+    global::sceneset.pady = Vector2f(padset["y"][0], padset["y"][1]);
+    global::sceneset.padz = Vector2f(padset["z"][0], padset["z"][1]);
+    
+    cfg.lookupValue("scene.rotation.x", global::sceneset.rotx);
+    cfg.lookupValue("scene.rotation.y", global::sceneset.roty);
+    
+    std::string objdir = cfg.lookup("scene.objdir");
+    libconfig::Setting& objset = cfg.lookup("scene.objects");
+
+    int num = objset.getLength();
+    if (!num)
+      return root;
+
+    // get scene objects
+    for (int i = 0; i < num; ++i)
     {
-      // search for dynamics file in the same directory
-      std::string dyn_filename = boost::trim_copy(line.substr(7));
-      size_t pos = filename.find_last_of("/");
-      if (pos == std::string::npos)
-        params_ptr = loadDynamics( dyn_filename );
-      else
-        params_ptr = loadDynamics( filename.substr(0,pos+1) + dyn_filename );
-      break;
+      try
+      {
+        std::string dynfile = objset[i]["dynfile"];
+
+        DynParamsPtr params_ptr;
+
+        params_ptr = loadDynamics( objdir + "/" + dynfile );
+
+        std::string objfile = objset[i]["objfile"];
+        
+        if (params_ptr)
+        {
+          size_t end = objfile.find_last_of(".");
+          params_ptr->cacheprefix = objfile.substr(0, end);
+        }
+
+        SceneNode *obj = loadObject( objdir + "/" + objfile, params_ptr );
+
+        if (!root)
+          root = new SceneNode("root");
+
+        root->add_child(obj);
+      }
+      catch (libconfig::SettingTypeException &te)
+      {
+        qWarning() << "Setting " << te.getPath() << "has the wrong type!";
+      }
+      catch (libconfig::SettingNotFoundException &nfe)
+      {
+        qWarning() << "Setting " << nfe.getPath() << "not found!";
+      }
     }
   }
-
-  file.close();
-
-  return processScene(scene, scene->mRootNode, params_ptr);
+  catch (libconfig::ParseException &pe) 
+  {
+    qWarning() << "Configuration file:" << filename.c_str() << ", could not be parsed:";
+    qWarning() << "libconfig:" << pe.getError();
+  }
+  catch (libconfig::FileIOException &ioe) 
+  {
+    qWarning() << "Configuration file:" << filename.c_str() << ", could not be opened!";
+  }
+  catch (libconfig::SettingTypeException &te)
+  {
+    qWarning() << "Setting " << te.getPath() << "has the wrong type!";
+  }
+  catch (libconfig::SettingNotFoundException &nfe)
+  {
+    qWarning() << "Setting " << nfe.getPath() << "not found!";
+  }
+  return root;
 }
 
 // PRE: we must have the current GL context

@@ -29,14 +29,25 @@ struct FluidParticleR : public ParticleR<REAL>
   REAL temp;          // store temporary values at the particle during computation
   REAL vol;           // volume estimate
   unsigned short id;  // index of the fluid this particle belongs to in the grid
-  FluidType type;     // type of the fluid
 };
 
-template<typename REAL, FluidType FT>
+template<typename REAL, int FT>
 struct FluidParticleRT : public FluidParticleR<REAL>
 { 
   explicit FluidParticleRT(Vector3R<REAL> p, Vector3R<REAL> v, REAL *a, REAL *ea, unsigned short i)
     : FluidParticleR<REAL>(p, v, a, ea, i) { }
 };
+
+// would like to infer the Type of fluid for a particular particle type:
+template <typename>
+struct extract_fluid_type;
+
+template <typename REAL, int FT>
+struct extract_fluid_type< FluidParticleRT<REAL, FT> >
+{
+  static const int type = FT;
+};
+
+
 
 #endif // PARTICLE_H

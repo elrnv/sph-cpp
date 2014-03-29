@@ -5,6 +5,7 @@ TARGET = sim
 SOURCES += \
   main.cpp \
   gltext.cpp \
+  settings.cpp \
   openglwindow.cpp \
   simwindow.cpp \
   scene.cpp \
@@ -21,6 +22,8 @@ SOURCES += \
 
 HEADERS += \
   gltext.h \
+  settings.h \
+  dynparams.h \
   openglwindow.h \
   simwindow.h \
   scene.h \
@@ -52,6 +55,9 @@ INCLUDEPATH += /opt/local/include
 LIBS += -L/opt/local/lib -lassimp
 
 LIBS += /opt/intel/lib/libiomp5.a
+
+# link to libconfig library to read config files
+LIBS += -lconfig++
 
 # MKL setup
 #MKLROOT = /opt/intel/mkl

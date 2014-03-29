@@ -27,8 +27,10 @@
 // Forward declaration
 template<typename REAL, typename SIZE>
 class GLPointCloudRS;
+template<typename REAL, typename SIZE, int FT>
+class FluidRST;
 
-// A dynamic cloud of points
+// A dynamic cloud of points, this is a purely abstract class
 template<typename REAL, typename SIZE>
 class FluidRS : public PointCloudRS<REAL,SIZE>
 {
@@ -39,9 +41,9 @@ public:
   ~FluidRS();
 
   // explicitly state that we use some base class members (convenience)
-  using PointCloudRS<REAL,SIZE>::get_radius();
+  using PointCloudRS<REAL,SIZE>::get_radius;
   using PointCloudRS<REAL,SIZE>::m_pos;
-  using PointCloudRS<REAL,SIZE>::m_box;
+  using PointCloudRS<REAL,SIZE>::m_bbox;
 
   void init(GLPointCloudRS<REAL, SIZE> *glpc);
 
@@ -67,7 +69,9 @@ public:
   inline REAL get_rest_density() const    { return m_rest_density; }
   inline REAL get_viscosity() const       { return m_viscosity; }
   inline REAL get_surface_tension() const { return m_st; }
+  inline REAL get_recoil_velocity_damping() const { return m_recoil_velocity_damping; }
   inline REAL get_sound_speed2() const    { return m_c2; }
+  inline FluidType get_type() const       { return m_params->fluid_type; }
 
   inline Vector3f get_color() const 
   { 
@@ -83,6 +87,15 @@ public:
   inline void resolve_collisions();
 
   inline void update_data(); // propagate changes to some viewer
+
+  template<int FT>
+  inline FluidRST<REAL,SIZE,FT> *cast() 
+  {
+    return static_cast<FluidRST<REAL,SIZE,FT> *>(this); 
+  }
+
+  inline void write_to_file(unsigned int frame);
+  inline bool read_from_file(unsigned int frame);
 
 protected:
   FluidParamsPtr m_params;
@@ -103,11 +116,13 @@ protected:
   Matrix3XR<REAL> m_extern_accel; // accelerations
 
   GLPointCloudRS<REAL,SIZE> *m_glpc; // should only used for callback
+
+  std::string m_cachefmt;
 }; // class FluidRS
 
 
 // Typed Fluid
-template<typename REAL, typename SIZE, FluidType FT>
+template<typename REAL, typename SIZE, int FT>
 class FluidRST : public FluidRS<REAL,SIZE>
 {
 public:
@@ -115,16 +130,17 @@ public:
   explicit FluidRST(const aiMesh *pc, FluidParamsPtr params);
   ~FluidRST();
 
-  inline FluidType init_processors();
-  inline FluidType get_type() const { return FT; }
+  // explicitly state that we use some base class members (convenience)
 
-  // Quantity Processors
-  CFDensityRST<REAL,SIZE,FT>              m_fluid_density_proc;
-  CFDensityUpdateRST<REAL,SIZE,FT>        m_fluid_density_update_proc;
-  CFPressureRST<REAL,SIZE,FT>             m_fluid_pressure_proc;
-  CFPressureAccelRST<REAL,SIZE,FT>        m_fluid_pressure_accel_proc;
-  CFViscosityAccelRST<REAL,SIZE,FT>       m_fluid_viscosity_accel_proc;
-  CFSurfaceTensionAccelRST<REAL,SIZE,FT>  m_fluid_surface_tension_accel_proc;
+  using FluidRS<REAL,SIZE>::m_kernel_radius;
+  using FluidRS<REAL,SIZE>::m_rest_density;
+  using FluidRS<REAL,SIZE>::m_viscosity;
+  using FluidRS<REAL,SIZE>::m_st;
+  using FluidRS<REAL,SIZE>::m_mass;
+  using FluidRS<REAL,SIZE>::m_recoil_velocity_damping;
+  using FluidRS<REAL,SIZE>::m_c2;
+
+  inline void init_processors();
 
   // routine to copy fluid properties to processors above
   template<class OutputType, class KernelType, class ComputeType>
@@ -156,12 +172,16 @@ public:
   GET_PROC( CFSurfaceTensionAccelRST )
   { return m_fluid_surface_tension_accel_proc; }
 
+  // Quantity Processors
+  CFDensityRST<REAL,SIZE,FT>              m_fluid_density_proc;
+  CFDensityUpdateRST<REAL,SIZE,FT>        m_fluid_density_update_proc;
+  CFPressureRST<REAL,SIZE,FT>             m_fluid_pressure_proc;
+  CFPressureAccelRST<REAL,SIZE,FT>        m_fluid_pressure_accel_proc;
+  CFViscosityAccelRST<REAL,SIZE,FT>       m_fluid_viscosity_accel_proc;
+  CFSurfaceTensionAccelRST<REAL,SIZE,FT>  m_fluid_surface_tension_accel_proc;
 }; // FluidRST
 
-// defaults
-typedef FluidRST<double, unsigned int, DEFAULT> Fluid;
-
-template<FluidType FT>
+template<int FT>
 using FluidT = FluidRST<double, unsigned int, FT>;
 
 #endif // FLUID_H

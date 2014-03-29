@@ -80,7 +80,7 @@ CBQ_TYPEDEF CBQPoly6R = CBQ<REAL, double, Poly6Kernel, ComputeType>;
 
 // Specific Compute SPH Quantity Processors
 
-template<typename REAL, typename SIZE, FluidType FT>
+template<typename REAL, typename SIZE, int FT>
 class CFDensityRST :
   public CFQPoly6RS< REAL, SIZE, CFDensityRST<REAL,SIZE,FT> >
 {
@@ -136,7 +136,7 @@ private:
 };
 
 
-template<typename REAL, typename SIZE, FluidType FT>
+template<typename REAL, typename SIZE, int FT>
 class CFDensityUpdateRST : 
   public CFQPoly6GradRS<REAL,SIZE,CFDensityUpdateRST<REAL,SIZE,FT> >
 {
@@ -157,14 +157,13 @@ public:
   inline void finish_particle(FluidParticleR<REAL> &p)
   {
     p.dinv += m_timestep * p.dinv * p.dinv * p.temp * this->m_kern.coef;
-    qDebug() << "p.dinv: " << p.dinv;
   }
 
 private:
   float m_timestep;
 };
 
-template<typename REAL, typename SIZE, FluidType FT>
+template<typename REAL, typename SIZE, int FT>
 class CFPressureRST :
   public CFQPoly6RS<REAL,SIZE,CFPressureRST<REAL,SIZE,FT> >
 {
@@ -195,7 +194,7 @@ public:
   }
 };
 
-template<typename REAL, typename SIZE, FluidType FT>
+template<typename REAL, typename SIZE, int FT>
 class CFPressureAccelRST :
   public CFQSpikyGradRS<REAL,SIZE,CFPressureAccelRST<REAL,SIZE,FT> >
 {
@@ -217,8 +216,10 @@ public:
        : -this->m_mass*(p.pressure*p.dinv*p.dinv +
           near_p.pressure*near_p.dinv*near_p.dinv)*this->m_kern(p.pos - near_p.pos));
 
+    //qDebug(" ac: % 10.5e % 10.5e % 10.5e", res[0], res[1], res[2]);
     for (unsigned char i = 0; i < 3; ++i)
       p.accel[i] += res[i]; // copy intermediate result
+
   }
 
   inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p)
@@ -241,16 +242,14 @@ public:
     for (unsigned char i = 0; i < 3; ++i)
       p.accel[i] += p.extern_accel[i];
 
-//    qDebug() << "p.dinv:" << p.dinv;
-    //qDebug(" ac: % 10.5e % 10.5e % 10.5e", p.accel[0], p.accel[1], p.accel[2]);
+    //qDebug() << "p.dinv:" << p.dinv;
   }
 private:
   MKI04Kernel m_bound_kern;
 };
 
 
-// TODO: fix the following
-template<typename REAL, typename SIZE, FluidType FT>
+template<typename REAL, typename SIZE, int FT>
 class CFViscosityAccelRST : 
   public CFQSpikyGradRS<REAL,SIZE,CFViscosityAccelRST<REAL,SIZE,FT> >
 {
@@ -320,7 +319,7 @@ public:
   inline void finish_particle(FluidParticleR<REAL> &p) { }
 };
 
-template<typename REAL, typename SIZE, FluidType FT>
+template<typename REAL, typename SIZE, int FT>
 class CFSurfaceTensionAccelRST : 
   public CFQSpikyGradRS<REAL,SIZE,CFSurfaceTensionAccelRST<REAL,SIZE,FT> >
 {

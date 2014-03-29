@@ -22,7 +22,6 @@ public:
   { p.dinv = 0.0f; }
   inline void fluid(ParticleR<REAL> &p, FluidParticleR<REAL> &near_p)
   { }
-
   inline void bound(ParticleR<REAL> &p, ParticleR<REAL> &near_p)
   {
     p.dinv += this->m_kern[ p.pos - near_p.pos ];
@@ -36,14 +35,37 @@ public:
 // forward declarations
 template<typename REAL, typename SIZE>
 class FluidRS;
-template<typename REAL, typename SIZE, FluidType FT>
+template<typename REAL, typename SIZE, int FT>
 class FluidRST;
 template<typename REAL, typename SIZE>
 class GLPointCloudRS;
 
+template <typename REAL, typename SIZE>
+class UniformGridRS;
 
-// Define a set of different types of fluids
-typedef std::vector< FluidRS<REAL,SIZE> * > FluidVec;
+// template recursion mechanism to iterate through each fluid type
+template<typename REAL, typename SIZE, int FT>
+struct FTiter
+{
+  // high level processing (ones that should be called by the integrator)
+  inline static void init_fluid_processors(UniformGridRS<REAL,SIZE> &);
+  inline static void populate_fluid_data(UniformGridRS<REAL,SIZE> &g);
+  inline static void update_density(UniformGridRS<REAL,SIZE> &, float);
+  inline static void compute_density(UniformGridRS<REAL,SIZE> &);
+  inline static void compute_accel(UniformGridRS<REAL,SIZE> &);
+  inline static void compute_pressure(UniformGridRS<REAL,SIZE> &);
+};
+
+template<typename REAL, typename SIZE> // base case
+struct FTiter<REAL, SIZE, NUMTYPES>
+{
+  inline static void init_fluid_processors(UniformGridRS<REAL,SIZE> &) { }
+  inline static void populate_fluid_data(UniformGridRS<REAL,SIZE> &) { }
+  inline static void update_density(UniformGridRS<REAL,SIZE> &,float) { }
+  inline static void compute_density(UniformGridRS<REAL,SIZE> &) { }
+  inline static void compute_accel(UniformGridRS<REAL,SIZE> &) { }
+  inline static void compute_pressure(UniformGridRS<REAL,SIZE> &) { }
+};
 
 // Grid structure used to optimize computing particle properties using kernels
 template <typename REAL, typename SIZE>
@@ -77,6 +99,9 @@ public:
 
   typedef typename Array3::template array_view<3>::type GridView;
 
+  // Define a set of different types of fluids
+  typedef std::vector< FluidRS<REAL,SIZE> * > FluidVec;
+
   // Constructors/Destructor
   UniformGridRS(const Vector3f &bmin, const Vector3f &bmax);
   ~UniformGridRS();
@@ -85,46 +110,23 @@ public:
   { 
     if (glpc->is_dynamic())
     {
-      FLUID_TYPED_CALL(add_fluid_impl, glpc->get_pointcloud()->get_type(), glpc);
+      FluidRS<REAL,SIZE> *fl = static_cast<FluidRS<REAL,SIZE> *>(glpc->get_pointcloud());
+      fl->init(glpc);
+      m_fluids[fl->get_type()].push_back(fl);
+      m_num_fluids += 1;
     }
   }
 
-#define ENABLE_GET_IF(fluid_type) \
-  inline typename std::enable_if<FT == fluid_type, FluidVecT<FT> &>::type
-
-  template<FluidType FT> 
-  ENABLE_GET_IF(MCG03) get_fluid_vec() { return m_fluids_MCG03; }
-  template<FluidType FT>
-  ENABLE_GET_IF(BT07) get_fluid_vec() { return m_fluids_BT07; }
-  template<FluidType FT>
-  ENABLE_GET_IF(AIAST12) get_fluid_vec() { return m_fluids_AIAST12; }
-  template<FluidType FT>
-  ENABLE_GET_IF(DEFAULT) get_fluid_vec() { return m_fluids_DEFAULT; }
-
-  // function iterating over fluids of all types
-  template <typename Func>
-  inline void for_each_fluid( Func f )
-  {
-    for (auto &fl : m_fluids_MCG03)   { f(fl); }
-    for (auto &fl : m_fluids_BT07)    { f(fl); }
-    for (auto &fl : m_fluids_AIAST12) { f(fl); }
-    for (auto &fl : m_fluids_DEFAULT) { f(fl); }
+  template<typename ParticleType>
+  inline FluidRST<REAL,SIZE, extract_fluid_type<ParticleType>::type> *
+  get_fluid(unsigned int id) 
+  { 
+    return m_fluids[extract_fluid_type<ParticleType>::type][id]
+              ->template cast< extract_fluid_type<ParticleType>::type>();
   }
-  #define FOR_EACH_FLUID( func ) \
-    for (auto &fl : m_fluids_MCG03)   func
-    //for (auto &fl : m_fluids_BT07)    func \
-    //for (auto &fl : m_fluids_AIAST12) func \
-    //for (auto &fl : m_fluids_DEFAULT) func \
-
-  #define FOR_EACH_FLUID_TYPE( f ) \
-    f<MCG03>(); 
-  //  f<BT07>(); \
-  //  f<AIAST12>(); \
-  //  f<DEFAULT>(); \
 
   void init();
   inline void update_grid();
-  inline void populate_fluid_data();
   inline void populate_bound_data();
   inline void clear_fluid_data();
 
@@ -159,7 +161,7 @@ public:
   typename std::enable_if< std::is_base_of< FluidParticleR<REAL>, ParticleType >::value,
            ProcessPairFunc & >::type determine_proc(const FluidParticleR<REAL> &p)
            {
-             return get_fluid(p)->template get_proc<ProcessPairFunc>();
+             return get_fluid<ParticleType>(p.id)->template get_proc<ProcessPairFunc>();
            }
 
   // Low level quantity processing functions
@@ -170,31 +172,31 @@ public:
   inline void compute_bound_quantity()
   { compute_quantity<Func, ParticleR<REAL> >(); }
 
-  template<typename Func, FluidType FT>
+  template<typename Func, int FT>
   inline void compute_fluid_quantity()
   { compute_quantity<Func, FluidParticleRT<REAL, FT> >(); }
 
-  template<FluidType FT>
+  template<int FT>
   inline void compute_pressure_accelT()
   { compute_fluid_quantity< CFPressureAccelRST<REAL, SIZE, FT>, FT >(); }
   
-  template<FluidType FT>
+  template<int FT>
   inline void compute_viscosity_accelT()
   { compute_fluid_quantity< CFViscosityAccelRST<REAL, SIZE, FT>, FT >(); }
 
-  template<FluidType FT>
+  template<int FT>
   inline void compute_surface_tension_accelT()
   { compute_fluid_quantity< CFSurfaceTensionAccelRST<REAL, SIZE, FT>, FT >(); }
 
-  template<FluidType FT>
+  template<int FT>
   inline void compute_densityT()
   { compute_fluid_quantity< CFDensityRST<REAL,SIZE,FT>, FT >(); }
 
-  template<FluidType FT>
+  template<int FT>
   inline void compute_density_updateT()
   { compute_fluid_quantity< CFDensityUpdateRST<REAL,SIZE,FT>, FT >(); }
 
-  template<FluidType FT>
+  template<int FT>
   inline void compute_pressureT()
   { compute_fluid_quantity< CFPressureRST<REAL,SIZE,FT>, FT >(); }
 
@@ -202,11 +204,6 @@ public:
   void compute_initial_density();
 #endif
 
-  // high level processing (ones that should be called by the integrator)
-  void compute_accel();
-  void compute_pressure() { FOR_EACH_FLUID_TYPE(compute_pressureT); }
-  void compute_density();
-  void update_density(float timestep);
 
   // run dynamic simulation
   void run();
@@ -214,16 +211,13 @@ public:
   // request stop which will be checked by the owner thread
   void request_stop() { m_stop_requested = true; }
 
+  friend FTiter<REAL,SIZE,NOTFLUID>;
+  friend FTiter<REAL,SIZE,DEFAULT>;
+  friend FTiter<REAL,SIZE,MCG03>;
+  friend FTiter<REAL,SIZE,BT07>;
+  friend FTiter<REAL,SIZE,AIAST12>;
 
 private: // member functions
-  template<FluidType FT> // convenience
-  inline void add_fluid_impl(GLPointCloudRS<REAL,SIZE> *glpc) 
-  { 
-    FluidRST<REAL,SIZE,FT> *fl = static_cast<FluidRST<REAL,SIZE,FT> *>(glpc->get_pointcloud());
-    fl->init(glpc);
-    get_fluid_vec<FT>().push_back(fl);
-    m_num_fluids += 1;
-  }
 
   // utility function used in the constructor to get a range of two elements
   // centered at x (or 2 if x is on the boundary)
@@ -234,7 +228,7 @@ private: // member functions
 
 private: // member variables
   // array of simulated interacting fluids
-  FluidVec m_fluids;
+  FluidVec m_fluids[NUMTYPES];
 
   unsigned int m_num_fluids;
 
@@ -252,6 +246,7 @@ private: // member variables
   CBVolumeR<REAL> *m_bound_volume_proc;
 
   std::atomic<bool> m_stop_requested;
+
 }; // class UniformGridRS
 
 typedef UniformGridRS<double, unsigned int> UniformGrid;
