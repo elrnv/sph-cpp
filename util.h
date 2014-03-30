@@ -180,19 +180,32 @@ loadScene( const std::string &filename )
     // Dynamic Settings
     global::dynset.fps = 60;
     global::dynset.frames = 250;
+    global::dynset.substeps = 10;
     global::dynset.cachedir = "";
     cfg.lookupValue("dynamics.fps", global::dynset.fps);
     cfg.lookupValue("dynamics.frames", global::dynset.frames);
+    cfg.lookupValue("dynamics.substeps", global::dynset.substeps);
     cfg.lookupValue("dynamics.cachedir", global::dynset.cachedir);
 
     global::sceneset.padx = Vector2f(0,0);
     global::sceneset.pady = Vector2f(0,0);
     global::sceneset.padz = Vector2f(0,0);
-    libconfig::Setting &padset = cfg.lookup("scene.padding");
-    global::sceneset.padx = Vector2f(padset["x"][0], padset["x"][1]);
-    global::sceneset.pady = Vector2f(padset["y"][0], padset["y"][1]);
-    global::sceneset.padz = Vector2f(padset["z"][0], padset["z"][1]);
+
+    try
+    {
+      libconfig::Setting &padset = cfg.lookup("scene.padding");
+      global::sceneset.padx = Vector2f(padset["x"][0], padset["x"][1]);
+      global::sceneset.pady = Vector2f(padset["y"][0], padset["y"][1]);
+      global::sceneset.padz = Vector2f(padset["z"][0], padset["z"][1]);
+    }
+    catch (libconfig::SettingTypeException &te)
+    {
+      qWarning() << "Setting " << te.getPath() << "has the wrong type!";
+    }
+    catch (libconfig::SettingNotFoundException &nfe) { }
     
+    global::sceneset.rotx = 0.0f;
+    global::sceneset.roty = 0.0f;
     cfg.lookupValue("scene.rotation.x", global::sceneset.rotx);
     cfg.lookupValue("scene.rotation.y", global::sceneset.roty);
     
@@ -223,11 +236,13 @@ loadScene( const std::string &filename )
         }
 
         SceneNode *obj = loadObject( objdir + "/" + objfile, params_ptr );
+        if(obj)
+        {
+          if (!root)
+            root = new SceneNode("root");
 
-        if (!root)
-          root = new SceneNode("root");
-
-        root->add_child(obj);
+          root->add_child(obj);
+        }
       }
       catch (libconfig::SettingTypeException &te)
       {
@@ -247,14 +262,6 @@ loadScene( const std::string &filename )
   catch (libconfig::FileIOException &ioe) 
   {
     qWarning() << "Configuration file:" << filename.c_str() << ", could not be opened!";
-  }
-  catch (libconfig::SettingTypeException &te)
-  {
-    qWarning() << "Setting " << te.getPath() << "has the wrong type!";
-  }
-  catch (libconfig::SettingNotFoundException &nfe)
-  {
-    qWarning() << "Setting " << nfe.getPath() << "not found!";
   }
   return root;
 }

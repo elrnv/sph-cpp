@@ -55,7 +55,6 @@ SimWindow::~SimWindow()
 
 void SimWindow::clear_dynamics()
 {
-  glclear_tr(); // clear dynamics text buffer
   if (!m_grid)
     return;
 
@@ -83,6 +82,7 @@ void SimWindow::load_model(int i)
 {
   clear_dynamics();
   SceneNode *scene = Util::loadScene("data/scene" + std::to_string(i) + ".cfg");
+
   if (!scene)
     return;
 
@@ -157,6 +157,7 @@ void SimWindow::toggle_halos()
 void SimWindow::start_dynamics()
 {
   clear_dynamics();
+  glclear_tr(); // clear dynamics text buffer
 
   // Create simulation grid
   m_grid = new UniformGrid(Vector3f(-1,-1,-1), Vector3f(1,1,1));

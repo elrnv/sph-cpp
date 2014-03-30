@@ -115,14 +115,14 @@ inline void FluidRS<REAL,SIZE>::update_data()
 }
 
 template<typename REAL, typename SIZE>
-inline void FluidRS<REAL,SIZE>::write_to_file(unsigned int frame) 
+inline void FluidRS<REAL,SIZE>::write_cache(unsigned int frame) 
 {
   if (global::dynset.cachedir.empty())
     return;
 
   // open output file
   FILE * outfile = NULL;
-  char buf[64];
+  char buf[128];
   sprintf(buf, m_cachefmt.c_str(), frame);
   outfile = fopen(buf,"w");
 
@@ -141,16 +141,34 @@ inline void FluidRS<REAL,SIZE>::write_to_file(unsigned int frame)
   fclose(outfile);
 }
 
+template<typename REAL, typename SIZE>
+inline bool FluidRS<REAL,SIZE>::is_cached(unsigned int frame) 
+{
+  if (global::dynset.cachedir.empty())
+    return false;
+
+  // open cache file
+  FILE * infile = NULL;
+  char buf[128];
+  sprintf(buf, m_cachefmt.c_str(), frame);
+  infile = fopen(buf, "r");
+  if (!infile)
+    return false;
+
+  fclose(infile);
+  return true;
+}
+
 // return if we successfully read from cached file and have a valid state
 template<typename REAL, typename SIZE>
-inline bool FluidRS<REAL,SIZE>::read_from_file(unsigned int frame) 
+inline bool FluidRS<REAL,SIZE>::read_cache(unsigned int frame) 
 {
   if (global::dynset.cachedir.empty())
     return false;
 
   // open input file
   std::ifstream infile;
-  char buf[64];
+  char buf[128];
   sprintf(buf, m_cachefmt.c_str(), frame);
   infile.open(buf);
 

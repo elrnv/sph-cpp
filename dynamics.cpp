@@ -288,58 +288,72 @@ void UniformGridRS<REAL,SIZE>::populate_bound_data()
 #endif
 }
 
-#if 0
-// heuristic to approximate the initial density
-// currently we use the given density and use Shepard's method 
-// to correct the kernel
-template<typename REAL>
-class ComputeInitialDensityR
-{
-public:
-  ComputeInitialDensityR(float h, REAL m, REAL &rd) 
-    : kern(h), mass(m), rest_density(rd) { }
-  ~ComputeInitialDensityR() { }
-
-  inline void init_particle(ParticleR<REAL> &p)
-  {
-//    qDebug() << "v" << p.pos[0] << p.pos[1] << p.pos[2];
-    p.dinv = 0.0f;
-  }
-
-  inline void fluid(ParticleR<REAL> &p, FluidParticleR<REAL> &near_p)
-  {
-    p.dinv += kern[ p.pos - near_p.pos ];
-  }
-  inline void bound(ParticleR<REAL> &p, ParticleR<REAL> &near_p)
-  {
-    p.dinv += kern[ p.pos - near_p.pos ];
-  }
-
-  inline void finish_particle(ParticleR<REAL> &p)
-  {
-    REAL density = p.dinv * mass * kern.coef;
-    p.dinv = 1.0f/density;
-//    qDebug() << density;
-    rest_density += density;
-  }
-
-private:
-  Poly6Kernel kern; // used to compute pressure force
-  REAL mass;
-  REAL &rest_density;
-};
-
 template<typename REAL, typename SIZE>
-void UniformGridRS<REAL,SIZE>::compute_initial_density()
+template<typename ProcessPairFunc, typename ParticleType>
+void UniformGridRS<REAL,SIZE>::compute_quantity()
 {
-  ComputeInitialDensityR<REAL> proc(m_h, m_dpc->m_mass, m_dpc->m_rest_density);
-  compute_bound_quantity(proc);
+  SIZE nx = m_gridsize[0];
+  SIZE ny = m_gridsize[1];
+  SIZE nz = m_gridsize[2];
+  for (SIZE i = 0; i < nx; ++i)
+  {
+    for (SIZE j = 0; j < ny; ++j)
+    {
+      for (SIZE k = 0; k < nz; ++k)
+      {
+        auto &pvec = 
+          m_grid[i][j][k].template get_vec<ParticleType>();
+        if (pvec.empty())
+          continue;
 
-  m_dpc->m_rest_density = 0.0f;
-  compute_fluid_quantity(proc);
-  m_dpc->m_rest_density /= m_dpc->m_num_vertices;
+        IndexRange xrange = range3(i,nx);
+        IndexRange yrange = range3(j,ny);
+        IndexRange zrange = range3(k,nz);
+        GridView neigh_view = m_grid[ boost::indices[xrange][yrange][zrange] ];
+
+        for ( auto &p : pvec )  // prepare data
+        {
+          ProcessPairFunc &process = determine_proc< ProcessPairFunc, ParticleType >(p);
+          process.init_particle(p);
+        }
+
+        SIZE xrange_size = xrange.finish() - xrange.start();
+        SIZE yrange_size = yrange.finish() - yrange.start();
+        SIZE zrange_size = zrange.finish() - zrange.start();
+        for (SIZE near_i = 0; near_i < xrange_size; ++near_i)
+        {
+          for (SIZE near_j = 0; near_j < yrange_size; ++near_j)
+          {
+            for (SIZE near_k = 0; near_k < zrange_size; ++near_k)
+            {
+              Cell &cell = neigh_view[near_i][near_j][near_k];
+              DynamicParticles &neigh_fluidvec = cell.fluidvec;
+              StaticParticles  &neigh_boundvec = cell.boundvec;
+              for ( auto &p : pvec )
+              {
+                ProcessPairFunc &process = determine_proc< ProcessPairFunc, ParticleType>(p);
+                for ( FluidParticleR<REAL> &near_p : neigh_fluidvec )
+                {
+                  process.fluid(p, near_p); // process neighbouring fluid data
+                }
+                for ( ParticleR<REAL> &near_p : neigh_boundvec )
+                {
+                  process.bound(p, near_p); // process neighbouring boundary data
+                }
+              }
+            }
+          }
+        }
+
+        for ( auto &p : pvec )  // finalize data
+        {
+          ProcessPairFunc &process = determine_proc< ProcessPairFunc, ParticleType >(p);
+          process.finish_particle(p);
+        }
+      } // for k
+    } // for j
+  } // for i
 }
-#endif
 
 template<typename REAL, typename SIZE, int FT>
 void FTiter<REAL,SIZE,FT>::update_density(UniformGridRS<REAL,SIZE> &g,float timestep)
@@ -410,75 +424,6 @@ void FTiter<REAL,SIZE,FT>::compute_accel(UniformGridRS<REAL,SIZE> &g)
 
   FTiter<REAL,SIZE,FT+1>::compute_accel(g); // recurse
 }
-
-template<typename REAL, typename SIZE>
-template<typename ProcessPairFunc, typename ParticleType>
-void UniformGridRS<REAL,SIZE>::compute_quantity()
-{
-  SIZE nx = m_gridsize[0];
-  SIZE ny = m_gridsize[1];
-  SIZE nz = m_gridsize[2];
-  for (SIZE i = 0; i < nx; ++i)
-  {
-    for (SIZE j = 0; j < ny; ++j)
-    {
-      for (SIZE k = 0; k < nz; ++k)
-      {
-        auto &pvec = 
-          m_grid[i][j][k].template get_vec<ParticleType>();
-        if (pvec.empty())
-          continue;
-
-        IndexRange xrange = range3(i,nx);
-        IndexRange yrange = range3(j,ny);
-        IndexRange zrange = range3(k,nz);
-        GridView neigh_view = m_grid[ boost::indices[xrange][yrange][zrange] ];
-
-        for ( auto &p : pvec )  // prepare data
-        {
-          ProcessPairFunc &process = determine_proc< ProcessPairFunc, ParticleType >(p);
-          process.init_particle(p);
-        }
-
-        SIZE xrange_size = xrange.finish() - xrange.start();
-        SIZE yrange_size = yrange.finish() - yrange.start();
-        SIZE zrange_size = zrange.finish() - zrange.start();
-        for (SIZE near_i = 0; near_i < xrange_size; ++near_i)
-        {
-          for (SIZE near_j = 0; near_j < yrange_size; ++near_j)
-          {
-            for (SIZE near_k = 0; near_k < zrange_size; ++near_k)
-            {
-              Cell &cell = neigh_view[near_i][near_j][near_k];
-              DynamicParticles &neigh_fluidvec = cell.fluidvec;
-              StaticParticles  &neigh_boundvec = cell.boundvec;
-              for ( auto &p : pvec )
-              {
-                ProcessPairFunc &process = determine_proc< ProcessPairFunc, ParticleType>(p);
-                for ( FluidParticleR<REAL> &near_p : neigh_fluidvec )
-                {
-                  process.fluid(p, near_p); // process neighbouring fluid data
-                }
-                for ( ParticleR<REAL> &near_p : neigh_boundvec )
-                {
-                  process.bound(p, near_p); // process neighbouring boundary data
-                }
-              }
-            }
-          }
-        }
-
-        for ( auto &p : pvec )  // finalize data
-        {
-          ProcessPairFunc &process = determine_proc< ProcessPairFunc, ParticleType >(p);
-          process.finish_particle(p);
-        }
-      } // for k
-    } // for j
-  } // for i
-
-}
-
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::run()
 {
@@ -487,92 +432,153 @@ void UniformGridRS<REAL,SIZE>::run()
 
   init();
 
-#ifdef MCG03
-  float dt = 2.5e-3;
-#else
-  float dt = 4.52e-4;
-#endif
-  dt = std::min(dt, 1.0f/global::dynset.fps);
+  // timestep
+  float dt = 1.0f/(global::dynset.fps * global::dynset.substeps);
 
   glprintf_tr("step: %.2es\n", dt);
   float rdt = dt;
 
-  clock_t prev_t = clock();
-  float t = 0.0f;
-  unsigned int iterations = 0;
-  unsigned int frames = 0;
-  for ( ; ; )
+  bool cached = true; // true if frame is cached
+
+  // check if first frame is cached
+  for (int j = 0; j < NUMTYPES; ++j)
+    for (auto &fl : m_fluids[j])
+      cached &= fl->is_cached(0); // check if we have already cached the first frame
+
+  float file_read_t = 0.0f;
+  float frame_t = 0.0f;
+  float substep_t = 0.0f;
+  unsigned int file_reads = 0;
+  unsigned int frame_count = 0;
+  unsigned int frame = 1;
+
+  for ( ; ; ++frame, ++frame_count ) // for each frame
   {
-    ///////// testing adaptive time step
-    float fdt = std::numeric_limits<float>::infinity();
-    float cvdt = std::numeric_limits<float>::infinity();
+    // check if we have the next frame cached for ALL of the fluids
+    clock_t s = clock();
+    cached = true;
     for (int j = 0; j < NUMTYPES; ++j)
       for (auto &fl : m_fluids[j])
-      {
-        for (SIZE i = 0; i < fl->get_num_vertices(); ++i)
+        cached &= fl->is_cached(frame);
+
+    if (cached) // if frame is cached just load it up
+    {
+      for (int j = 0; j < NUMTYPES; ++j)
+        for (auto &fl : m_fluids[j])
+          fl->read_cache(frame);
+
+      file_read_t += float(clock() - s) / CLOCKS_PER_SEC;
+      file_reads += 1;
+
+      for (int j = 0; j < NUMTYPES; ++j)
+        for (auto &fl : m_fluids[j])
+          fl->update_data(); // notify gl we have new positions
+
+    }
+    else // compute next frame
+    {
+      substep_t = 0.0f;
+      for (unsigned int iter = 0; iter < global::dynset.substeps; ++iter)
+      { // for each simulation substep
+#if 0
+        ///////// testing adaptive time step
+        float fdt = std::numeric_limits<float>::infinity();
+        float cvdt = std::numeric_limits<float>::infinity();
+        for (int j = 0; j < NUMTYPES; ++j)
+          for (auto &fl : m_fluids[j])
+          {
+            for (SIZE i = 0; i < fl->get_num_vertices(); ++i)
+            {
+              fdt = std::min(fdt,
+                  float(fl->get_radius() /
+                    (fl->get_mass()*Vector3R<REAL>(fl->get_extern_accel().col(i)).norm())));
+              cvdt = std::min(cvdt,
+                  float(fl->get_radius()/(fl->get_sound_speed2()*(1+0.6*fl->get_viscosity()))));
+              // check for nan and infs
+              //if (!std::isfinite(fl->vel_at(i)[0]) ||
+              //    !std::isfinite(fl->vel_at(i)[1]) || 
+              //    !std::isfinite(fl->vel_at(i)[2]))
+              //  qDebug() << "Found NaN at " << i;
+            }
+          }
+
+        float new_rdt = std::min(0.25*fdt, 0.4*cvdt);
+        if (new_rdt != rdt)
         {
-          fdt = std::min(fdt,
-              float(fl->get_radius() /
-                (fl->get_mass()*Vector3R<REAL>(fl->get_extern_accel().col(i)).norm())));
-          cvdt = std::min(cvdt,
-              float(fl->get_radius()/(fl->get_sound_speed2()*(1+0.6*fl->get_viscosity()))));
-          // check for nan and infs
-          //if (!std::isfinite(fl->vel_at(i)[0]) ||
-          //    !std::isfinite(fl->vel_at(i)[1]) || 
-          //    !std::isfinite(fl->vel_at(i)[2]))
-          //  qDebug() << "Found NaN at " << i;
+          glprintf_tr("\rrecommended step: %.2es", new_rdt);
+          rdt = new_rdt;
+          //dt = rdt;
         }
-      }
+        //////// end of adaptive timestep test
+#endif
 
-    float new_rdt = std::min(0.25*fdt, 0.4*cvdt);
-    if (new_rdt != rdt)
+        clock_t prev_t = clock();
+
+        //if (count % 100)
+        //  update_density(dt);
+        //else
+          FTiter<REAL,SIZE,DEFAULT>::compute_density(*this);
+        FTiter<REAL,SIZE,DEFAULT>::compute_pressure(*this);
+        FTiter<REAL,SIZE,DEFAULT>::compute_accel(*this); // update m_accel
+
+        float factor = 1.0f; // leap-frog method has a different first step
+        if (iter == 0 && frame == 1)
+          factor = 0.5f;
+
+        for (int j = 0; j < NUMTYPES; ++j)
+        {
+          for (auto &fl : m_fluids[j])
+          {
+            fl->get_vel() = fl->get_vel() + factor*dt*fl->get_accel();
+            fl->get_pos() = (fl->get_pos() + dt*fl->get_vel()).eval();
+            if (j == MCG03)
+              fl->resolve_collisions();
+
+            // prepare velocities for acceleration computation
+            fl->get_vel() = fl->get_vel() + 0.5*dt*fl->get_accel();
+          }
+        }
+
+        update_grid(); // prepare grid for next simulation step
+
+        substep_t += float(clock() - prev_t) / CLOCKS_PER_SEC;
+
+        if (m_stop_requested) break;
+
+        for (int j = 0; j < NUMTYPES; ++j)
+          for (auto &fl : m_fluids[j])
+            fl->update_data(); // notify gl we have new positions
+
+      } // for each substep
+
+      for (int j = 0; j < NUMTYPES; ++j)
+        for (auto &fl : m_fluids[j])
+          fl->write_cache(frame); // save frame to cache
+
+    } // if not cached
+
+    frame_t += float(clock() - s) / CLOCKS_PER_SEC;
+
+    glprintf_tl("\ravg time per:  substep = %.2es,   frame = %.2es,   read = %.2es",
+        substep_t / float(global::dynset.substeps),
+        frame_t / float(frame_count),
+        file_read_t / float(file_reads));
+
+    if (m_stop_requested) break;
+
+    if (frame >= global::dynset.frames)
     {
-      glprintf_tr("\rrecommended step: %.2es", new_rdt);
-      rdt = new_rdt;
-      //dt = rdt;
+      // for timing
+      file_reads = 0;
+      frame_count = 0;
+      frame_t = 0.0f;
+      file_read_t = 0.0f;
+
+      // actual frame
+      frame = 0;
     }
-    //////// end of adaptive timestep test
-
-    //if (count % 100)
-    //  update_density(dt);
-    //else
-      FTiter<REAL,SIZE,DEFAULT>::compute_density(*this);
-    FTiter<REAL,SIZE,DEFAULT>::compute_pressure(*this);
-    FTiter<REAL,SIZE,DEFAULT>::compute_accel(*this); // update m_accel
-
-    float factor = 1.0f; // leap-frog method has a different first step
-    if (iterations == 0)
-      factor = 0.5f;
-
-    for (int j = 0; j < NUMTYPES; ++j)
-    {
-      for (auto &fl : m_fluids[j])
-      {
-        fl->get_vel() = fl->get_vel() + factor*dt*fl->get_accel();
-        fl->get_pos() = (fl->get_pos() + dt*fl->get_vel()).eval();
-        if (j == MCG03)
-          fl->resolve_collisions();
-        fl->update_data(); // notify gl we have new positions
-
-        if ((iterations+1)*dt*global::dynset.fps >= frames)
-          fl->write_to_file(++frames); // save frame to cache
-        
-        // prepare velocities for acceleration computation
-        fl->get_vel() = fl->get_vel() + 0.5*dt*fl->get_accel();
-      }
-    }
-
-    update_grid(); // prepare grid for next simulation step
-
-  if (m_stop_requested) break;
-
-    clock_t cur_t = clock();
-    t += float(cur_t - prev_t) / CLOCKS_PER_SEC;
-    prev_t = cur_t;
-    iterations += 1;
   }
-  glprintf_tr("avg time per step: %.2es\n", t / float(iterations));
-  glprintf_tr("avg time per frame: %.2es\n", t / float(frames));
+
 }
 
 template class UniformGridRS<double, unsigned int>;

@@ -94,8 +94,9 @@ public:
     return static_cast<FluidRST<REAL,SIZE,FT> *>(this); 
   }
 
-  inline void write_to_file(unsigned int frame);
-  inline bool read_from_file(unsigned int frame);
+  inline void write_cache(unsigned int frame);
+  inline bool is_cached(unsigned int frame);
+  inline bool read_cache(unsigned int frame);
 
 protected:
   FluidParamsPtr m_params;
