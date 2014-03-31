@@ -74,7 +74,6 @@ void SimWindow::init()
   m_ubo.allocate( sizeof(m_udata) );
   m_ubo.bindToIndex();
 
-	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   load_model(0);
 }
 
@@ -117,13 +116,14 @@ void SimWindow::change_viewmode(ViewMode vm)
 void SimWindow::reset_viewmode()
 {
   glEnable(GL_BLEND);
+  glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
   if (m_viewmode == ViewMode::PARTICLE) 
   {
     glDisable(GL_DEPTH_TEST);
     //glDepthFunc(GL_NEVER);
 	  glDisable(GL_CULL_FACE);
-    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc(GL_ONE, GL_ONE);
     glEnable(GL_PROGRAM_POINT_SIZE);
   }
   else
@@ -184,27 +184,43 @@ void SimWindow::render()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
   reset_viewmode();
+  int i = 0;
+
+  Affine3f vtrans(get_view_trans()); // view transformation
+  m_udata.vpmtx = (get_proj_trans() * vtrans).matrix();
+  m_udata.mvpmtx = m_udata.vpmtx * m_udata.modelmtx;
+  m_udata.vinvmtx = vtrans.inverse().matrix();
+  m_udata.eyepos = m_udata.vinvmtx * Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
+
+  m_udata.normalmtx.block(0,0,3,3) = m_udata.modelmtx.block(0,0,3,3).inverse().transpose();
+
+  m_ubo.bind();
+  m_ubo.write(0, &m_udata, sizeof( m_udata )); // write uniform buffer object
+  m_ubo.release();
+
+  glFinish(); // Finish writing uniform buffer before drawing
+
+#if 0 // sorting
+  AffineCompact3f mvtrans = AffineCompact3f(vtrans.matrix() * m_udata.modelmtx);
 
   for ( const GLPrimitivePtr &prim_ptr : m_glprims )
   {
     GLPrimitive *glprim = prim_ptr.get();
 
-    Affine3f vtrans(get_view_trans()); // view transformation
-    m_udata.vpmtx = (get_proj_trans() * vtrans).matrix();
-    m_udata.mvpmtx = m_udata.vpmtx * m_udata.modelmtx;
-    m_udata.vinvmtx = vtrans.inverse().matrix();
-    m_udata.eyepos = m_udata.vinvmtx * Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
-
-    m_udata.normalmtx.block(0,0,3,3) = m_udata.modelmtx.block(0,0,3,3).inverse().transpose();
-
-    m_udata.ambient = glprim->get_ambient();
-    m_udata.diffuse = glprim->get_diffuse();
-    m_udata.specular = glprim->get_specular();
-    m_udata.options[0] = glprim->get_specpow();
-    m_udata.options[1] = glprim->get_opacity();
-
     if (m_viewmode == ShaderManager::PARTICLE)
-      glprim->sort_by_depth(AffineCompact3f(vtrans.matrix() * m_udata.modelmtx));
+      glprim->sort_by_depth(mvtrans);
+
+    ++i;
+  }
+
+  std::sort(m_glprims.begin(), m_glprims.end(),
+      [mvtrans](const GLPrimitivePtr &p1, const GLPrimitivePtr &p2)
+      { return (mvtrans * p1->get_closest_pt())[2] < (mvtrans * p2->get_closest_pt())[2]; });
+#endif
+
+  for ( const GLPrimitivePtr &prim_ptr : m_glprims )
+  {
+    GLPrimitive *glprim = prim_ptr.get();
 
     glprim->update_glbuf(); // in case data has changed
 
@@ -213,12 +229,12 @@ void SimWindow::render()
 
     glprim->get_program()->bind();
 
-    m_ubo.bind();
-    m_ubo.write(0, &m_udata, sizeof( m_udata )); // write uniform buffer object
-    m_ubo.release();
+    glprim->get_program()->setUniformValue("ambient", glprim->get_ambient());
+    glprim->get_program()->setUniformValue("diffuse", glprim->get_diffuse());
+    glprim->get_program()->setUniformValue("specular", glprim->get_specular());
+    glprim->get_program()->setUniformValue("specpow", glprim->get_specpow());
+    glprim->get_program()->setUniformValue("opacity", glprim->get_opacity());
 
-    glFinish(); // Finish writing uniform buffer before drawing
-    
     Vector4f l1 = m_udata.vinvmtx * Vector4f(0.0, 0.0, 10.0, 1.0);
     glprim->get_program()->setUniformValue("lights[0].pos", QVector4D(l1[0], l1[1], l1[2], l1[3]));
     glprim->get_program()->setUniformValue("lights[0].col", QVector4D(0.9, 0.9, 0.9, 1.0));

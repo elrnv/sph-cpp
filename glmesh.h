@@ -28,6 +28,8 @@ public:
   SIZE get_num_vertices() const { return m_mesh->get_verts().size();   }
 
   void update_data();
+
+  Vector3f get_closest_pt() const { return Vector3f(m_vertices.col(0)); }
   void sort_by_depth(const AffineCompact3f &mvtrans);
   void update_glbuf();
   void update_shader(ShaderManager::ShaderType type);

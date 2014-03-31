@@ -50,11 +50,6 @@ private:
     Matrix4f normalmtx; // only linear part is used
     Matrix4f vinvmtx;
     Vector4f eyepos;
-
-    Vector4f ambient;
-    Vector4f diffuse;
-    Vector4f specular;
-    Vector4f options; // only the first value is used
   } m_udata;
 
   UniformGrid *m_grid; // simulation grid

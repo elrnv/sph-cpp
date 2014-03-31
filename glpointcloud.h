@@ -32,6 +32,7 @@ public:
   inline SIZE get_num_indices()  const { return get_num_vertices(); }
   inline SIZE get_num_vertices() const { return m_pc->get_num_vertices(); }
 
+  Vector3f get_closest_pt() const;
   void sort_by_depth(const AffineCompact3f &mvmtx);
   void update_glbuf();
   void update_shader(ShaderManager::ShaderType type);

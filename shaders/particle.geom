@@ -11,11 +11,6 @@ layout(std140) uniform Globals
   mat4 NormalMtx;
   mat4 ViewInvMtx;
   vec4 eye;
-
-  vec4 ambient;
-  vec4 diffuse;
-  vec4 specular;
-  vec4 options;
 };
 
 // canonically this is near plane distance from eye in pixels

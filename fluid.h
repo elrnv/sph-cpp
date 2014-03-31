@@ -42,13 +42,13 @@ public:
 
   // explicitly state that we use some base class members (convenience)
   using PointCloudRS<REAL,SIZE>::get_radius;
+  using PointCloudRS<REAL,SIZE>::pos_at;
   using PointCloudRS<REAL,SIZE>::m_pos;
   using PointCloudRS<REAL,SIZE>::m_bbox;
 
   void init(GLPointCloudRS<REAL, SIZE> *glpc);
 
   // get pointers to be able to externally evolve data
-  inline REAL *pos_at(SIZE i)    { return this->m_pos.data() + i*3; }
   inline REAL *vel_at(SIZE i)    { return m_vel.data() + i*3; }
   inline REAL *accel_at(SIZE i)  { return m_accel.data() + i*3; }
   inline REAL *extern_accel_at(SIZE i)  { return m_extern_accel.data() + i*3; }
@@ -75,7 +75,7 @@ public:
 
   inline Vector3f get_color() const 
   { 
-    Vector4f diffuse = m_glpc->get_diffuse();
+    const QVector3D &diffuse = m_glpc->get_diffuse();
     return Vector3f(diffuse[0], diffuse[1], diffuse[2]);
   }
 
@@ -155,23 +155,12 @@ public:
     std::is_same< ProcessPairFunc, proc_type<REAL,SIZE,FT>  >::value, \
     proc_type<REAL,SIZE,FT> >::type &get_proc()
 
-  GET_PROC( CFDensityRST )
-  { return m_fluid_density_proc; }
-
-  GET_PROC( CFDensityUpdateRST )
-  { return m_fluid_density_update_proc; }
-
-  GET_PROC( CFPressureRST )
-  { return m_fluid_pressure_proc; }
-
-  GET_PROC( CFPressureAccelRST )
-  { return m_fluid_pressure_accel_proc; }
-
-  GET_PROC( CFViscosityAccelRST )
-  { return m_fluid_viscosity_accel_proc; }
-
-  GET_PROC( CFSurfaceTensionAccelRST )
-  { return m_fluid_surface_tension_accel_proc; }
+  GET_PROC( CFDensityRST ) { return m_fluid_density_proc; }
+  GET_PROC( CFDensityUpdateRST ) { return m_fluid_density_update_proc; }
+  GET_PROC( CFPressureRST ) { return m_fluid_pressure_proc; }
+  GET_PROC( CFPressureAccelRST ) { return m_fluid_pressure_accel_proc; }
+  GET_PROC( CFViscosityAccelRST ) { return m_fluid_viscosity_accel_proc; }
+  GET_PROC( CFSurfaceTensionAccelRST ) { return m_fluid_surface_tension_accel_proc; }
 
   // Quantity Processors
   CFDensityRST<REAL,SIZE,FT>              m_fluid_density_proc;

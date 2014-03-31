@@ -31,6 +31,7 @@ SceneNode::SceneNode(const aiNode *node)
 SceneNode::SceneNode(const SceneNode &orig)
   : m_name(orig.m_name)
   , m_trans(orig.m_trans)
+  , m_bbox(orig.m_bbox)
 {
   m_children.resize(orig.m_children.size());
 

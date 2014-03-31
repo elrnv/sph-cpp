@@ -29,7 +29,6 @@ public:
   // main coefficient
   float coef;
 
-protected:
   inline double pow3(double x) { return x*x*x; }
   inline double pow2(double x) { return x*x; }
 

@@ -6,32 +6,13 @@
 #include "kernel.h"
 #include "pointcloud.h"
 #include "particle.h"
-#include "quantityprocessor.h"
 
 #define M_G 9.81f
 
-// Compute routines used to compute SPH quantities
+// Compute routine used to compute SPH quantities
 
-// From [Solenthaler and Pajarola 2008], an alternative density
-// (number_density * mass) is used
 template<typename REAL>
-class CBVolumeR : public CBQPoly6R<REAL, CBVolumeR<REAL> >
-{
-public:
-  inline void init_particle(ParticleR<REAL> &p) 
-  { p.dinv = 0.0f; }
-  inline void fluid(ParticleR<REAL> &p, FluidParticleR<REAL> &near_p)
-  { }
-  inline void bound(ParticleR<REAL> &p, ParticleR<REAL> &near_p)
-  {
-    p.dinv += this->m_kern[ p.pos - near_p.pos ];
-  }
-  inline void finish_particle(ParticleR<REAL> &p)
-  {
-    p.dinv = 1.0f/(p.dinv * this->m_kern.coef);
-  }
-};
-
+class CBVolumeR;
 // forward declarations
 template<typename REAL, typename SIZE>
 class FluidRS;
@@ -177,28 +158,22 @@ public:
   { compute_quantity<Func, FluidParticleRT<REAL, FT> >(); }
 
   template<int FT>
-  inline void compute_pressure_accelT()
-  { compute_fluid_quantity< CFPressureAccelRST<REAL, SIZE, FT>, FT >(); }
+  inline void compute_pressure_accelT();
   
   template<int FT>
-  inline void compute_viscosity_accelT()
-  { compute_fluid_quantity< CFViscosityAccelRST<REAL, SIZE, FT>, FT >(); }
+  inline void compute_viscosity_accelT();
 
   template<int FT>
-  inline void compute_surface_tension_accelT()
-  { compute_fluid_quantity< CFSurfaceTensionAccelRST<REAL, SIZE, FT>, FT >(); }
+  inline void compute_surface_tension_accelT();
 
   template<int FT>
-  inline void compute_densityT()
-  { compute_fluid_quantity< CFDensityRST<REAL,SIZE,FT>, FT >(); }
+  inline void compute_densityT();
 
   template<int FT>
-  inline void compute_density_updateT()
-  { compute_fluid_quantity< CFDensityUpdateRST<REAL,SIZE,FT>, FT >(); }
+  inline void compute_density_updateT();
 
   template<int FT>
-  inline void compute_pressureT()
-  { compute_fluid_quantity< CFPressureRST<REAL,SIZE,FT>, FT >(); }
+  inline void compute_pressureT();
 
 #if 0
   void compute_initial_density();

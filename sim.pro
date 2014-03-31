@@ -15,6 +15,7 @@ SOURCES += \
   material.cpp \
   uniformbuffer.cpp \
   shadermanager.cpp \
+  quantityprocessor.cpp \
   fluid.cpp \
   dynamics.cpp \
   glmesh.cpp \

@@ -25,6 +25,7 @@ public:
   inline REAL get_radius() { return 0.5*compute_mindist(); }
   inline REAL get_halo_radius() { return get_radius(); }
   inline SIZE get_num_vertices() const { return m_pos.cols(); }
+  inline REAL *pos_at(SIZE i)    { return m_pos.data() + i*3; }
   inline Matrix3XR<REAL> &get_pos() { return m_pos; }
   inline bool is_pointcloud() const { return true; }
 

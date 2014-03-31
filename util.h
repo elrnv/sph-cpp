@@ -231,8 +231,11 @@ loadScene( const std::string &filename )
         
         if (params_ptr)
         {
+          size_t start = objfile.find_last_of("/");
           size_t end = objfile.find_last_of(".");
-          params_ptr->cacheprefix = objfile.substr(0, end);
+          if( start == std::string::npos )
+            start = -1;
+          params_ptr->cacheprefix = objfile.substr(start+1, end - start - 1);
         }
 
         SceneNode *obj = loadObject( objdir + "/" + objfile, params_ptr );

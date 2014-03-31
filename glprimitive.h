@@ -33,9 +33,9 @@ public:
     const Vector3f &ka = mat->ka();
     const Vector3f &kd = mat->kd();
     const Vector3f &ks = mat->ks();
-    m_ambient_color = Vector4f(ka[0], ka[1], ka[2], 1.0f);
-    m_diffuse_color = Vector4f(kd[0], kd[1], kd[2], 1.0f);
-    m_specular_color = Vector4f(ks[0], ks[1], ks[2], 1.0f);
+    m_ambient_color = QVector3D(ka[0], ka[1], ka[2]);
+    m_diffuse_color = QVector3D(kd[0], kd[1], kd[2]);
+    m_specular_color = QVector3D(ks[0], ks[1], ks[2]);
   }
   virtual ~GLPrimitiveS() { }
 
@@ -45,12 +45,12 @@ public:
   QOpenGLBuffer &get_nml() { return m_nml; }
   QOpenGLBuffer &get_idx() { return m_idx; }
 
-  const Vector4f &get_ambient()  const { return m_ambient_color; }
-  const Vector4f &get_diffuse()  const { return m_diffuse_color; }
-  const Vector4f &get_specular() const { return m_specular_color; }
-        float     get_specpow()  const { return m_specular_power; }
-        float     get_opacity()  const { return m_opacity; }
-        float     get_reflectivity() const { return m_reflectivity; }
+  const QVector3D &get_ambient()  const { return m_ambient_color; }
+  const QVector3D &get_diffuse()  const { return m_diffuse_color; }
+  const QVector3D &get_specular() const { return m_specular_color; }
+  float get_specpow()  const { return m_specular_power; }
+  float get_opacity()  const { return m_opacity; }
+  float get_reflectivity() const { return m_reflectivity; }
 
   virtual bool is_pointcloud() const { return false; }
   virtual bool is_mesh()       const { return false; }
@@ -58,6 +58,9 @@ public:
 
   virtual inline SIZE get_num_indices()  const = 0;
   virtual inline SIZE get_num_vertices() const = 0;
+
+  // return the coordinates of the point closest to the camera (needed for sorting)
+  virtual Vector3f get_closest_pt() const = 0;
 
   virtual void sort_by_depth(const AffineCompact3f &mvtrans) = 0;
   virtual void update_glbuf() = 0;
@@ -77,9 +80,9 @@ protected:
   QOpenGLBuffer m_nml; // normal buffer
   QOpenGLBuffer m_idx; // index buffer
 
-  Vector4f m_ambient_color;
-  Vector4f m_diffuse_color;
-  Vector4f m_specular_color;
+  QVector3D m_ambient_color;
+  QVector3D m_diffuse_color;
+  QVector3D m_specular_color;
   float    m_specular_power; // shininess
   float    m_opacity;
   float    m_reflectivity;

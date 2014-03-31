@@ -54,6 +54,12 @@ void GLPointCloudRS<REAL,SIZE>::update_data()
 }
 
 template<typename REAL, typename SIZE>
+Vector3f GLPointCloudRS<REAL,SIZE>::get_closest_pt() const
+{
+  return Vector3f(m_vertices.col(get_num_vertices()-1));
+}
+
+template<typename REAL, typename SIZE>
 void GLPointCloudRS<REAL,SIZE>::sort_by_depth(const AffineCompact3f &mvtrans)
 {
   std::lock_guard<std::mutex> guard(this->m_lock); // prevent others from reading buffers

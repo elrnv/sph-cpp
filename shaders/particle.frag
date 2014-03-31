@@ -8,12 +8,13 @@ layout(std140) uniform Globals
   mat4 NormalMtx;
   mat4 ViewInvMtx;
   vec4 eye;
-
-  vec4 ambient;
-  vec4 diffuse;
-  vec4 specular;
-  vec4 options;
 };
+
+uniform vec3 ambient;
+uniform vec3 diffuse;
+uniform vec3 specular;
+uniform float specpow;
+uniform float opacity;
 
 struct Light
 {
@@ -52,20 +53,20 @@ void main()
       vec3 L = normalize((lights[i].pos - frag.pos).xyz);
       vec3 R = normalize(reflect(-L, nml));
 
-      vec3 diff = diffuse.xyz * max(dot(nml, L), 0.0f);
+      vec3 diff = diffuse * max(dot(nml, L), 0.0f);
       vec3 spec = vec3(0.f, 0.f, 0.f);
-      if (options.x > 0)
-         spec = specular.xyz * pow( max(dot(R,E), 0.0f), options.x);
+      if (specpow > 0)
+         spec = specular * pow( max(dot(R,E), 0.0f), specpow);
       acc += (diff + spec) * lights[i].col.xyz;
     }
 
     acc *= frag.dimming;
 
-    frag_color = vec4(ambient.xyz + acc, options.y);
+    frag_color = vec4((ambient + acc)*opacity, 1.0);
   }
   else if (len_rel < 1 && len_rel > 0.95)
   {
-    frag_color = vec4(0.1*ambient.xyz + 0.1*lights[0].col.xyz, 0.1*options.y);
+    frag_color = vec4(0.1*(ambient + lights[0].col.xyz)*opacity, 1.0);
   }
   else
     discard;

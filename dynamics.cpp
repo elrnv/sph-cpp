@@ -6,6 +6,27 @@
 #include "gltext.h"
 #include "fluid.h"
 #include "settings.h"
+#include "quantityprocessor.h"
+
+// From [Solenthaler and Pajarola 2008], an alternative density
+// (number_density * mass) is used
+template<typename REAL>
+class CBVolumeR : public CBQPoly6R<REAL, CBVolumeR<REAL> >
+{
+public:
+  inline void init_particle(ParticleR<REAL> &p) 
+  { p.dinv = 0.0f; }
+  inline void fluid(ParticleR<REAL> &p, FluidParticleR<REAL> &near_p)
+  { }
+  inline void bound(ParticleR<REAL> &p, ParticleR<REAL> &near_p)
+  {
+    p.dinv += this->m_kern[ p.pos - near_p.pos ];
+  }
+  inline void finish_particle(ParticleR<REAL> &p)
+  {
+    p.dinv = 1.0f/(p.dinv * this->m_kern.coef);
+  }
+};
 
 // UniformGrid stuff
 
@@ -288,6 +309,25 @@ void UniformGridRS<REAL,SIZE>::populate_bound_data()
 #endif
 }
 
+template<typename REAL, typename SIZE> template<int FT>
+void UniformGridRS<REAL,SIZE>::compute_pressure_accelT()
+{ compute_fluid_quantity< CFPressureAccelRST<REAL, SIZE, FT>, FT >(); }
+template<typename REAL, typename SIZE> template<int FT>
+void UniformGridRS<REAL,SIZE>::compute_viscosity_accelT()
+{ compute_fluid_quantity< CFViscosityAccelRST<REAL, SIZE, FT>, FT >(); }
+template<typename REAL, typename SIZE> template<int FT>
+void UniformGridRS<REAL,SIZE>::compute_surface_tension_accelT()
+{ compute_fluid_quantity< CFSurfaceTensionAccelRST<REAL, SIZE, FT>, FT >(); }
+template<typename REAL, typename SIZE> template<int FT>
+void UniformGridRS<REAL,SIZE>::compute_densityT()
+{ compute_fluid_quantity< CFDensityRST<REAL,SIZE,FT>, FT >(); }
+template<typename REAL, typename SIZE> template<int FT>
+void UniformGridRS<REAL,SIZE>::compute_density_updateT()
+{ compute_fluid_quantity< CFDensityUpdateRST<REAL,SIZE,FT>, FT >(); }
+template<typename REAL, typename SIZE> template<int FT>
+void UniformGridRS<REAL,SIZE>::compute_pressureT()
+{ compute_fluid_quantity< CFPressureRST<REAL,SIZE,FT>, FT >(); }
+
 template<typename REAL, typename SIZE>
 template<typename ProcessPairFunc, typename ParticleType>
 void UniformGridRS<REAL,SIZE>::compute_quantity()
@@ -444,6 +484,11 @@ void UniformGridRS<REAL,SIZE>::run()
   for (int j = 0; j < NUMTYPES; ++j)
     for (auto &fl : m_fluids[j])
       cached &= fl->is_cached(0); // check if we have already cached the first frame
+
+  if (!cached)
+    for (int j = 0; j < NUMTYPES; ++j)
+      for (auto &fl : m_fluids[j])
+        fl->write_cache(0); // save frame to cache
 
   float file_read_t = 0.0f;
   float frame_t = 0.0f;
