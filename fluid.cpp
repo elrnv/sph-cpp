@@ -24,7 +24,11 @@ FluidRS<REAL,SIZE>::FluidRS(const aiMesh *pc, FluidParamsPtr params)
 
 template<typename REAL, typename SIZE>
 FluidRS<REAL,SIZE>::~FluidRS()
-{ }
+{ 
+  qDebug() << "removing fluid: " << this;
+  qDebug() << "m_accel: " << &m_accel;
+  qDebug() << "m_extern_accel: " << &m_extern_accel;
+}
 
 
 // the fluid must be initialized before being simulated
@@ -271,30 +275,26 @@ FluidRST<REAL,SIZE,FT>::FluidRST(const aiMesh *pc, FluidParamsPtr params)
 
 template<typename REAL, typename SIZE, int FT>
 FluidRST<REAL,SIZE,FT>::~FluidRST()
-{ }
+{
+  qDebug() << "destroying fluidt:" << this;
+}
 
 template<typename REAL, typename SIZE, int FT>
 void FluidRST<REAL,SIZE,FT>::init_processors()
 {
-  m_fluid_density_proc.init_kernel(m_kernel_radius);
-  m_fluid_density_update_proc.init_kernel(m_kernel_radius);
-  m_fluid_pressure_proc.init_kernel(m_kernel_radius);
-  m_fluid_viscosity_accel_proc.init_kernel(m_kernel_radius);
-  m_fluid_pressure_accel_proc.init_kernel(m_kernel_radius);
-  m_fluid_surface_tension_accel_proc.init_kernel(m_kernel_radius);
+ // m_fluid_density_proc.init_kernel(m_kernel_radius);
+ // m_fluid_density_update_proc.init_kernel(m_kernel_radius);
+ // m_fluid_accel_proc.init_kernel(m_kernel_radius);
 
-  copy_properties_to_proc(m_fluid_density_proc);
-  copy_properties_to_proc(m_fluid_density_update_proc);
-  copy_properties_to_proc(m_fluid_pressure_proc);
-  copy_properties_to_proc(m_fluid_viscosity_accel_proc);
-  copy_properties_to_proc(m_fluid_pressure_accel_proc);
-  copy_properties_to_proc(m_fluid_surface_tension_accel_proc);
+ // copy_properties_to_proc(m_fluid_density_proc);
+ // copy_properties_to_proc(m_fluid_density_update_proc);
+ // copy_properties_to_proc(m_fluid_accel_proc);
 }
 
 template<typename REAL, typename SIZE, int FT>
-template<class OutputType, class KernelType, class ComputeType>
-inline void FluidRST<REAL,SIZE,FT>::copy_properties_to_proc(
-    CFQ<REAL,SIZE,OutputType,KernelType,ComputeType> &cfq_proc)
+template<class ComputeType>
+void FluidRST<REAL,SIZE,FT>::copy_properties_to_proc(
+    CFQ<REAL,SIZE,ComputeType> &cfq_proc)
 {
   cfq_proc.m_mass = m_mass;
   cfq_proc.m_radius = this->get_radius();

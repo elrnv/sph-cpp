@@ -45,6 +45,10 @@ SceneNode::SceneNode(const SceneNode &orig)
 
 SceneNode::~SceneNode()
 {
+  qDebug() << "destroying SceneNode";
+  for( SceneNode *node : m_children )
+    delete node;
+  m_children.clear();
 }
 
 void SceneNode::rotate(float angle, const Vector3f &axis)
@@ -138,10 +142,10 @@ void SceneNode::normalize_model(const Vector3f &ext_blf, const Vector3f &ext_trc
 
 // GeometryNode
 
-GeometryNode::GeometryNode(const std::string& name, Primitive* primitive)
+GeometryNode::GeometryNode(const std::string& name, PrimitivePtr primitive)
   : SceneNode(name)
   , m_primitive(primitive)
-  , m_material(&DEFAULT_MATERIAL)
+  , m_material(new Material())
 {
 }
 
@@ -151,7 +155,6 @@ GeometryNode::GeometryNode(
     DynParamsPtr dyn_params)
   : SceneNode(mesh->mName.C_Str())
   , m_primitive(NULL)
-  , m_material(&DEFAULT_MATERIAL)
 {
   if ( mesh->mPrimitiveTypes & aiPrimitiveType_POINT )
   {
@@ -161,26 +164,30 @@ GeometryNode::GeometryNode(
       FluidParamsPtr fparams = boost::static_pointer_cast<FluidParams>(dyn_params);
       switch(fparams->fluid_type)
       {
-        case MCG03: m_primitive = new FluidT<int(MCG03)>(mesh, fparams); break;
-        case BT07: m_primitive = new FluidT<int(BT07)>(mesh, fparams); break;
-        case AIAST12: m_primitive = new FluidT<int(AIAST12)>(mesh, fparams); break;
-        default: m_primitive = new FluidT<int(DEFAULT)>(mesh, fparams); break;
+        case MCG03: 
+          m_primitive = PrimitivePtr(new FluidT<int(MCG03)>(mesh, fparams)); break;
+        case BT07: 
+          m_primitive = PrimitivePtr(new FluidT<int(BT07)>(mesh, fparams)); break;
+        case AIAST12: 
+          m_primitive = PrimitivePtr(new FluidT<int(AIAST12)>(mesh, fparams)); break;
+        default: 
+          m_primitive = PrimitivePtr(new FluidT<int(DEFAULT)>(mesh, fparams)); break;
       }
       //m_primitive = FLUID_TYPED_CALL(new FluidT, fparams->fluid_type, mesh, fparams);
     }
     else
-      m_primitive = new PointCloud(mesh); // interpret as point cloud
+      m_primitive = PrimitivePtr(new PointCloud(mesh)); // interpret as point cloud
   }
   else if ( mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)
   {
-    m_primitive = new Mesh(mesh); // interpret as triangular mesh
+    m_primitive = PrimitivePtr(new Mesh(mesh)); // interpret as triangular mesh
   }
   // otherwise m_primitive remains NULL
 
   if (!mat)
-    return;
+    m_material = MaterialConstPtr(new Material());
 
-  m_material = new Material(*mat);
+  m_material = MaterialConstPtr(new Material(*mat));
 }
 
 GeometryNode::GeometryNode(const GeometryNode &orig)
@@ -191,14 +198,8 @@ GeometryNode::GeometryNode(const GeometryNode &orig)
 }
 
 GeometryNode::~GeometryNode()
-{ 
-  // To make this node disown its members, set them to NULL.
-  // This way we may transfer ownership elsewhere.
-  if (m_material)
-    delete m_material;
-
-  if (m_primitive)
-    delete m_primitive; 
+{
+  qDebug() << "destroying GeometryNode";
 }
 
 void GeometryNode::flatten()
@@ -217,7 +218,7 @@ void GeometryNode::print(int depth) const
   }
   else if (m_primitive->is_mesh())
   {
-    std::cerr << *(Mesh *)m_primitive << std::endl;
+    std::cerr << *(boost::static_pointer_cast<Mesh>(m_primitive)) << std::endl;
   }
   SceneNode::print(depth);
 }

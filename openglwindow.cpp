@@ -35,7 +35,7 @@ OpenGLWindow::~OpenGLWindow()
 
 }
 
-void OpenGLWindow::init() 
+void OpenGLWindow::init()
 {
   m_text_painter.init();
 }
@@ -258,6 +258,10 @@ void OpenGLWindow::set_animating(bool animating)
 		renderLater();
   }
 }
+
+// default closing routine (override if needed)
+void OpenGLWindow::onClose()
+{ }
 
 // view related functions
 void OpenGLWindow::reset_view()

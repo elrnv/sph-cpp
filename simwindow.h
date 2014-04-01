@@ -9,8 +9,7 @@
 #include "glprimitive.h"
 #include "dynamics.h"
 
-typedef boost::shared_ptr<GLPrimitive> GLPrimitivePtr;
-typedef std::vector< GLPrimitivePtr > GLPrimVec;
+typedef std::vector< GLPrimitive * > GLPrimVec;
 
 class SimWindow : public OpenGLWindow
 {
@@ -33,6 +32,9 @@ public:
   void clear_dynamics();
 
   inline void toggle_shortcuts();
+
+public slots:
+  void onClose();
 
 protected:
   void keyPressEvent(QKeyEvent *event);
@@ -61,7 +63,7 @@ private:
 
   ShaderManager m_shaderman;
 
-  std::thread m_sim_thread;
+  std::thread *m_sim_thread;
 };
 
 #endif // SIMWINDOW_H

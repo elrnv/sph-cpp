@@ -27,6 +27,7 @@ public:
 public slots:
   void renderLater();
   void renderNow();
+  virtual void onClose();
 
 protected:
   Vector2f window_dim();

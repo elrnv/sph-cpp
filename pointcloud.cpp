@@ -29,6 +29,7 @@ PointCloudRS<REAL,SIZE>::PointCloudRS(const aiMesh *mesh)
 template<typename REAL, typename SIZE>
 PointCloudRS<REAL,SIZE>::~PointCloudRS()
 {
+  qDebug() << "destroying PointCloud: " << this;
 }
 
 template<typename REAL, typename SIZE>

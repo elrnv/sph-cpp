@@ -10,17 +10,21 @@
 // GLPointCloud stuff
 template<typename REAL, typename SIZE>
 GLPointCloudRS<REAL,SIZE>::GLPointCloudRS(
-    PointCloudRS<REAL,SIZE> *pc,
-    const Material *mat,
+    PointCloudPtrRS<REAL,SIZE> pc,
+    MaterialConstPtr mat,
     UniformBuffer &ubo,
     ShaderManager &shaderman)
   : GLPrimitiveS<SIZE>(mat, ubo, shaderman)
   , m_pc(pc)
   , m_vertices(3, get_num_vertices())
+  , m_radius(pc->get_radius())
+  , m_halo_radius(pc->get_halo_radius())
   , m_insync(true)
   , m_halos(false)
+  , m_isdynamic(pc->is_dynamic())
 {
-  m_vertices = m_pc->get_pos().template cast<float>();
+  m_vertices = m_pc->get_pos().template cast<float>(); // copy position data
+
   this->m_vao.create();
   this->m_vao.bind();
 
@@ -32,13 +36,18 @@ GLPointCloudRS<REAL,SIZE>::GLPointCloudRS(
 
   this->m_vao.release();
 
+  if (is_dynamic())
+  {
+    FluidRS<REAL,SIZE> &fl = static_cast<FluidRS<REAL,SIZE> &>(*pc);
+    fl.init(this);
+  }
+
   update_shader(ShaderManager::PARTICLE);
 }
 
 template<typename REAL, typename SIZE>
 GLPointCloudRS<REAL,SIZE>::~GLPointCloudRS()
-{
-}
+{ }
 
 template<typename REAL, typename SIZE>
 void GLPointCloudRS<REAL,SIZE>::update_data()
@@ -84,7 +93,9 @@ void GLPointCloudRS<REAL,SIZE>::sort_by_depth(const AffineCompact3f &mvtrans)
 template<typename REAL, typename SIZE>
 void GLPointCloudRS<REAL,SIZE>::update_glbuf()
 {
-  std::lock_guard<std::mutex> guard(this->m_lock); // prevent others from reading buffers
+  // even though this routine doesn't access m_pc, another thread may be
+  // writing to m_vertices so we still need to lock it
+  std::lock_guard<std::mutex> guard(this->m_lock);
 
   if (m_insync)
     return;

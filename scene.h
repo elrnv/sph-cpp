@@ -97,7 +97,7 @@ class GeometryNode : public SceneNode
 public:
   // Create a geo node with existing primitive
   // Ownership of the primitive is transferred to this node
-  GeometryNode(const std::string& name, Primitive* primitive);
+  GeometryNode(const std::string& name, PrimitivePtr primitive);
 
   // Construct a geometry node and mesh from given assimp mesh
   GeometryNode(
@@ -115,23 +115,8 @@ public:
 
   virtual bool is_geometry() const { return true; }
 
-        Primitive* get_primitive() const { return m_primitive; }
-  const Material*  get_material()  const { return m_material; }
-
-  // The following two routines return overwritten memebers
-  const Material *set_material(const Material* material)
-  {
-    const Material *temp = m_material;
-    m_material = material;
-    return temp;
-  }
-
-  Primitive *set_primitive(Primitive* primitive)
-  {
-    Primitive *temp = m_primitive;
-    m_primitive = primitive;
-    return temp;
-  }
+  PrimitivePtr     get_primitive() const { return m_primitive; }
+  MaterialConstPtr get_material()  const { return m_material; }
 
   // compute the transformations into the primitives
   // this operation invalidates the bounding box
@@ -143,8 +128,8 @@ public:
   void cube_bbox();
 
 protected:
-  Primitive *m_primitive;
-  const Material *m_material;
+  PrimitivePtr m_primitive;
+  MaterialConstPtr  m_material;
 
 };
 

@@ -4,6 +4,9 @@
 #include "eigen.h"
 #include "dynparams.h"
 
+template<typename REAL,typename SIZE>
+class FluidRS;
+
 template<typename REAL>
 struct ParticleR
 {
@@ -15,39 +18,21 @@ struct ParticleR
   REAL pressure;
 };
 
-template<typename REAL>
-struct FluidParticleR : public ParticleR<REAL>
+template<typename REAL, typename SIZE>
+struct FluidParticleRS : public ParticleR<REAL>
 {
-  explicit FluidParticleR(Vector3R<REAL> p, Vector3R<REAL> v, REAL *a, REAL *ea,
-      unsigned short i)
-    : ParticleR<REAL>(p), vel(v), accel(a), extern_accel(ea), id(i) { }
-  ~FluidParticleR() { }
+  explicit FluidParticleRS(Vector3R<REAL> p, Vector3R<REAL> v, REAL *a, REAL *ea,
+      FluidRS<REAL,SIZE> *f)
+    : ParticleR<REAL>(p), vel(v), accel(a), extern_accel(ea), fl(f) { }
+  ~FluidParticleRS() { }
 
   Vector3R<REAL> vel;
   REAL *accel;        // 3-array to which we write total acceleration
   REAL *extern_accel; // 3-array to which we write acceleration from external forces
   REAL temp;          // store temporary values at the particle during computation
   REAL vol;           // volume estimate
-  unsigned short id;  // index of the fluid this particle belongs to in the grid
+  FluidRS<REAL,SIZE> *fl; // fluid to which this particle belongs to
 };
-
-template<typename REAL, int FT>
-struct FluidParticleRT : public FluidParticleR<REAL>
-{ 
-  explicit FluidParticleRT(Vector3R<REAL> p, Vector3R<REAL> v, REAL *a, REAL *ea, unsigned short i)
-    : FluidParticleR<REAL>(p, v, a, ea, i) { }
-};
-
-// would like to infer the Type of fluid for a particular particle type:
-template <typename>
-struct extract_fluid_type;
-
-template <typename REAL, int FT>
-struct extract_fluid_type< FluidParticleRT<REAL, FT> >
-{
-  static const int type = FT;
-};
-
 
 
 #endif // PARTICLE_H

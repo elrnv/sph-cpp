@@ -11,22 +11,18 @@ template <typename REAL, typename SIZE>
 class FluidRS;
 
 // Compute SPH quantity definitions
-template< typename REAL,
+template< typename REAL, typename SIZE,
           typename ParticleType,
-          typename OutputType, 
-          class KernelType,
           class ComputeType>
-class ComputeQuantityR
+class ComputeQuantityRS
 {
   public:
-    inline void init_kernel(float _h) { m_kern.init(_h); }
-
     // Compute Interface
     inline void init_particle (ParticleType &p)
     {
       static_cast<ComputeType*>(this)->init_particle(p);
     }
-    inline void fluid (ParticleType &p, FluidParticleR<REAL> &near_p)
+    inline void fluid (ParticleType &p, FluidParticleRS<REAL,SIZE> &near_p)
     {
       static_cast<ComputeType*>(this)->fluid(p, near_p);
     }
@@ -38,18 +34,11 @@ class ComputeQuantityR
     {
       static_cast<ComputeType*>(this)->finish_particle(p);
     }
-
-  public: //TODO: make protected
-    // Smoothing kernel used to interpolate data
-    Kernel<OutputType, KernelType> m_kern;
 };
 
-template<typename REAL, typename SIZE,
-         typename OutputType,
-         class KernelType,
-         class ComputeType>
+template<typename REAL, typename SIZE, class ComputeType>
 class CFQ : 
-  public ComputeQuantityR<REAL, FluidParticleR<REAL>, OutputType, KernelType, ComputeType>
+  public ComputeQuantityRS<REAL, SIZE, FluidParticleRS<REAL,SIZE>, ComputeType>
 {
   // global quantities acquired from the current observed object
 public:
@@ -62,106 +51,56 @@ public:
   REAL m_cs;
 };
 
-template<typename REAL, typename OutputType, class KernelType, class ComputeType>
-class CBQ : public ComputeQuantityR<REAL, ParticleR<REAL>, OutputType, KernelType, ComputeType>
-{
-};
-
-// convenience defines used in computing SPH values
-#define CFQ_TYPEDEF template<typename REAL, typename SIZE, class ComputeType> using
-CFQ_TYPEDEF CFQPoly6RS     = CFQ<REAL, SIZE, double, Poly6Kernel, ComputeType>;
-CFQ_TYPEDEF CFQPoly6GradRS = CFQ<REAL, SIZE, Vector3d, Poly6GradKernel, ComputeType>;
-CFQ_TYPEDEF CFQSpikyGradRS = CFQ<REAL, SIZE, Vector3d, SpikyGradKernel, ComputeType>;
-CFQ_TYPEDEF CFQViscLapRS   = CFQ<REAL, SIZE, double, ViscLapKernel, ComputeType>;
-
-#define CBQ_TYPEDEF template<typename REAL, class ComputeType> using
-CBQ_TYPEDEF CBQPoly6R = CBQ<REAL, double, Poly6Kernel, ComputeType>;
+template<typename REAL, typename SIZE, class ComputeType>
+class CBQ : public ComputeQuantityRS<REAL, SIZE, ParticleR<REAL>, ComputeType>
+{ };
 
 
 // Specific Compute SPH Quantity Processors
 
 template<typename REAL, typename SIZE, int FT>
-class CFDensityRST :
-  public CFQPoly6RS< REAL, SIZE, CFDensityRST<REAL,SIZE,FT> >
+class CFDensityRST : public CFQ< REAL, SIZE, CFDensityRST<REAL,SIZE,FT> >
 {
 public:
+  inline void init_kernel(float h) { m_kern.init(h); }
   inline void init(REAL &mv, REAL &av);
-  inline void init_particle(FluidParticleR<REAL> &p);
-  inline void fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p);
-  inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p);
-  inline void finish_particle(FluidParticleR<REAL> &p);
+  inline void init_particle(FluidParticleRS<REAL,SIZE> &p);
+  inline void fluid(FluidParticleRS<REAL,SIZE> &p, FluidParticleRS<REAL,SIZE> &near_p);
+  inline void bound(FluidParticleRS<REAL,SIZE> &p, ParticleR<REAL> &near_p);
+  inline void finish_particle(FluidParticleRS<REAL,SIZE> &p);
 
 private:
   REAL *max_var; // max variation
   REAL *avg_var; // average variation
+  Poly6Kernel m_kern;
 };
 
 
 template<typename REAL, typename SIZE, int FT>
-class CFDensityUpdateRST : 
-  public CFQPoly6GradRS<REAL,SIZE,CFDensityUpdateRST<REAL,SIZE,FT> >
+class CFDensityUpdateRST : public CFQ<REAL,SIZE,CFDensityUpdateRST<REAL,SIZE,FT> >
 {
 public:
+  inline void init_kernel(float h) { m_kern.init(h); }
   inline void init(float ts);
-  inline void init_particle(FluidParticleR<REAL> &p);
-  inline void fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p);
-  inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p);
-  inline void finish_particle(FluidParticleR<REAL> &p);
+  inline void init_particle(FluidParticleRS<REAL,SIZE> &p);
+  inline void fluid(FluidParticleRS<REAL,SIZE> &p, FluidParticleRS<REAL,SIZE> &near_p);
+  inline void bound(FluidParticleRS<REAL,SIZE> &p, ParticleR<REAL> &near_p);
+  inline void finish_particle(FluidParticleRS<REAL,SIZE> &p);
 private:
   float m_timestep;
+  Poly6GradKernel m_kern;
 };
 
 template<typename REAL, typename SIZE, int FT>
-class CFPressureRST :
-  public CFQPoly6RS<REAL,SIZE,CFPressureRST<REAL,SIZE,FT> >
+class CFAccelRST : public CFQ<REAL,SIZE,CFAccelRST<REAL,SIZE,FT> >
 {
 public:
-  inline REAL pow7(REAL x);
-  inline void init_particle(ParticleR<REAL> &p);
-  inline void fluid(ParticleR<REAL> &p, FluidParticleR<REAL> &near_p);
-  inline void bound(ParticleR<REAL> &p, ParticleR<REAL> &near_p);
-  inline void finish_particle(ParticleR<REAL> &p);
-};
-
-template<typename REAL, typename SIZE, int FT>
-class CFPressureAccelRST :
-  public CFQSpikyGradRS<REAL,SIZE,CFPressureAccelRST<REAL,SIZE,FT> >
-{
-public:
+  inline void init_kernel(float h);
   inline void init();
-  inline void init_particle(FluidParticleR<REAL> &p);
-  inline void fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p);
-  inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p);
-  inline void finish_particle(FluidParticleR<REAL> &p);
-private:
-  MKI04Kernel m_bound_kern;
+  inline void init_particle(FluidParticleRS<REAL,SIZE> &p);
+  inline void fluid(FluidParticleRS<REAL,SIZE> &p, FluidParticleRS<REAL,SIZE> &near_p);
+  inline void bound(FluidParticleRS<REAL,SIZE> &p, ParticleR<REAL> &near_p);
+  inline void finish_particle(FluidParticleRS<REAL,SIZE> &p);
 };
-
-
-template<typename REAL, typename SIZE, int FT>
-class CFViscosityAccelRST : 
-  public CFQSpikyGradRS<REAL,SIZE,CFViscosityAccelRST<REAL,SIZE,FT> >
-{
-public:
-  inline void init_particle(FluidParticleR<REAL> &p);
-  inline void fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p);
-  inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p);
-  inline void finish_particle(FluidParticleR<REAL> &p);
-};
-
-template<typename REAL, typename SIZE, int FT>
-class CFSurfaceTensionAccelRST : 
-  public CFQPoly6GradRS<REAL,SIZE,CFSurfaceTensionAccelRST<REAL,SIZE,FT> >
-{
-public:
-  inline void init();
-  inline void init_particle(FluidParticleR<REAL> &p);
-  inline void fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p);
-  inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p);
-  inline void finish_particle(FluidParticleR<REAL> &p);
-private:
-  Poly6LapKernel m_lap_kern;
-};
-
 
 #endif // QUANTITYPROCESSOR_H

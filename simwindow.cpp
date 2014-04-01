@@ -7,6 +7,10 @@
 #include "simwindow.h"
 #include "fluid.h"
 
+#ifndef CONFIGDIR
+  #define CONFIGDIR "/Users/egor/proj/sim/data/"
+#endif
+
 void SimWindow::toggle_shortcuts()
 {
   m_show_shortcuts = !m_show_shortcuts;
@@ -50,6 +54,10 @@ SimWindow::SimWindow()
 
 SimWindow::~SimWindow()
 {
+}
+
+void SimWindow::onClose()
+{
   clear_dynamics();
 }
 
@@ -59,7 +67,8 @@ void SimWindow::clear_dynamics()
     return;
 
   m_grid->request_stop(); // stop thread
-  m_sim_thread.join();
+  m_sim_thread->join();
+  delete m_sim_thread; m_sim_thread = 0;
   delete m_grid; m_grid = 0;
 }
 
@@ -80,7 +89,7 @@ void SimWindow::init()
 void SimWindow::load_model(int i)
 {
   clear_dynamics();
-  SceneNode *scene = Util::loadScene("data/scene" + std::to_string(i) + ".cfg");
+  SceneNode *scene = Util::loadScene(std::string(CONFIGDIR) + "scene" + std::to_string(i) + ".cfg");
 
   if (!scene)
     return;
@@ -99,10 +108,13 @@ void SimWindow::load_model(int i)
   scene->cube_bbox();
   m_udata.modelmtx.setIdentity();
 
+  for ( auto &glprim : m_glprims )
+    delete glprim;
+
   m_glprims.clear();
   m_glprims.reserve( scene->num_primitives() );
   Util::loadGLData( scene, m_glprims, m_ubo, m_shaderman );
-  delete scene;
+  //delete scene; scene = 0;
   change_viewmode(m_viewmode);
 }
 
@@ -143,38 +155,38 @@ void SimWindow::stop_dynamics()
 
 void SimWindow::toggle_halos()
 {
-  for ( const GLPrimitivePtr &prim_ptr : m_glprims )
+  for ( auto &glprim : m_glprims )
   {
-    GLPrimitive *glprim = prim_ptr.get();
     if (!glprim->is_pointcloud())
       continue;
 
-    GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
+    GLPointCloud *glpc = static_cast<GLPointCloud*>(glprim);
     glpc->toggle_halos();
   }
 }
 
 void SimWindow::start_dynamics()
 {
-  clear_dynamics();
+  //clear_dynamics();
   glclear_tr(); // clear dynamics text buffer
 
   // Create simulation grid
   m_grid = new UniformGrid(Vector3f(-1,-1,-1), Vector3f(1,1,1));
 
-  for ( const GLPrimitivePtr &prim_ptr : m_glprims )
+  for ( auto &glprim : m_glprims )
   {
-    GLPrimitive *glprim = prim_ptr.get();
     if (!glprim->is_pointcloud())
       continue;
 
-    GLPointCloud *glpc = static_cast<GLPointCloud *>(glprim);
+    GLPointCloud *glpc = static_cast<GLPointCloud*>(glprim);
     if (glpc->is_dynamic())
-      m_grid->add_fluid(glpc);
+      m_grid->add_fluid(*glpc);
   }
 
+  m_grid->init();
+
   // run simulation
-  m_sim_thread = std::thread(&UniformGrid::run, m_grid);
+  m_sim_thread = new std::thread(&UniformGrid::run, m_grid);
 
   set_animating(true);
 }
@@ -203,26 +215,23 @@ void SimWindow::render()
 #if 0 // sorting
   AffineCompact3f mvtrans = AffineCompact3f(vtrans.matrix() * m_udata.modelmtx);
 
-  for ( const GLPrimitivePtr &prim_ptr : m_glprims )
+  for ( auto &glprim : m_glprims )
   {
-    GLPrimitive *glprim = prim_ptr.get();
-
     if (m_viewmode == ShaderManager::PARTICLE)
       glprim->sort_by_depth(mvtrans);
-
     ++i;
   }
 
   std::sort(m_glprims.begin(), m_glprims.end(),
-      [mvtrans](const GLPrimitivePtr &p1, const GLPrimitivePtr &p2)
+      [mvtrans](const GLPrimitive *p1, const GLPrimitive *p2)
       { return (mvtrans * p1->get_closest_pt())[2] < (mvtrans * p2->get_closest_pt())[2]; });
 #endif
 
-  for ( const GLPrimitivePtr &prim_ptr : m_glprims )
+  for ( auto &glprim : m_glprims )
   {
-    GLPrimitive *glprim = prim_ptr.get();
-
     glprim->update_glbuf(); // in case data has changed
+
+    glFinish();
 
     if (m_change_prog)
       glprim->update_shader(m_viewmode);
@@ -247,15 +256,14 @@ void SimWindow::render()
       glprim->get_program()->setUniformValue("pt_scale", float(14.5*window_dim()[1]*m_near));
       if (glprim->is_pointcloud())
       {
-        GLPointCloud * glpc = static_cast<GLPointCloud *>(glprim);
-        PointCloud *pc = glpc->get_pointcloud();
-        glprim->get_program()->setUniformValue( "pt_radius", GLfloat(pc->get_radius()));
-        if (pc->is_dynamic() && !glpc->is_halos())
+        GLPointCloud *glpc = static_cast<GLPointCloud*>(glprim);
+        glprim->get_program()->setUniformValue( "pt_radius", GLfloat(glpc->get_radius()));
+        if (glpc->is_dynamic() && !glpc->is_halos())
         {
-          glprim->get_program()->setUniformValue( "pt_halo", GLfloat(pc->get_radius()));
+          glprim->get_program()->setUniformValue( "pt_halo", GLfloat(glpc->get_radius()));
         }
         else
-          glprim->get_program()->setUniformValue("pt_halo", GLfloat(pc->get_halo_radius()));
+          glprim->get_program()->setUniformValue("pt_halo", GLfloat(glpc->get_halo_radius()));
       }
       else
       {
@@ -272,6 +280,7 @@ void SimWindow::render()
 
     glprim->get_vao().release();
     glprim->get_program()->release();
+    glFinish();
   }
   m_change_prog = false;
 }
@@ -279,7 +288,7 @@ void SimWindow::render()
 void SimWindow::keyPressEvent(QKeyEvent *event)
 {
   int key = event->key();
-  m_context->makeCurrent(this);
+  //m_context->makeCurrent(this);
   switch (key)
   {
     case Qt::Key_T:

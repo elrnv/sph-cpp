@@ -63,7 +63,7 @@ public:
 
   // kernel support radius
   inline REAL get_kernel_radius() const { return m_kernel_radius; }
-  inline REAL get_halo_radius()   const { return get_kernel_radius(); }
+  virtual REAL get_halo_radius() { return get_kernel_radius(); }
 
   inline REAL get_mass() const            { return m_mass; }
   inline REAL get_rest_density() const    { return m_rest_density; }
@@ -141,12 +141,11 @@ public:
   using FluidRS<REAL,SIZE>::m_recoil_velocity_damping;
   using FluidRS<REAL,SIZE>::m_c2;
 
-  inline void init_processors();
+  void init_processors();
 
   // routine to copy fluid properties to processors above
-  template<class OutputType, class KernelType, class ComputeType>
-  inline void copy_properties_to_proc(
-    CFQ<REAL,SIZE,OutputType,KernelType,ComputeType> &cfq_proc);
+  template<class ComputeType>
+  inline void copy_properties_to_proc(CFQ<REAL,SIZE,ComputeType> &cfq_proc);
 
   // compile time type checked proc getters
 #define GET_PROC(proc_type) \
@@ -155,21 +154,21 @@ public:
     std::is_same< ProcessPairFunc, proc_type<REAL,SIZE,FT>  >::value, \
     proc_type<REAL,SIZE,FT> >::type &get_proc()
 
-  GET_PROC( CFDensityRST ) { return m_fluid_density_proc; }
-  GET_PROC( CFDensityUpdateRST ) { return m_fluid_density_update_proc; }
-  GET_PROC( CFPressureRST ) { return m_fluid_pressure_proc; }
-  GET_PROC( CFPressureAccelRST ) { return m_fluid_pressure_accel_proc; }
-  GET_PROC( CFViscosityAccelRST ) { return m_fluid_viscosity_accel_proc; }
-  GET_PROC( CFSurfaceTensionAccelRST ) { return m_fluid_surface_tension_accel_proc; }
+  //GET_PROC( CFDensityRST ) { return m_fluid_density_proc; }
+  //GET_PROC( CFDensityUpdateRST ) { return m_fluid_density_update_proc; }
+  //GET_PROC( CFAccelRST ) { return m_fluid_accel_proc; }
 
-  // Quantity Processors
-  CFDensityRST<REAL,SIZE,FT>              m_fluid_density_proc;
-  CFDensityUpdateRST<REAL,SIZE,FT>        m_fluid_density_update_proc;
-  CFPressureRST<REAL,SIZE,FT>             m_fluid_pressure_proc;
-  CFPressureAccelRST<REAL,SIZE,FT>        m_fluid_pressure_accel_proc;
-  CFViscosityAccelRST<REAL,SIZE,FT>       m_fluid_viscosity_accel_proc;
-  CFSurfaceTensionAccelRST<REAL,SIZE,FT>  m_fluid_surface_tension_accel_proc;
+  //// Quantity Processors
+  //CFDensityRST<REAL,SIZE,FT>        m_fluid_density_proc;
+  //CFDensityUpdateRST<REAL,SIZE,FT>  m_fluid_density_update_proc;
+  //CFAccelRST<REAL,SIZE,FT>          m_fluid_accel_proc;
 }; // FluidRST
+
+template<typename REAL, typename SIZE, int FT>
+using FluidPtrRST = boost::shared_ptr< FluidRST<REAL, SIZE, FT> >;
+
+template<typename REAL, typename SIZE>
+using FluidPtrRS = boost::shared_ptr< FluidRS<REAL, SIZE> >;
 
 template<int FT>
 using FluidT = FluidRST<double, unsigned int, FT>;
