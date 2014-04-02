@@ -40,7 +40,5 @@ Material::Material(const Vector3f& ka, const Vector3f& kd, const Vector3f& ks,
 }
 
 Material::~Material()
-{
-  qDebug() << "destroying material: " << this;
-}
+{ }
 

@@ -45,7 +45,6 @@ SceneNode::SceneNode(const SceneNode &orig)
 
 SceneNode::~SceneNode()
 {
-  qDebug() << "destroying SceneNode";
   for( SceneNode *node : m_children )
     delete node;
   m_children.clear();
@@ -162,18 +161,7 @@ GeometryNode::GeometryNode(
     {
       // interpret as fluid
       FluidParamsPtr fparams = boost::static_pointer_cast<FluidParams>(dyn_params);
-      switch(fparams->fluid_type)
-      {
-        case MCG03: 
-          m_primitive = PrimitivePtr(new FluidT<int(MCG03)>(mesh, fparams)); break;
-        case BT07: 
-          m_primitive = PrimitivePtr(new FluidT<int(BT07)>(mesh, fparams)); break;
-        case AIAST12: 
-          m_primitive = PrimitivePtr(new FluidT<int(AIAST12)>(mesh, fparams)); break;
-        default: 
-          m_primitive = PrimitivePtr(new FluidT<int(DEFAULT)>(mesh, fparams)); break;
-      }
-      //m_primitive = FLUID_TYPED_CALL(new FluidT, fparams->fluid_type, mesh, fparams);
+      m_primitive = PrimitivePtr(new Fluid(mesh, fparams));
     }
     else
       m_primitive = PrimitivePtr(new PointCloud(mesh)); // interpret as point cloud
@@ -198,9 +186,7 @@ GeometryNode::GeometryNode(const GeometryNode &orig)
 }
 
 GeometryNode::~GeometryNode()
-{
-  qDebug() << "destroying GeometryNode";
-}
+{ }
 
 void GeometryNode::flatten()
 {

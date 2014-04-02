@@ -10,7 +10,7 @@ public:
   Primitive()
     : m_bbox(Vector3f(-1.0f,-1.0f,-1.0f), Vector3f(1.0f,1.0f,1.0f))
   { }
-  virtual ~Primitive() { qDebug() << "destroying primitive:" << this; }
+  virtual ~Primitive() { }
   virtual inline bool is_mesh()       const { return false; }
   virtual inline bool is_pointcloud() const { return false; }
   virtual inline bool is_dynamic()    const { return false; }

@@ -14,22 +14,19 @@ template<typename REAL, typename SIZE>
 FluidRS<REAL,SIZE>::FluidRS(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params)
   : PointCloudRS<REAL,SIZE>(*pc)
   , m_params(params)
+  , m_ft(params->fluid_type)
 { }
 
 template<typename REAL, typename SIZE>
 FluidRS<REAL,SIZE>::FluidRS(const aiMesh *pc, FluidParamsPtr params)
   : PointCloudRS<REAL,SIZE>(pc)
   , m_params(params)
+  , m_ft(params->fluid_type)
 { }
 
 template<typename REAL, typename SIZE>
 FluidRS<REAL,SIZE>::~FluidRS()
-{ 
-  qDebug() << "removing fluid: " << this;
-  qDebug() << "m_accel: " << &m_accel;
-  qDebug() << "m_extern_accel: " << &m_extern_accel;
-}
-
+{ }
 
 // the fluid must be initialized before being simulated
 template<typename REAL, typename SIZE>
@@ -260,53 +257,4 @@ inline bool FluidRS<REAL,SIZE>::read_cache(unsigned int frame)
   return true;
 }
 
-
-// Typed Fluid Stuff
-
-template<typename REAL, typename SIZE, int FT>
-FluidRST<REAL,SIZE,FT>::FluidRST(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params)
-  : FluidRS<REAL,SIZE>(pc, params)
-{ }
-
-template<typename REAL, typename SIZE, int FT>
-FluidRST<REAL,SIZE,FT>::FluidRST(const aiMesh *pc, FluidParamsPtr params)
-  : FluidRS<REAL,SIZE>(pc, params)
-{ }
-
-template<typename REAL, typename SIZE, int FT>
-FluidRST<REAL,SIZE,FT>::~FluidRST()
-{
-  qDebug() << "destroying fluidt:" << this;
-}
-
-template<typename REAL, typename SIZE, int FT>
-void FluidRST<REAL,SIZE,FT>::init_processors()
-{
- // m_fluid_density_proc.init_kernel(m_kernel_radius);
- // m_fluid_density_update_proc.init_kernel(m_kernel_radius);
- // m_fluid_accel_proc.init_kernel(m_kernel_radius);
-
- // copy_properties_to_proc(m_fluid_density_proc);
- // copy_properties_to_proc(m_fluid_density_update_proc);
- // copy_properties_to_proc(m_fluid_accel_proc);
-}
-
-template<typename REAL, typename SIZE, int FT>
-template<class ComputeType>
-void FluidRST<REAL,SIZE,FT>::copy_properties_to_proc(
-    CFQ<REAL,SIZE,ComputeType> &cfq_proc)
-{
-  cfq_proc.m_mass = m_mass;
-  cfq_proc.m_radius = this->get_radius();
-  cfq_proc.m_rest_density = m_rest_density;
-  cfq_proc.m_viscosity = m_viscosity;
-  cfq_proc.m_st = m_st;
-  cfq_proc.m_cs2 = m_c2;
-  cfq_proc.m_cs = std::sqrt(cfq_proc.m_cs2);
-}
-
 template class FluidRS<double, unsigned int>;
-template class FluidRST<double, unsigned int, 0>; //MCG03
-template class FluidRST<double, unsigned int, 1>; //BT07
-template class FluidRST<double, unsigned int, 2>; //AIAST12
-template class FluidRST<double, unsigned int, 3>; //DEFAULT

@@ -67,8 +67,7 @@ void SimWindow::clear_dynamics()
     return;
 
   m_grid->request_stop(); // stop thread
-  m_sim_thread->join();
-  delete m_sim_thread; m_sim_thread = 0;
+  m_sim_thread.join();
   delete m_grid; m_grid = 0;
 }
 
@@ -114,7 +113,7 @@ void SimWindow::load_model(int i)
   m_glprims.clear();
   m_glprims.reserve( scene->num_primitives() );
   Util::loadGLData( scene, m_glprims, m_ubo, m_shaderman );
-  //delete scene; scene = 0;
+  delete scene; scene = 0;
   change_viewmode(m_viewmode);
 }
 
@@ -167,7 +166,7 @@ void SimWindow::toggle_halos()
 
 void SimWindow::start_dynamics()
 {
-  //clear_dynamics();
+  clear_dynamics();
   glclear_tr(); // clear dynamics text buffer
 
   // Create simulation grid
@@ -186,7 +185,7 @@ void SimWindow::start_dynamics()
   m_grid->init();
 
   // run simulation
-  m_sim_thread = new std::thread(&UniformGrid::run, m_grid);
+  m_sim_thread = std::thread(&UniformGrid::run, m_grid);
 
   set_animating(true);
 }
@@ -210,7 +209,7 @@ void SimWindow::render()
   m_ubo.write(0, &m_udata, sizeof( m_udata )); // write uniform buffer object
   m_ubo.release();
 
-  glFinish(); // Finish writing uniform buffer before drawing
+  //glFinish(); // Finish writing uniform buffer before drawing
 
 #if 0 // sorting
   AffineCompact3f mvtrans = AffineCompact3f(vtrans.matrix() * m_udata.modelmtx);
@@ -230,8 +229,6 @@ void SimWindow::render()
   for ( auto &glprim : m_glprims )
   {
     glprim->update_glbuf(); // in case data has changed
-
-    glFinish();
 
     if (m_change_prog)
       glprim->update_shader(m_viewmode);
@@ -280,7 +277,6 @@ void SimWindow::render()
 
     glprim->get_vao().release();
     glprim->get_program()->release();
-    glFinish();
   }
   m_change_prog = false;
 }

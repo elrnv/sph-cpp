@@ -63,7 +63,7 @@ public:
 
   // kernel support radius
   inline REAL get_kernel_radius() const { return m_kernel_radius; }
-  virtual REAL get_halo_radius() { return get_kernel_radius(); }
+  inline REAL get_halo_radius()   const { return get_kernel_radius(); }
 
   inline REAL get_mass() const            { return m_mass; }
   inline REAL get_rest_density() const    { return m_rest_density; }
@@ -71,7 +71,7 @@ public:
   inline REAL get_surface_tension() const { return m_st; }
   inline REAL get_recoil_velocity_damping() const { return m_recoil_velocity_damping; }
   inline REAL get_sound_speed2() const    { return m_c2; }
-  inline FluidType get_type() const       { return m_params->fluid_type; }
+  inline FluidType get_type() const       { return m_ft; }
 
   inline Vector3f get_color() const 
   { 
@@ -100,6 +100,7 @@ public:
 
 protected:
   FluidParamsPtr m_params;
+  FluidType m_ft; // copied from m_params
 
   Vector3f m_bmin;
   Vector3f m_bmax;
@@ -121,56 +122,5 @@ protected:
   std::string m_cachefmt;
 }; // class FluidRS
 
-
-// Typed Fluid
-template<typename REAL, typename SIZE, int FT>
-class FluidRST : public FluidRS<REAL,SIZE>
-{
-public:
-  explicit FluidRST(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params);
-  explicit FluidRST(const aiMesh *pc, FluidParamsPtr params);
-  ~FluidRST();
-
-  // explicitly state that we use some base class members (convenience)
-
-  using FluidRS<REAL,SIZE>::m_kernel_radius;
-  using FluidRS<REAL,SIZE>::m_rest_density;
-  using FluidRS<REAL,SIZE>::m_viscosity;
-  using FluidRS<REAL,SIZE>::m_st;
-  using FluidRS<REAL,SIZE>::m_mass;
-  using FluidRS<REAL,SIZE>::m_recoil_velocity_damping;
-  using FluidRS<REAL,SIZE>::m_c2;
-
-  void init_processors();
-
-  // routine to copy fluid properties to processors above
-  template<class ComputeType>
-  inline void copy_properties_to_proc(CFQ<REAL,SIZE,ComputeType> &cfq_proc);
-
-  // compile time type checked proc getters
-#define GET_PROC(proc_type) \
-  template <typename ProcessPairFunc> \
-    inline typename std::enable_if< \
-    std::is_same< ProcessPairFunc, proc_type<REAL,SIZE,FT>  >::value, \
-    proc_type<REAL,SIZE,FT> >::type &get_proc()
-
-  //GET_PROC( CFDensityRST ) { return m_fluid_density_proc; }
-  //GET_PROC( CFDensityUpdateRST ) { return m_fluid_density_update_proc; }
-  //GET_PROC( CFAccelRST ) { return m_fluid_accel_proc; }
-
-  //// Quantity Processors
-  //CFDensityRST<REAL,SIZE,FT>        m_fluid_density_proc;
-  //CFDensityUpdateRST<REAL,SIZE,FT>  m_fluid_density_update_proc;
-  //CFAccelRST<REAL,SIZE,FT>          m_fluid_accel_proc;
-}; // FluidRST
-
-template<typename REAL, typename SIZE, int FT>
-using FluidPtrRST = boost::shared_ptr< FluidRST<REAL, SIZE, FT> >;
-
-template<typename REAL, typename SIZE>
-using FluidPtrRS = boost::shared_ptr< FluidRS<REAL, SIZE> >;
-
-template<int FT>
-using FluidT = FluidRST<double, unsigned int, FT>;
-
+typedef FluidRS<double, unsigned int> Fluid;
 #endif // FLUID_H

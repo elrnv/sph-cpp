@@ -63,7 +63,7 @@ private:
 
   ShaderManager m_shaderman;
 
-  std::thread *m_sim_thread;
+  std::thread m_sim_thread;
 };
 
 #endif // SIMWINDOW_H

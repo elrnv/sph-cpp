@@ -15,13 +15,9 @@ class CBVolumeRS;
 // forward declarations
 template<typename REAL, typename SIZE>
 class FluidRS;
-template<typename REAL, typename SIZE, int FT>
-class FluidRST;
 
 template<typename REAL, typename SIZE>
 using FluidPtrRS = boost::shared_ptr< FluidRS<REAL,SIZE> >;
-template<typename REAL, typename SIZE, int FT>
-using FluidPtrRST = boost::shared_ptr< FluidRST<REAL,SIZE,FT> >;
 
 template<typename REAL, typename SIZE>
 class GLPointCloudRS;
@@ -34,7 +30,7 @@ template<typename REAL, typename SIZE, int FT>
 struct FTiter
 {
   // high level processing (ones that should be called by the integrator)
-  inline static void init_fluid_processors(UniformGridRS<REAL,SIZE> &);
+//  inline static void init_fluid_processors(UniformGridRS<REAL,SIZE> &);
   inline static void populate_fluid_data(UniformGridRS<REAL,SIZE> &g);
   inline static void update_density(UniformGridRS<REAL,SIZE> &, float);
   inline static void compute_density(UniformGridRS<REAL,SIZE> &);
@@ -44,7 +40,7 @@ struct FTiter
 template<typename REAL, typename SIZE> // base case
 struct FTiter<REAL, SIZE, NUMTYPES>
 {
-  inline static void init_fluid_processors(UniformGridRS<REAL,SIZE> &) { }
+//  inline static void init_fluid_processors(UniformGridRS<REAL,SIZE> &) { }
   inline static void populate_fluid_data(UniformGridRS<REAL,SIZE> &) { }
   inline static void update_density(UniformGridRS<REAL,SIZE> &,float) { }
   inline static void compute_density(UniformGridRS<REAL,SIZE> &) { }
@@ -58,22 +54,22 @@ class UniformGridRS
 public:
 
   // grid-cell data definitions
-  typedef std::deque< FluidParticleRS<REAL,SIZE> > DynamicParticles;
+  typedef std::deque< FluidParticleR<REAL> > DynamicParticles;
   typedef std::deque< ParticleR<REAL> > StaticParticles;
 
   struct Cell
   {
-    DynamicParticles fluidvec; // dynamic fluid particles
-    StaticParticles boundvec; // static boundary particles
-    //DynamicParticles rigidvec; // dynamic rigid body object data
+    DynamicParticles fluidvec[NUMTYPES]; // dynamic fluid particles
+    StaticParticles boundvec;     // static boundary particles
+    //DynamicParticles rigidvec;  // dynamic rigid body object data
 
-    template <typename ParticleType>
-    typename std::enable_if<std::is_same< ParticleType, ParticleR<REAL> >::value,
+    template <int FT>
+    typename std::enable_if<FT == NOTFLUID,
              StaticParticles &>::type get_vec() { return boundvec; }
 
-    template <typename ParticleType>
-    typename std::enable_if<std::is_same< FluidParticleRS<REAL,SIZE>, ParticleType >::value,
-             DynamicParticles &>::type get_vec() { return fluidvec; }
+    template <int FT >
+    typename std::enable_if< FT != NOTFLUID,
+             DynamicParticles &>::type get_vec() { return fluidvec[FT]; }
   };
 
   typedef boost::multi_array< Cell, 3 > Array3;
@@ -119,47 +115,9 @@ public:
       clamp(static_cast<Index>(m_hinv*(pos[2]-m_bmin[2])), 0, m_gridsize[2]-1) }};
   }
 
-  template <typename ProcessPairFunc>
-  typename std::enable_if< std::is_same< ProcessPairFunc, CBVolumeRS<REAL,SIZE> >::value,
-           CBVolumeRS<REAL,SIZE> >::type &get_proc()
-           {
-             return *m_bound_volume_proc;
-           }
-
-  template <typename ProcessPairFunc, typename ParticleType, int FT>
-  typename std::enable_if< std::is_same< ParticleType, ParticleR<REAL> >::value,
-           ProcessPairFunc & >::type determine_proc(const ParticleType &p)
-           {
-             Q_UNUSED(p); return get_proc<ProcessPairFunc>();
-           }
-
-  template <typename ProcessPairFunc, typename ParticleType, int FT>
-  typename std::enable_if< std::is_same< FluidParticleRS<REAL,SIZE>, ParticleType >::value,
-           ProcessPairFunc & >::type determine_proc(const FluidParticleRS<REAL,SIZE> &p)
-           {
-             return static_cast<FluidRST<REAL,SIZE,FT>*>(p.fl)->template get_proc<ProcessPairFunc>();
-           }
-
   // Low level quantity processing functions
-  template<typename ProcessPairFunc, typename ParticleType, int FT>
-  inline void compute_quantity();
-
-  template<typename Func>
-  inline void compute_bound_quantity()
-  { compute_quantity<Func, ParticleR<REAL>, NOTFLUID >(); }
-
-  template<typename Func, int FT>
-  inline void compute_fluid_quantity()
-  { compute_quantity<Func, FluidParticleRS<REAL, SIZE>, FT >(); }
-
-  template<int FT>
-  inline void compute_accelT();
-  
-  template<int FT>
-  inline void compute_densityT();
-
-  template<int FT>
-  inline void compute_density_updateT();
+  template<typename ProcessPairFunc, int FT>
+  inline void compute_quantity(ProcessPairFunc f);
 
 #if 0
   void compute_initial_density();

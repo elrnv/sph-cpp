@@ -118,12 +118,7 @@ void GLPointCloudRS<REAL,SIZE>::update_shader(ShaderManager::ShaderType type)
   }
 
   Q_UNUSED(type);
-  //if (type == ShaderManager::PHONG)
-  //  this->m_prog = this->m_shaderman.get_phong_shader();
-  //else if (type == ShaderManager::PARTICLE)
-    this->m_prog = this->m_shaderman.get_particle_shader();
-  //else
-  //  this->m_prog = this->m_shaderman.get_wireframe_shader();
+  this->m_prog = this->m_shaderman.get_particle_shader();
 
   this->m_vao.bind();
 
@@ -135,30 +130,5 @@ void GLPointCloudRS<REAL,SIZE>::update_shader(ShaderManager::ShaderType type)
 
   this->m_ubo.bindToProg(this->m_prog->programId(), "Globals");
 }
-
-//template<typename REAL, typename SIZE>
-//FluidRST<REAL,SIZE,FT> *GLPointCloudRS<REAL,SIZE>::make_dynamic(FluidParamsPtr params)
-//{
-//  this->m_pos.setUsagePattern( QOpenGLBuffer::StreamDraw );
-//
-//  FluidRST<REAL,SIZE> *dpc =
-//    new FluidRST<REAL, SIZE>(m_pc, params);
-//
-//  delete m_pc; // delete the old point cloud
-//  m_pc = dpc;  // set new dynamic point cloud as a member
-//  return dpc;  // return new dynamic point cloud
-//}
-//
-//template<typename REAL, typename SIZE>
-//PointCloudRS<REAL,SIZE> *GLPointCloudRS<REAL,SIZE>::init_dynamics()
-//{ 
-//  if (m_pc->is_dynamic())
-//  {
-//    static_cast<FluidRST<REAL,SIZE,FT> *>(m_pc)->init(this);
-//    return m_pc;
-//  }
-//
-//  return NULL;
-//}
 
 template class GLPointCloudRS<double, unsigned int>;

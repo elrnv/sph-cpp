@@ -38,22 +38,7 @@ public:
     m_specular_color = QVector3D(ks[0], ks[1], ks[2]);
   }
   virtual ~GLPrimitiveS() 
-  {
-    qDebug() << "destroying GLPrimitive"; 
-    qDebug() << "m_ubo: " << &m_ubo;
-    qDebug() << "m_vao: " << &m_vao;
-    qDebug() << "m_prog: " << &m_prog;
-    qDebug() << "m_man: " << &m_shaderman;
-    qDebug() << "m_pos: " << &m_pos;
-    qDebug() << "m_nml: " << &m_nml;
-    qDebug() << "ambient address: " << &m_ambient_color;
-    qDebug() << "diffuse address: " << &m_diffuse_color;
-    qDebug() << "specular address: " << &m_specular_color;
-    qDebug() << "specpow address: " << &m_specular_power;
-    qDebug() << "opacity address: " << &m_opacity;
-    qDebug() << "refl address: " << &m_reflectivity;
-
-  }
+  { }
 
   QOpenGLVertexArrayObject &get_vao()     { return m_vao; }
   QOpenGLShaderProgram     *get_program() { return m_prog; }

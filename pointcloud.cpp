@@ -28,9 +28,7 @@ PointCloudRS<REAL,SIZE>::PointCloudRS(const aiMesh *mesh)
 
 template<typename REAL, typename SIZE>
 PointCloudRS<REAL,SIZE>::~PointCloudRS()
-{
-  qDebug() << "destroying PointCloud: " << this;
-}
+{ }
 
 template<typename REAL, typename SIZE>
 void PointCloudRS<REAL,SIZE>::transform_in_place(const AffineCompact3f &trans)

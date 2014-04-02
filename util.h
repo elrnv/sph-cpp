@@ -34,9 +34,6 @@ processScene( const aiScene *scene, const aiNode *node, DynParamsPtr dyn_params 
   for (unsigned int i = 0; i < num_meshes; ++i)
   {
     aiMesh *aimesh = scene->mMeshes[meshidx[i]];
-
-    qDebug() << "aimesh " << aimesh;
-    qDebug() << "material index" << aimesh->mMaterialIndex;
     aiMaterial *aimat = scene->mMaterials[aimesh->mMaterialIndex];
     scene_node->add_child(new GeometryNode(aimesh, aimat, dyn_params));
   }
