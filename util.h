@@ -35,8 +35,7 @@ processScene( const aiScene *scene, const aiNode *node, DynParamsPtr dyn_params 
   {
     aiMesh *aimesh = scene->mMeshes[meshidx[i]];
     aiMaterial *aimat = scene->mMaterials[aimesh->mMaterialIndex];
-    GeometryNode *geo_node = new GeometryNode(aimesh, aimat, dyn_params);
-    scene_node->add_child(geo_node);
+    scene_node->add_child(new GeometryNode(aimesh, aimat, dyn_params));
   }
 
   // Continue for all child nodes
@@ -75,7 +74,7 @@ loadDynamics( const std::string &filename )
       continue;
     }
 
-    if (!params_ptr.get())
+    if (!params_ptr)
       continue;
 
     if (boost::iequals(var_name, "vel"))
@@ -92,9 +91,9 @@ loadDynamics( const std::string &filename )
     }
   }
 
-  if (params_ptr.get() && params_ptr->type == DynParams::FLUID)
+  if (params_ptr && params_ptr->type == DynParams::FLUID)
   {
-    FluidParamsPtr fparams_ptr = boost::static_pointer_cast<FluidParams>(params_ptr);
+    FluidParams &fparams = static_cast<FluidParams&>(*params_ptr);
 
     file.clear();
     file.seekg(0); // rewind
@@ -112,26 +111,26 @@ loadDynamics( const std::string &filename )
           std::string fluid_type;
           iss >> fluid_type;
           if (boost::iequals(fluid_type, "mcg03"))
-            fparams_ptr->fluid_type = MCG03;
+            fparams.fluid_type = MCG03;
           else if (boost::iequals(fluid_type, "bt07"))
-            fparams_ptr->fluid_type = BT07;
+            fparams.fluid_type = BT07;
           else if (boost::iequals(fluid_type, "aiast12"))
-            fparams_ptr->fluid_type = AIAST12;
+            fparams.fluid_type = AIAST12;
         }
         else if (boost::iequals(var_name, "d"))
-          iss >> fparams_ptr->density;
+          iss >> fparams.density;
         else if (boost::iequals(var_name, "v"))
-          iss >> fparams_ptr->viscosity;
+          iss >> fparams.viscosity;
         else if (boost::iequals(var_name, "st"))
-          iss >> fparams_ptr->surface_tension;
+          iss >> fparams.surface_tension;
         else if (boost::iequals(var_name, "cs"))
-          iss >> fparams_ptr->sound_speed;
+          iss >> fparams.sound_speed;
         else if (boost::iequals(var_name, "c"))
-          iss >> fparams_ptr->compressibility;
+          iss >> fparams.compressibility;
         else if (boost::iequals(var_name, "ki"))
-          iss >> fparams_ptr->kernel_inflation;
+          iss >> fparams.kernel_inflation;
         else if (boost::iequals(var_name, "rvd"))
-          iss >> fparams_ptr->recoil_velocity_damping;
+          iss >> fparams.recoil_velocity_damping;
       }
     }
   }
@@ -149,15 +148,15 @@ loadObject( const std::string &filename, DynParamsPtr params_ptr )
 
   // Read the file into an assimp scene data structure
   const aiScene *scene = 
-    importer.ReadFile( filename, 0
-      | aiProcess_CalcTangentSpace     
-      | aiProcess_GenSmoothNormals // or GenNormals
-      | aiProcess_JoinIdenticalVertices
-      | aiProcess_Triangulate
-      | aiProcess_GenUVCoords
-      | aiProcess_SortByPType
-      | aiProcess_FindDegenerates
-        );
+      importer.ReadFile( filename, 0
+        | aiProcess_CalcTangentSpace     
+        | aiProcess_GenSmoothNormals // or GenNormals
+        | aiProcess_JoinIdenticalVertices
+        | aiProcess_Triangulate
+        | aiProcess_GenUVCoords
+        | aiProcess_SortByPType
+        | aiProcess_FindDegenerates
+          );
 
   if (!scene)
   {
@@ -223,9 +222,7 @@ loadScene( const std::string &filename )
       {
         std::string dynfile = objset[i]["dynfile"];
 
-        DynParamsPtr params_ptr;
-
-        params_ptr = loadDynamics( objdir + "/" + dynfile );
+        DynParamsPtr params_ptr(loadDynamics( objdir + "/" + dynfile ));
 
         std::string objfile = objset[i]["objfile"];
         
@@ -272,33 +269,26 @@ loadScene( const std::string &filename )
 // PRE: we must have the current GL context
 void loadGLData(
     const SceneNode *node,
-    std::vector< boost::shared_ptr<GLPrimitive> > &gl_prims,
+    std::vector< GLPrimitive * > &gl_prims,
     UniformBuffer &ubo,
     ShaderManager &shaderman)
 {
   if (node->is_geometry())
   {
     const GeometryNode *geonode = static_cast<const GeometryNode*>(node);
-    Primitive *prim = geonode->get_primitive();
+    PrimitivePtr prim = geonode->get_primitive();
     if (prim)
     {
       if (prim->is_mesh())
       {
-        boost::shared_ptr<GLPrimitive> mesh(
-            new GLMesh(static_cast<Mesh*>(prim),
-                       static_cast<const Material*>(geonode->get_material()),
-                       ubo, shaderman));
-      
-        gl_prims.push_back(mesh);
+        gl_prims.push_back(new GLMesh(boost::static_pointer_cast<Mesh>(prim),
+                                  geonode->get_material(), ubo, shaderman));
       }
       else if (prim->is_pointcloud())
       {
-        boost::shared_ptr<GLPrimitive> pc(
-            new GLPointCloud(static_cast<PointCloud *>(prim),
-                             static_cast<const Material*>(geonode->get_material()),
-                             ubo, shaderman));
+        gl_prims.push_back(new GLPointCloud(boost::static_pointer_cast<PointCloud>(prim),
+                                        geonode->get_material(), ubo, shaderman));
       
-        gl_prims.push_back(pc);
       }
     }
   }

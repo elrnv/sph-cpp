@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <assimp/mesh.h>
+#include <boost/shared_ptr.hpp>
 #include "primitive.h"
 #include "dynparams.h"
 
@@ -23,7 +24,7 @@ public:
   ~PointCloudRS();
 
   inline REAL get_radius() { return 0.5*compute_mindist(); }
-  inline REAL get_halo_radius() { return get_radius(); }
+  virtual REAL get_halo_radius() { return get_radius(); }
   inline SIZE get_num_vertices() const { return m_pos.cols(); }
   inline REAL *pos_at(SIZE i)    { return m_pos.data() + i*3; }
   inline Matrix3XR<REAL> &get_pos() { return m_pos; }
@@ -41,7 +42,11 @@ protected:
   Matrix3XR<REAL> m_pos;
 }; // class PointCloudRS
 
+template<typename REAL, typename SIZE>
+using PointCloudPtrRS = boost::shared_ptr< PointCloudRS<REAL, SIZE> >;
+
 // defaults
 typedef PointCloudRS<double, unsigned int> PointCloud;
+typedef PointCloudPtrRS<double, unsigned int> PointCloudPtr;
 
 #endif // POINTCLOUD_H

@@ -16,7 +16,7 @@ class GLPrimitiveS : public QObject
 {
 public:
   explicit GLPrimitiveS(
-      const Material *mat,
+      MaterialConstPtr mat,
       UniformBuffer &ubo,
       ShaderManager &shaderman)
     : m_ubo(ubo)
@@ -37,7 +37,8 @@ public:
     m_diffuse_color = QVector3D(kd[0], kd[1], kd[2]);
     m_specular_color = QVector3D(ks[0], ks[1], ks[2]);
   }
-  virtual ~GLPrimitiveS() { }
+  virtual ~GLPrimitiveS() 
+  { }
 
   QOpenGLVertexArrayObject &get_vao()     { return m_vao; }
   QOpenGLShaderProgram     *get_program() { return m_prog; }
@@ -90,6 +91,10 @@ protected:
   std::mutex m_lock; // lock used for transferring dynamic data to GL
 };
 
+template<typename SIZE>
+using GLPrimitivePtrS = boost::shared_ptr< GLPrimitiveS<SIZE> >;
+
 typedef GLPrimitiveS<unsigned int> GLPrimitive;
+typedef GLPrimitivePtrS<unsigned int> GLPrimitivePtr;
 
 #endif // GLPRIMITIVE_H

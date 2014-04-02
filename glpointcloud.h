@@ -6,6 +6,7 @@
 #include "pointcloud.h"
 #include "glprimitive.h"
 #include "dynparams.h"
+#include "dynamics.h"
 
 template<typename REAL, typename SIZE>
 class FluidRS;
@@ -16,18 +17,16 @@ class GLPointCloudRS : public GLPrimitiveS<SIZE>
 {
 public:
   explicit GLPointCloudRS(
-      PointCloudRS<REAL, SIZE> *pc,
-      const Material *mat,
+      PointCloudPtrRS<REAL, SIZE> pc,
+      MaterialConstPtr mat,
       UniformBuffer &ubo,
       ShaderManager &shaderman);
   ~GLPointCloudRS();
 
-  PointCloudRS<REAL, SIZE> *get_pointcloud() { return m_pc; }
-
   inline bool is_pointcloud() const { return true; }
-  inline bool is_dynamic()    const { return m_pc->is_dynamic(); }
-
-  //inline PointCloudRS<REAL,SIZE> *init_dynamics();
+  inline bool is_dynamic()    const { return m_isdynamic; }
+  inline REAL get_radius()    const { return m_radius; }
+  inline REAL get_halo_radius() const { return m_halo_radius; }
 
   inline SIZE get_num_indices()  const { return get_num_vertices(); }
   inline SIZE get_num_vertices() const { return m_pc->get_num_vertices(); }
@@ -37,6 +36,7 @@ public:
   void update_glbuf();
   void update_shader(ShaderManager::ShaderType type);
 
+  //inline PointCloudRS<REAL,SIZE> *init_dynamics();
   //FluidRS<REAL,SIZE> *make_dynamic(FluidParamsPtr params);
 
   void print() const { std::cerr << *m_pc << std::endl; }
@@ -46,15 +46,19 @@ public:
   bool is_halos() const { return m_halos; }
   void toggle_halos() { m_halos = !m_halos; }
 
+  friend UniformGridRS<REAL,SIZE>;
+
 protected:
-  PointCloudRS<REAL, SIZE> *m_pc; // reference to the native mesh object
+  PointCloudPtrRS<REAL, SIZE> m_pc; // reference to the native point cloud object
 
   // intermediate buffer between pc and glbuffer
   Matrix3XR<GLfloat> m_vertices;
 
+  REAL m_radius;      // particle radius inherited from point cloud
+  REAL m_halo_radius; // particle influence radius inherited from point cloud
   bool m_insync;
-
   bool m_halos; // show kernel influence visually
+  bool m_isdynamic;
 };
 
 // defaults

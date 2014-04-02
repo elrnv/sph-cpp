@@ -13,13 +13,13 @@ class GLMeshRS : public GLPrimitiveS<SIZE>
 {
 public:
   explicit GLMeshRS(
-      MeshRS<REAL,SIZE> *mesh,
-      const Material *mat,
+      MeshPtrRS<REAL,SIZE> mesh,
+      MaterialConstPtr mat,
       UniformBuffer &ubo,
       ShaderManager &shaderman);
   ~GLMeshRS();
 
-  MeshRS<REAL,SIZE> *get_mesh() { return m_mesh; }
+  MeshPtrRS<REAL,SIZE> get_mesh() { return m_mesh; }
 
   inline bool is_mesh()    const { return true; }
   inline bool is_dynamic() const { return m_mesh->is_dynamic(); }
@@ -37,7 +37,7 @@ public:
   void print() const { std::cerr << *m_mesh << std::endl; }
 
 protected:
-  MeshRS<REAL,SIZE> *m_mesh; // reference to the native mesh object
+  MeshPtrRS<REAL,SIZE> m_mesh; // reference to the native mesh object
 
   // intermediate buffers between mesh and glbuffers
   Matrix3XR<GLfloat> m_vertices; 

@@ -48,14 +48,12 @@ HEADERS += \
 # compile with latest c++ specs
 CONFIG += c++11
 
-QT_CONFIG -= no-pkg-config
-CONFIG += link_pkgconfig
-PKGCONFIG += eigen3
-
+INCLUDEPATH += /opt/local/include/eigen3
 INCLUDEPATH += /opt/local/include
-LIBS += -L/opt/local/lib -lassimp
+LIBS += -L/opt/local/lib 
+LIBS += -lassimp
 
-LIBS += /opt/intel/lib/libiomp5.a
+# LIBS += /opt/intel/lib/libiomp5.a
 
 # link to libconfig library to read config files
 LIBS += -lconfig++
@@ -72,6 +70,6 @@ LIBS += -lconfig++
 # QMAKE_CXXFLAGS += -DBOOST_DISABLE_ASSERTS
 
 # show warnings if a function is not inlined
-QMAKE_CXXFLAGS += -stdlib=libc++ -Winline -Wno-unused-parameter 
+QMAKE_CXXFLAGS += -stdlib=libc++ -Winline -Wno-unused-parameter
 
 RESOURCES += resources.qrc

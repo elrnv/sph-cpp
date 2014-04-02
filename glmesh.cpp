@@ -8,8 +8,8 @@
 // GLMesh stuff
 template<typename REAL, typename SIZE>
 GLMeshRS<REAL,SIZE>::GLMeshRS(
-    MeshRS<REAL,SIZE> *mesh,
-    const Material *mat,
+    MeshPtrRS<REAL,SIZE> mesh,
+    MaterialConstPtr mat,
     UniformBuffer &ubo,
     ShaderManager &shaderman)
   : GLPrimitiveS<SIZE>(mat, ubo, shaderman)

@@ -2,16 +2,17 @@
 #define MATERIAL_H
 
 #include <assimp/material.h>
+#include <boost/shared_ptr.hpp>
 #include "eigen.h"
 
 // Materials
 
 class Material {
 public:
+  Material();
   Material(const aiMaterial &mat);
   Material(const Vector3f &ka, const Vector3f &kd, const Vector3f &ks,
-                float shininess,
-                float reflectivity);
+                float shininess, float reflectivity, float opacity);
   virtual ~Material();
 
   const Vector3f &ka() const { return m_ka; }
@@ -26,16 +27,11 @@ private:
   Vector3f m_kd; // diffuse
   Vector3f m_ks; // specular
 
-  float m_opacity;
   float m_shininess;
   float m_reflectivity;
+  float m_opacity;
 };
 
-// define a default material
-const Material DEFAULT_MATERIAL =
-  Material(Vector3f(0.0f,0.0f,0.0f),
-           Vector3f(0.6f,0.6f,0.6f),
-           Vector3f(0.2f,0.2f,0.0f),
-           25.0f, 0.0f);
+typedef boost::shared_ptr< const Material > MaterialConstPtr;
 
 #endif

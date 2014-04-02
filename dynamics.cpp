@@ -470,8 +470,6 @@ void UniformGridRS<REAL,SIZE>::run()
   if (m_num_fluids < 1)
     return;
 
-  init();
-
   // timestep
   float dt = 1.0f/(global::dynset.fps * global::dynset.substeps);
 

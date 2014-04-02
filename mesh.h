@@ -4,6 +4,7 @@
 #include <vector>
 #include <iostream>
 #include <assimp/mesh.h>
+#include <boost/shared_ptr.hpp>
 #include "primitive.h"
 
 template<typename REAL, typename SIZE>
@@ -69,7 +70,11 @@ protected:
   FaceVecRS<REAL, SIZE> m_faces;
 };
 
+template<typename REAL, typename SIZE>
+using MeshPtrRS = boost::shared_ptr< MeshRS<REAL, SIZE> >;
+
 // defaults
 typedef MeshRS<double, unsigned int> Mesh;
+typedef MeshPtrRS<double, unsigned int> MeshPtr;
 
 #endif // MESH_H

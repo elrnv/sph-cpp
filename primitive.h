@@ -1,6 +1,7 @@
 #ifndef PRIMITIVE_H
 #define PRIMITIVE_H
 
+#include <boost/shared_ptr.hpp>
 #include "eigen.h"
 
 class Primitive
@@ -20,5 +21,7 @@ public:
 protected:
   AlignedBox3f m_bbox;
 };
+
+typedef boost::shared_ptr<Primitive> PrimitivePtr;
 
 #endif // PRIMITIVE_H

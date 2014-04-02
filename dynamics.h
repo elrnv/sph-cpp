@@ -16,6 +16,10 @@ class CBVolumeR;
 // forward declarations
 template<typename REAL, typename SIZE>
 class FluidRS;
+
+template<typename REAL, typename SIZE>
+using FluidPtrRS = boost::shared_ptr< FluidRS<REAL,SIZE> >;
+
 template<typename REAL, typename SIZE, int FT>
 class FluidRST;
 template<typename REAL, typename SIZE>
@@ -79,18 +83,17 @@ public:
   typedef typename Array3::template array_view<3>::type GridView;
 
   // Define a set of different types of fluids
-  typedef std::vector< FluidRS<REAL,SIZE> * > FluidVec;
+  typedef std::vector< FluidPtrRS<REAL,SIZE> > FluidVec;
 
   // Constructors/Destructor
   UniformGridRS(const Vector3f &bmin, const Vector3f &bmax);
   ~UniformGridRS();
   
-  inline void add_fluid(GLPointCloudRS<REAL,SIZE> *glpc) 
+  inline void add_fluid(GLPointCloudRS<REAL,SIZE> &glpc) 
   { 
-    if (glpc->is_dynamic())
+    if (glpc.is_dynamic())
     {
-      FluidRS<REAL,SIZE> *fl = static_cast<FluidRS<REAL,SIZE> *>(glpc->get_pointcloud());
-      fl->init(glpc);
+      FluidPtrRS<REAL,SIZE> fl = boost::static_pointer_cast<FluidRS<REAL,SIZE>>(glpc.m_pc);
       m_fluids[fl->get_type()].push_back(fl);
       m_num_fluids += 1;
     }
