@@ -25,9 +25,9 @@ public:
   typedef ShaderManager::ShaderType ViewMode;
   void change_viewmode(ViewMode vm);
   void reset_viewmode();
-  void stop_dynamics();
-  void start_dynamics();
+  void toggle_dynamics();
   void toggle_halos();
+  void clear_cache();
 
   void clear_dynamics();
 
@@ -41,6 +41,7 @@ protected:
 
 private:
   bool m_show_shortcuts;
+  bool m_dynamics;
 
   UniformBuffer m_ubo;
 

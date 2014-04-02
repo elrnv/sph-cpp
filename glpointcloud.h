@@ -42,6 +42,7 @@ public:
   void print() const { std::cerr << *m_pc << std::endl; }
 
   void update_data();
+  inline void clear_cache();
 
   bool is_halos() const { return m_halos; }
   void toggle_halos() { m_halos = !m_halos; }

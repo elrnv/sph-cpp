@@ -42,7 +42,7 @@ GLPointCloudRS<REAL,SIZE>::GLPointCloudRS(
     fl.init(this);
   }
 
-  update_shader(ShaderManager::PARTICLE);
+  update_shader(ShaderManager::ADDITIVE_PARTICLE);
 }
 
 template<typename REAL, typename SIZE>
@@ -60,6 +60,17 @@ void GLPointCloudRS<REAL,SIZE>::update_data()
   m_vertices = m_pc->get_pos().template cast<float>();
 
   m_insync = false;
+}
+
+template<typename REAL, typename SIZE>
+void GLPointCloudRS<REAL,SIZE>::clear_cache()
+{
+  std::lock_guard<std::mutex> guard(this->m_lock);
+  if (is_dynamic())
+  {
+    FluidRS<REAL,SIZE> &fl = static_cast<FluidRS<REAL,SIZE> &>(*m_pc);
+    fl.clear_cache();
+  }
 }
 
 template<typename REAL, typename SIZE>
@@ -117,8 +128,10 @@ void GLPointCloudRS<REAL,SIZE>::update_shader(ShaderManager::ShaderType type)
     this->m_prog->disableAttributeArray( "pos" );
   }
 
-  Q_UNUSED(type);
-  this->m_prog = this->m_shaderman.get_particle_shader();
+  if (type == ShaderManager::PARTICLE)
+    this->m_prog = this->m_shaderman.get_particle_shader();
+  else 
+    this->m_prog = this->m_shaderman.get_additive_particle_shader();
 
   this->m_vao.bind();
 

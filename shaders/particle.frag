@@ -66,7 +66,7 @@ void main()
   }
   else if (len_rel < 1 && len_rel > 0.95)
   {
-    frag_color = vec4(0.1*(ambient + lights[0].col.xyz)*opacity, 1.0);
+    frag_color = vec4(0.2*(ambient + lights[0].col.xyz)*opacity, 1.0);
   }
   else
     discard;

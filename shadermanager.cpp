@@ -31,4 +31,10 @@ void ShaderManager::init()
   m_particle_shader.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/particle.frag");
   m_particle_shader.link();
   qDebug() << "Particle Shader LOG:" << m_particle_shader.log();
+
+  m_add_particle_shader.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/particle.vert");
+  m_add_particle_shader.addShaderFromSourceFile(QOpenGLShader::Geometry, ":/particle.geom");
+  m_add_particle_shader.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/particle.frag");
+  m_add_particle_shader.link();
+  qDebug() << "Additive Particle Shader LOG:" << m_particle_shader.log();
 }

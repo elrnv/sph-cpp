@@ -62,7 +62,11 @@ public:
   inline const Vector3f &get_bmax() const { return m_bmax; }
 
   // kernel support radius
-  inline REAL get_kernel_radius() const { return m_kernel_radius; }
+  inline REAL get_kernel_radius()
+  { 
+    return m_params->kernel_inflation * this->get_radius(); 
+  }
+
   inline REAL get_halo_radius()   { return get_kernel_radius(); }
 
   inline REAL get_mass() const            { return m_mass; }
@@ -94,6 +98,7 @@ public:
     return static_cast<FluidRST<REAL,SIZE,FT> *>(this); 
   }
 
+  void clear_cache();
   inline void write_cache(unsigned int frame);
   inline bool is_cached(unsigned int frame);
   inline bool read_cache(unsigned int frame);
@@ -143,10 +148,6 @@ public:
 
   inline void init_processors();
 
-  // routine to copy fluid properties to processors above
-  template<class ComputeType>
-  inline void copy_properties_to_proc( CFQ<REAL,SIZE,ComputeType> &cfq_proc);
-
   // compile time type checked proc getters
 #define GET_PROC(proc_type) \
   template <typename ProcessPairFunc> \
@@ -157,21 +158,11 @@ public:
   GET_PROC( CFDensityRST ) { return m_fluid_density_proc; }
   GET_PROC( CFDensityUpdateRST ) { return m_fluid_density_update_proc; }
   GET_PROC( CFAccelRST ) { return m_fluid_accel_proc; }
- // GET_PROC( CFPressureRST ) { return m_fluid_pressure_proc; }
- // GET_PROC( CFPressureAccelRST ) { return m_fluid_pressure_accel_proc; }
- // GET_PROC( CFViscosityAccelRST ) { return m_fluid_viscosity_accel_proc; }
- // GET_PROC( CFSurfaceTensionAccelRST ) { return m_fluid_surface_tension_accel_proc; }
 
   // Quantity Processors
   CFDensityRST<REAL,SIZE,FT>              m_fluid_density_proc;
   CFDensityUpdateRST<REAL,SIZE,FT>        m_fluid_density_update_proc;
   CFAccelRST<REAL,SIZE,FT>             m_fluid_accel_proc;
-#if 0
-  CFPressureRST<REAL,SIZE,FT>             m_fluid_pressure_proc;
-  CFPressureAccelRST<REAL,SIZE,FT>        m_fluid_pressure_accel_proc;
-  CFViscosityAccelRST<REAL,SIZE,FT>       m_fluid_viscosity_accel_proc;
-  CFSurfaceTensionAccelRST<REAL,SIZE,FT>  m_fluid_surface_tension_accel_proc;
-#endif
 }; // FluidRST
 
 template<int FT>

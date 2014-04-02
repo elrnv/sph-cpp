@@ -164,7 +164,6 @@ void GLMeshRS<REAL, SIZE>::update_shader(ShaderManager::ShaderType type)
   else
     this->m_prog = this->m_shaderman.get_wireframe_shader();
 
-  this->m_prog->bind();
   this->m_vao.bind();
 
   this->m_pos.bind();
@@ -178,7 +177,6 @@ void GLMeshRS<REAL, SIZE>::update_shader(ShaderManager::ShaderType type)
   this->m_vao.release();
 
   this->m_ubo.bindToProg(this->m_prog->programId(), "Globals");
-  this->m_prog->release();
 }
 
 // defaults

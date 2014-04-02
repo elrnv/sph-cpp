@@ -26,8 +26,9 @@ struct FluidParticleR : public ParticleR<REAL>
   Vector3R<REAL> vel;
   REAL *accel;        // 3-array to which we write total acceleration
   REAL *extern_accel; // 3-array to which we write acceleration from external forces
-  REAL temp;          // store temporary values at the particle during computation
   REAL vol;           // volume estimate
+  REAL c;         // for surface tension computations
+  Vector3R<REAL> n;         // for surface tension computations
   unsigned short id;  // index of the fluid this particle belongs to in the grid
 };
 

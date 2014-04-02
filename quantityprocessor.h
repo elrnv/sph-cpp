@@ -1,14 +1,12 @@
 #ifndef QUANTITYPROCESSOR_H
 #define QUANTITYPROCESSOR_H
 
-#include "particle.h"
 #include "kernel.h"
-#include "dynparams.h"
-
-#define M_G 9.81f
 
 template<typename REAL>
-inline REAL pow7(REAL x) { return (x*x)*(x*x)*(x*x)*x; }
+struct ParticleR;
+template<typename REAL>
+struct FluidParticleR;
 
 template <typename REAL, typename SIZE>
 class FluidRS;
@@ -78,68 +76,12 @@ class CFDensityRST : public CFQ< REAL, SIZE, CFDensityRST<REAL,SIZE,FT> >
 {
 
 public:
-  inline void init_kernel(float h) { m_kern.init(h); }
-  inline void init(REAL &mv, REAL &av) 
-  {
-    max_var = &mv; avg_var = &av;
-  }
-  inline void init_particle(FluidParticleR<REAL> &p)
-
-{ 
-  //fprintf(stderr, "density init_particle\n");
-  p.dinv = 0.0f; p.vol = 0.0f;
-}
-  inline void fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p)
-
-{
-  p.dinv += this->m_kern[ p.pos - near_p.pos ];
-  p.vol += this->m_kern[ p.pos - near_p.pos ];
- // fprintf(stderr, "p.dinv += %.2e\n", p.dinv);
-}
-  inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p)
-
-{
-  if (FT == MCG03)
-    return;
-
-  p.dinv += this->m_rest_density * near_p.dinv * this->m_kern[ p.pos - near_p.pos ];
-  p.vol += this->m_kern[ p.pos - near_p.pos ];
-}
-  inline void finish_particle(FluidParticleR<REAL> &p)
-{
-  if (FT == MCG03)
-  {
-    p.dinv = 1.0f/(this->m_mass * p.dinv * this->m_kern.coef);
-  }
-  else
-  {
-    // By default, use kernel correction
-    p.dinv =
-      (8*this->m_radius*this->m_radius*this->m_radius*p.vol)/(this->m_mass * p.dinv);
-#if 0
-  qDebug() << (this->m_mass * p.dinv) << "/"
-    << (8*this->m_radius*this->m_radius*this->m_radius*p.vol) << " = " <<
-    (this->m_mass * p.dinv)/(8*this->m_radius*this->m_radius*this->m_radius*p.vol);
-#endif
-  }
-
-  REAL var = std::abs(1.0f/p.dinv - this->m_rest_density);
-  if ( var > *max_var )
-    *max_var = var;
-  *avg_var += var;
-
-  if (FT == MCG03)
-  {
-    p.pressure = this->m_cs2 * (1.0f/p.dinv - this->m_rest_density);
-  }
-  else // Enable tait pressure equation by default
-  {
-    p.pressure =
-      this->m_rest_density * this->m_cs2 * 0.14285714285714 * 
-      (pow7(1.0f / (p.dinv * this->m_rest_density)) - 1);
-  }
-//  fprintf(stderr, "p.pressure = %.2e\n", p.pressure);
-}
+  inline void init_kernel(float h);
+  inline void init(REAL &mv, REAL &av);
+  inline void init_particle(FluidParticleR<REAL> &p);
+  inline void fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p);
+  inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p);
+  inline void finish_particle(FluidParticleR<REAL> &p);
 
 private:
   REAL *max_var; // max variation
@@ -177,6 +119,7 @@ private:
   SpikyGradKernel m_spikygrad_kern; // for pressure
   ViscLapKernel   m_visclap_kern;   // for viscosity
   Poly6GradKernel m_colorgrad_kern;     // surface tension
+  Poly6LapKernel  m_colorlap_kern;     // surface tension
 };
 
 #endif // QUANTITYPROCESSOR_H

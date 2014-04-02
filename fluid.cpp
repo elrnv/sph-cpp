@@ -34,11 +34,11 @@ void FluidRS<REAL,SIZE>::init(GLPointCloudRS<REAL, SIZE> *glpc)
   m_bmin = m_bbox.corner(Eigen::AlignedBox3f::BottomLeftFloor);
   m_bmax = m_bbox.corner(Eigen::AlignedBox3f::TopRightCeil);
 
-  REAL r = get_radius();
-  m_kernel_radius = m_params->kernel_inflation * r;
+  m_kernel_radius = get_kernel_radius();
   m_rest_density = m_params->density;
   m_viscosity = m_params->viscosity;
   m_st = m_params->surface_tension;
+  REAL r = get_radius();
   m_mass = m_params->density*8*r*r*r;
   m_recoil_velocity_damping = m_params->recoil_velocity_damping;
 
@@ -256,6 +256,19 @@ inline bool FluidRS<REAL,SIZE>::read_cache(unsigned int frame)
   return true;
 }
 
+template<typename REAL, typename SIZE>
+inline void FluidRS<REAL,SIZE>::clear_cache() 
+{
+  if (global::dynset.cachedir.empty())
+    return;
+
+  for (unsigned int fr = 0; fr <= global::dynset.frames; ++fr)
+  {
+    char buf[128];
+    sprintf(buf, m_cachefmt.c_str(), fr);
+    remove(buf);
+  }
+}
 
 // Typed Fluid Stuff
 
@@ -279,37 +292,10 @@ void FluidRST<REAL,SIZE,FT>::init_processors()
   m_fluid_density_proc.init_kernel(m_kernel_radius);
   m_fluid_density_update_proc.init_kernel(m_kernel_radius);
   m_fluid_accel_proc.init_kernel(m_kernel_radius);
-#if 0
-  m_fluid_pressure_proc.init_kernel(m_kernel_radius);
-  m_fluid_viscosity_accel_proc.init_kernel(m_kernel_radius);
-  m_fluid_pressure_accel_proc.init_kernel(m_kernel_radius);
-  m_fluid_surface_tension_accel_proc.init_kernel(m_kernel_radius);
-#endif
 
-  copy_properties_to_proc(m_fluid_density_proc);
-  copy_properties_to_proc(m_fluid_density_update_proc);
-  copy_properties_to_proc(m_fluid_accel_proc);
-#if 0
-  copy_properties_to_proc(m_fluid_pressure_proc);
-  copy_properties_to_proc(m_fluid_viscosity_accel_proc);
-  copy_properties_to_proc(m_fluid_pressure_accel_proc);
-  copy_properties_to_proc(m_fluid_surface_tension_accel_proc);
-#endif
-}
-
-template<typename REAL, typename SIZE, int FT>
-template<class ComputeType>
-inline void FluidRST<REAL,SIZE,FT>::copy_properties_to_proc(
-    CFQ<REAL,SIZE,ComputeType> &cfq_proc)
-{
-  cfq_proc.copy_fluid_params(*this);
-//  cfq_proc.m_mass = m_mass;
-//  cfq_proc.m_radius = this->get_radius();
-//  cfq_proc.m_rest_density = m_rest_density;
-//  cfq_proc.m_viscosity = m_viscosity;
-//  cfq_proc.m_st = m_st;
-//  cfq_proc.m_cs2 = m_c2;
-//  cfq_proc.m_cs = std::sqrt(cfq_proc.m_cs2);
+  m_fluid_density_proc.copy_fluid_params(*this);
+  m_fluid_density_update_proc.copy_fluid_params(*this);
+  m_fluid_accel_proc.copy_fluid_params(*this);
 }
 
 template class FluidRS<double, unsigned int>;

@@ -87,6 +87,7 @@ void UniformGridRS<REAL,SIZE>::init()
       glprintf_trcv(fl->get_color(), "# of particles: %d  \n", fl->get_num_vertices());
       glprintf_trcv(fl->get_color(), "rest density: %.2f  \n", fl->get_rest_density());
       glprintf_trcv(fl->get_color(), "particle mass: %.2f  \n", fl->get_mass());
+      glprintf_trcv(fl->get_color(), "particle radius: %.2f  \n", fl->get_radius());
       glprintf_trcv(fl->get_color(), "viscosity: %.2f  \n", fl->get_viscosity());
       glprintf_trcv(fl->get_color(), "surface tension: %.2f  \n", fl->get_surface_tension());
       glprintf_trcv(fl->get_color(), "sound speed: %.2e  \n", std::sqrt(fl->get_sound_speed2()));

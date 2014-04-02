@@ -37,15 +37,16 @@ void SimWindow::toggle_shortcuts()
   glprintf_blc(BLUE,  "    5 - normal point cloud\n");
   glprintf_blc(BLUE,  "    6 - dense point cloud\n");
   glprintf_bl("  Dynamics: \n");
-  glprintf_blc(RED,  "    D - start\n");
-  glprintf_blc(RED,  "    C - stop\n");
+  glprintf_blc(RED,  "    D - start/stop\n");
+  glprintf_blc(RED,  "    C - clear cache\n");
   glprintf_blc(CYAN, "    H - show/hide halos\n");
 }
 
 SimWindow::SimWindow()
   : m_show_shortcuts(true) // immediately toggled below
+  , m_dynamics(false)
   , m_grid(NULL)
-  , m_viewmode(ShaderManager::PARTICLE)
+  , m_viewmode(ShaderManager::ADDITIVE_PARTICLE)
   , m_change_prog(true)
   , m_shaderman(this)
 {
@@ -129,12 +130,19 @@ void SimWindow::reset_viewmode()
   glEnable(GL_BLEND);
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
-  if (m_viewmode == ViewMode::PARTICLE) 
+  if (m_viewmode == ViewMode::ADDITIVE_PARTICLE) 
   {
     glDisable(GL_DEPTH_TEST);
     //glDepthFunc(GL_NEVER);
 	  glDisable(GL_CULL_FACE);
     glBlendFunc(GL_ONE, GL_ONE);
+    glEnable(GL_PROGRAM_POINT_SIZE);
+  }
+  else if (m_viewmode == ViewMode::PARTICLE) 
+  {
+    glDisable(GL_DEPTH_TEST);
+	  glDisable(GL_CULL_FACE);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_PROGRAM_POINT_SIZE);
   }
   else
@@ -144,12 +152,6 @@ void SimWindow::reset_viewmode()
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_PROGRAM_POINT_SIZE);
   }
-}
-
-void SimWindow::stop_dynamics()
-{
-  clear_dynamics();
-  set_animating(false);
 }
 
 void SimWindow::toggle_halos()
@@ -164,14 +166,8 @@ void SimWindow::toggle_halos()
   }
 }
 
-void SimWindow::start_dynamics()
+void SimWindow::clear_cache()
 {
-  clear_dynamics();
-  glclear_tr(); // clear dynamics text buffer
-
-  // Create simulation grid
-  m_grid = new UniformGrid(Vector3f(-1,-1,-1), Vector3f(1,1,1));
-
   for ( auto &glprim : m_glprims )
   {
     if (!glprim->is_pointcloud())
@@ -179,15 +175,41 @@ void SimWindow::start_dynamics()
 
     GLPointCloud *glpc = static_cast<GLPointCloud*>(glprim);
     if (glpc->is_dynamic())
-      m_grid->add_fluid(*glpc);
+      glpc->clear_cache();
   }
+  glprintf_trc(CYAN, "Cache cleared\n");
+}
 
-  m_grid->init();
+void SimWindow::toggle_dynamics()
+{
+  clear_dynamics();
 
-  // run simulation
-  m_sim_thread = std::thread(&UniformGrid::run, m_grid);
+  m_dynamics = !m_dynamics;
 
-  set_animating(true);
+  if (m_dynamics)
+  {
+    glclear_tr(); // clear dynamics text buffer
+
+    // Create simulation grid
+    m_grid = new UniformGrid(Vector3f(-1,-1,-1), Vector3f(1,1,1));
+
+    for ( auto &glprim : m_glprims )
+    {
+      if (!glprim->is_pointcloud())
+        continue;
+
+      GLPointCloud *glpc = static_cast<GLPointCloud*>(glprim);
+      if (glpc->is_dynamic())
+        m_grid->add_fluid(*glpc);
+    }
+
+    m_grid->init();
+
+    // run simulation
+    m_sim_thread = std::thread(&UniformGrid::run, m_grid);
+
+  }
+  set_animating(m_dynamics);
 }
 
 void SimWindow::render()
@@ -209,22 +231,23 @@ void SimWindow::render()
   m_ubo.write(0, &m_udata, sizeof( m_udata )); // write uniform buffer object
   m_ubo.release();
 
-  //glFinish(); // Finish writing uniform buffer before drawing
+  glFinish(); // Finish writing uniform buffer before drawing
 
-#if 0 // sorting
-  AffineCompact3f mvtrans = AffineCompact3f(vtrans.matrix() * m_udata.modelmtx);
-
-  for ( auto &glprim : m_glprims )
+  if (m_viewmode != ViewMode::ADDITIVE_PARTICLE)
   {
-    if (m_viewmode == ShaderManager::PARTICLE)
-      glprim->sort_by_depth(mvtrans);
-    ++i;
-  }
+    AffineCompact3f mvtrans = AffineCompact3f(vtrans.matrix() * m_udata.modelmtx);
 
-  std::sort(m_glprims.begin(), m_glprims.end(),
-      [mvtrans](const GLPrimitive *p1, const GLPrimitive *p2)
-      { return (mvtrans * p1->get_closest_pt())[2] < (mvtrans * p2->get_closest_pt())[2]; });
-#endif
+    for ( auto &glprim : m_glprims )
+    {
+      if (m_viewmode == ShaderManager::PARTICLE)
+        glprim->sort_by_depth(mvtrans);
+      ++i;
+    }
+
+    std::sort(m_glprims.begin(), m_glprims.end(),
+        [mvtrans](const GLPrimitive *p1, const GLPrimitive *p2)
+        { return (mvtrans * p1->get_closest_pt())[2] < (mvtrans * p2->get_closest_pt())[2]; });
+  }
 
   for ( auto &glprim : m_glprims )
   {
@@ -248,7 +271,8 @@ void SimWindow::render()
     glprim->get_program()->setUniformValue("lights[1].col", QVector4D(0.0, 0.0, 0.0, 0.0));
 
     glprim->get_vao().bind();
-    if (m_viewmode == ShaderManager::PARTICLE)
+    if (m_viewmode == ShaderManager::PARTICLE ||
+        m_viewmode == ShaderManager::ADDITIVE_PARTICLE )
     {
       glprim->get_program()->setUniformValue("pt_scale", float(14.5*window_dim()[1]*m_near));
       if (glprim->is_pointcloud())
@@ -260,14 +284,15 @@ void SimWindow::render()
           glprim->get_program()->setUniformValue( "pt_halo", GLfloat(glpc->get_radius()));
         }
         else
+        {
           glprim->get_program()->setUniformValue("pt_halo", GLfloat(glpc->get_halo_radius()));
+        }
       }
       else
       {
         glprim->get_program()->setUniformValue("pt_radius", 0.02f);
         glprim->get_program()->setUniformValue("pt_halo", 0.02f);
       }
-
       glDrawArrays(GL_POINTS, 0, glprim->get_num_vertices());
     }
     else
@@ -291,13 +316,13 @@ void SimWindow::keyPressEvent(QKeyEvent *event)
       toggle_shortcuts();
       break;
     case Qt::Key_D:
-      start_dynamics();
+      toggle_dynamics();
       break;
     case Qt::Key_H:
       toggle_halos();
       break;
     case Qt::Key_C:
-      stop_dynamics();
+      clear_cache();
       break;
     case Qt::Key_W:
       change_viewmode(ViewMode::WIREFRAME);
@@ -305,8 +330,11 @@ void SimWindow::keyPressEvent(QKeyEvent *event)
     case Qt::Key_S:
       change_viewmode(ViewMode::PHONG);
       break;
-    case Qt::Key_P:
+    case Qt::Key_Q:
       change_viewmode(ViewMode::PARTICLE);
+      break;
+    case Qt::Key_A:
+      change_viewmode(ViewMode::ADDITIVE_PARTICLE);
       break;
     case Qt::Key_1: load_model(1); break;
     case Qt::Key_2: load_model(2); break;
