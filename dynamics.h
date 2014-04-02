@@ -11,8 +11,8 @@
 
 // Compute routine used to compute SPH quantities
 
-template<typename REAL>
-class CBVolumeR;
+template<typename REAL,typename SIZE>
+class CBVolumeRS;
 // forward declarations
 template<typename REAL, typename SIZE>
 class FluidRS;
@@ -127,8 +127,8 @@ public:
   }
 
   template <typename ProcessPairFunc>
-  typename std::enable_if< std::is_same< ProcessPairFunc, CBVolumeR<REAL> >::value,
-           CBVolumeR<REAL> >::type &get_proc()
+  typename std::enable_if< std::is_same< ProcessPairFunc, CBVolumeRS<REAL,SIZE> >::value,
+           CBVolumeRS<REAL,SIZE> >::type &get_proc()
            {
              return *m_bound_volume_proc;
            }
@@ -159,6 +159,7 @@ public:
   inline void compute_fluid_quantity()
   { compute_quantity<Func, FluidParticleRT<REAL, FT> >(); }
 
+#if 0
   template<int FT>
   inline void compute_pressure_accelT();
   
@@ -167,6 +168,9 @@ public:
 
   template<int FT>
   inline void compute_surface_tension_accelT();
+#endif
+  template<int FT>
+  inline void compute_accelT();
 
   template<int FT>
   inline void compute_densityT();
@@ -220,7 +224,7 @@ private: // member variables
   Vector3f m_bmin; // min boundary corner
   Vector3f m_bmax; // max boundary corner
 
-  CBVolumeR<REAL> *m_bound_volume_proc;
+  CBVolumeRS<REAL,SIZE> *m_bound_volume_proc;
 
   std::atomic<bool> m_stop_requested;
 

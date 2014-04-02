@@ -10,10 +10,11 @@
 
 // From [Solenthaler and Pajarola 2008], an alternative density
 // (number_density * mass) is used
-template<typename REAL>
-class CBVolumeR : public CBQPoly6R<REAL, CBVolumeR<REAL> >
+template<typename REAL, typename SIZE>
+class CBVolumeRS : public CBQ<REAL, SIZE, CBVolumeRS<REAL,SIZE> >
 {
 public:
+  inline void init_kernel(float h) { m_kern.init(h); }
   inline void init_particle(ParticleR<REAL> &p) 
   { p.dinv = 0.0f; }
   inline void fluid(ParticleR<REAL> &p, FluidParticleR<REAL> &near_p)
@@ -26,6 +27,8 @@ public:
   {
     p.dinv = 1.0f/(p.dinv * this->m_kern.coef);
   }
+private:
+  Poly6Kernel m_kern;
 };
 
 // UniformGrid stuff
@@ -90,10 +93,10 @@ void UniformGridRS<REAL,SIZE>::init()
     }
   }
 
-  CBVolumeR<REAL> proc;
+  CBVolumeRS<REAL,SIZE> proc;
   proc.init_kernel(m_h);
   m_bound_volume_proc = &proc;
-  //compute_bound_quantity< CBVolumeR<REAL> >();
+  //compute_bound_quantity< CBVolumeRS<REAL,SIZE> >();
   m_bound_volume_proc = NULL;
 }
 
@@ -306,6 +309,7 @@ void UniformGridRS<REAL,SIZE>::populate_bound_data()
 #endif
 }
 
+#if 0
 template<typename REAL, typename SIZE> template<int FT>
 void UniformGridRS<REAL,SIZE>::compute_pressure_accelT()
 { compute_fluid_quantity< CFPressureAccelRST<REAL, SIZE, FT>, FT >(); }
@@ -316,20 +320,25 @@ template<typename REAL, typename SIZE> template<int FT>
 void UniformGridRS<REAL,SIZE>::compute_surface_tension_accelT()
 { compute_fluid_quantity< CFSurfaceTensionAccelRST<REAL, SIZE, FT>, FT >(); }
 template<typename REAL, typename SIZE> template<int FT>
+void UniformGridRS<REAL,SIZE>::compute_pressureT()
+{ compute_fluid_quantity< CFPressureRST<REAL,SIZE,FT>, FT >(); }
+#endif
+template<typename REAL, typename SIZE> template<int FT>
+void UniformGridRS<REAL,SIZE>::compute_accelT()
+{ compute_fluid_quantity< CFAccelRST<REAL, SIZE, FT>, FT >(); }
+
+template<typename REAL, typename SIZE> template<int FT>
 void UniformGridRS<REAL,SIZE>::compute_densityT()
 { compute_fluid_quantity< CFDensityRST<REAL,SIZE,FT>, FT >(); }
 template<typename REAL, typename SIZE> template<int FT>
 void UniformGridRS<REAL,SIZE>::compute_density_updateT()
 { compute_fluid_quantity< CFDensityUpdateRST<REAL,SIZE,FT>, FT >(); }
-template<typename REAL, typename SIZE> template<int FT>
-void UniformGridRS<REAL,SIZE>::compute_pressureT()
-{ compute_fluid_quantity< CFPressureRST<REAL,SIZE,FT>, FT >(); }
 
 template<typename REAL, typename SIZE>
 template<typename ProcessPairFunc, typename ParticleType>
 void UniformGridRS<REAL,SIZE>::compute_quantity()
 {
-  clock_t s = clock();
+//  clock_t s = clock();
   SIZE nx = m_gridsize[0];
   SIZE ny = m_gridsize[1];
   SIZE nz = m_gridsize[2];
@@ -392,7 +401,7 @@ void UniformGridRS<REAL,SIZE>::compute_quantity()
     } // for j
   } // for i
 
-  qDebug() << "average time" << (float(clock() - s) / CLOCKS_PER_SEC);
+  //qDebug() << "average time" << (float(clock() - s) / CLOCKS_PER_SEC);
 }
 
 template<typename REAL, typename SIZE, int FT>
@@ -442,6 +451,7 @@ void FTiter<REAL,SIZE,FT>::compute_density(UniformGridRS<REAL,SIZE> &g)
   FTiter<REAL,SIZE,FT+1>::compute_density(g); // recurse
 }
 
+#if 0
 template<typename REAL, typename SIZE, int FT>
 void FTiter<REAL,SIZE,FT>::compute_pressure(UniformGridRS<REAL,SIZE> &g)
 {
@@ -449,6 +459,7 @@ void FTiter<REAL,SIZE,FT>::compute_pressure(UniformGridRS<REAL,SIZE> &g)
     g.template compute_pressureT<FT>();
   FTiter<REAL,SIZE,FT+1>::compute_pressure(g); // recurse
 }
+#endif
 
 template<typename REAL, typename SIZE, int FT>
 void FTiter<REAL,SIZE,FT>::compute_accel(UniformGridRS<REAL,SIZE> &g)
@@ -458,8 +469,9 @@ void FTiter<REAL,SIZE,FT>::compute_accel(UniformGridRS<REAL,SIZE> &g)
     for (auto &fl : g.m_fluids[FT])
       fl->template cast<FT>()->reset_accel();     // now may assume all accelerations are zero
 
-    g.template compute_pressure_accelT<FT>();
-    g.template compute_viscosity_accelT<FT>();
+    //g.template compute_pressure_accelT<FT>();
+    //g.template compute_viscosity_accelT<FT>();
+    g.template compute_accelT<FT>();
   }
 
   FTiter<REAL,SIZE,FT+1>::compute_accel(g); // recurse
@@ -491,9 +503,6 @@ void UniformGridRS<REAL,SIZE>::run()
   float file_read_t = 0.0f;
   float frame_t = 0.0f;
   float substep_t = 0.0f;
-
-          float substep_avg = 0.0f;
-                 unsigned int total_substeps = 0;
   unsigned int file_reads = 0;
   unsigned int frame_count = 0;
   unsigned int frame = 1;
@@ -564,12 +573,9 @@ void UniformGridRS<REAL,SIZE>::run()
         //  update_density(dt);
         //else
           FTiter<REAL,SIZE,DEFAULT>::compute_density(*this);
-        FTiter<REAL,SIZE,DEFAULT>::compute_pressure(*this);
+        //FTiter<REAL,SIZE,DEFAULT>::compute_pressure(*this);
         FTiter<REAL,SIZE,DEFAULT>::compute_accel(*this); // update m_accel
         substep_t += float(clock() - prev_t) / CLOCKS_PER_SEC;
-        substep_avg += substep_t;
-        total_substeps += 1;
-
 
         float factor = 1.0f; // leap-frog method has a different first step
         if (iter == 0 && frame == 1)
