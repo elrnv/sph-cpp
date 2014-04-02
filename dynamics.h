@@ -30,7 +30,6 @@ struct FTiter
 {
   // high level processing (ones that should be called by the integrator)
   inline static void init_fluid_processors(UniformGridRS<REAL,SIZE> &);
-  inline static void populate_fluid_data(UniformGridRS<REAL,SIZE> &g);
   inline static void update_density(UniformGridRS<REAL,SIZE> &, float);
   inline static void compute_density(UniformGridRS<REAL,SIZE> &);
   inline static void compute_accel(UniformGridRS<REAL,SIZE> &);
@@ -41,7 +40,6 @@ template<typename REAL, typename SIZE> // base case
 struct FTiter<REAL, SIZE, NUMTYPES>
 {
   inline static void init_fluid_processors(UniformGridRS<REAL,SIZE> &) { }
-  inline static void populate_fluid_data(UniformGridRS<REAL,SIZE> &) { }
   inline static void update_density(UniformGridRS<REAL,SIZE> &,float) { }
   inline static void compute_density(UniformGridRS<REAL,SIZE> &) { }
   inline static void compute_accel(UniformGridRS<REAL,SIZE> &) { }
@@ -108,6 +106,7 @@ public:
 
   void init();
   inline void update_grid();
+  inline void populate_fluid_data();
   inline void populate_bound_data();
   inline void clear_fluid_data();
 

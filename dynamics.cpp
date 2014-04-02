@@ -72,7 +72,7 @@ void UniformGridRS<REAL,SIZE>::init()
 
   m_grid.resize( boost::extents[m_gridsize[0]][m_gridsize[1]][m_gridsize[2]] );
   
-  FTiter<REAL,SIZE,DEFAULT>::populate_fluid_data(*this); // populate grid with particles
+  populate_fluid_data(); // populate grid with particles
   populate_bound_data();
 
   int count = 0;
@@ -101,7 +101,7 @@ template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::update_grid()
 {
   clear_fluid_data();
-  FTiter<REAL,SIZE,DEFAULT>::populate_fluid_data(*this); // populate grid with particles
+  populate_fluid_data(); // populate grid with particles
 }
 
 template<typename REAL, typename SIZE>
@@ -123,28 +123,25 @@ void FTiter<REAL,SIZE,FT>::init_fluid_processors(UniformGridRS<REAL,SIZE> &g)
   FTiter<REAL,SIZE,FT+1>::init_fluid_processors(g);
 }
 
-template<typename REAL, typename SIZE, int FT>
-void FTiter<REAL,SIZE,FT>::populate_fluid_data(UniformGridRS<REAL,SIZE> &g)
+template<typename REAL, typename SIZE>
+void UniformGridRS<REAL,SIZE>::populate_fluid_data()
 { 
-  if (g.m_fluids[FT].size())
+  for (int ft = DEFAULT; ft < NUMTYPES; ++ft)
   {
     unsigned short id = 0; // generate ids
-    for (auto &fl : g.m_fluids[FT])
+    for (auto &fl : m_fluids[ft])
     {
       SIZE num_vtx = fl->get_num_vertices();
       for ( SIZE i = 0; i < num_vtx; ++i )
       {
         Vector3R<REAL> pos(fl->get_pos().col(i));
         Vector3R<REAL> vel(fl->get_vel().col(i));
-        typename UniformGridRS<REAL,SIZE>::Array3Index idx = g.get_voxel_index(pos);
-        g.m_grid(idx).fluidvec.push_back( 
-            FluidParticleRT<REAL,FT>( pos, vel, fl->accel_at(i), fl->extern_accel_at(i), id));
+        typename UniformGridRS<REAL,SIZE>::Array3Index idx = get_voxel_index(pos);
+        m_grid(idx).fluidvec.push_back(FluidParticleR<REAL>( pos, vel, fl->accel_at(i), fl->extern_accel_at(i), id));
       }
       id++;
     }
   }
-
-  FTiter<REAL,SIZE,FT+1>::populate_fluid_data(g);
 }
 
 template<typename REAL, typename SIZE>
@@ -332,6 +329,7 @@ template<typename REAL, typename SIZE>
 template<typename ProcessPairFunc, typename ParticleType>
 void UniformGridRS<REAL,SIZE>::compute_quantity()
 {
+  clock_t s = clock();
   SIZE nx = m_gridsize[0];
   SIZE ny = m_gridsize[1];
   SIZE nz = m_gridsize[2];
@@ -393,6 +391,8 @@ void UniformGridRS<REAL,SIZE>::compute_quantity()
       } // for k
     } // for j
   } // for i
+
+  qDebug() << "average time" << (float(clock() - s) / CLOCKS_PER_SEC);
 }
 
 template<typename REAL, typename SIZE, int FT>
@@ -493,6 +493,9 @@ void UniformGridRS<REAL,SIZE>::run()
   float file_read_t = 0.0f;
   float frame_t = 0.0f;
   float substep_t = 0.0f;
+
+          float substep_avg = 0.0f;
+                 unsigned int total_substeps = 0;
   unsigned int file_reads = 0;
   unsigned int frame_count = 0;
   unsigned int frame = 1;
@@ -565,6 +568,10 @@ void UniformGridRS<REAL,SIZE>::run()
           FTiter<REAL,SIZE,DEFAULT>::compute_density(*this);
         FTiter<REAL,SIZE,DEFAULT>::compute_pressure(*this);
         FTiter<REAL,SIZE,DEFAULT>::compute_accel(*this); // update m_accel
+        substep_t += float(clock() - prev_t) / CLOCKS_PER_SEC;
+        substep_avg += substep_t;
+        total_substeps += 1;
+
 
         float factor = 1.0f; // leap-frog method has a different first step
         if (iter == 0 && frame == 1)
@@ -586,7 +593,6 @@ void UniformGridRS<REAL,SIZE>::run()
 
         update_grid(); // prepare grid for next simulation step
 
-        substep_t += float(clock() - prev_t) / CLOCKS_PER_SEC;
 
         if (m_stop_requested) break;
 

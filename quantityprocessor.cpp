@@ -111,7 +111,10 @@ template<typename REAL, typename SIZE, int FT>
 void CFPressureRST<REAL,SIZE,FT>::finish_particle(ParticleR<REAL> &p)
 {
   if (FT == MCG03)
+  {
     p.pressure = this->m_cs2 * (1.0f/p.dinv - this->m_rest_density);
+                 
+  }
   else // Enable tait pressure equation by default
     p.pressure =
       this->m_rest_density * this->m_cs2 * 0.14285714285714 * 
@@ -247,6 +250,7 @@ public:
   inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p) { }
   inline void finish_particle(FluidParticleR<REAL> &p)
   {
+    //qDebug() << "p.accel = " << p.accel[0] << p.accel[1] << p.accel[2];
   }
 };
 
@@ -273,8 +277,8 @@ void CFSurfaceTensionAccelRST<REAL,SIZE,FT>::fluid(FluidParticleR<REAL> &p, Flui
 
   Vector3R<REAL> res;
 
-  for (unsigned char i = 0; i < 3; ++i)
-    p.accel[i] += res[i]; // copy intermediate result
+///  for (unsigned char i = 0; i < 3; ++i)
+///    p.accel[i] += res[i]; // copy intermediate result
 }
 
 template<typename REAL, typename SIZE, int FT>
@@ -301,8 +305,8 @@ public:
 
     Vector3R<REAL> res;
 
-    for (unsigned char i = 0; i < 3; ++i)
-      p.accel[i] += res[i]; // copy intermediate result
+ //   for (unsigned char i = 0; i < 3; ++i)
+//      p.accel[i] += res[i]; // copy intermediate result
   }
 
   inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p)
