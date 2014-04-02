@@ -41,8 +41,9 @@ void main()
   frag.col = vtx[0].col;
   frag.halo_ratio = pt_radius / pt_halo;
   gl_Position = VPMtx * frag.pos;
-  gl_PointSize = 2.0 * pt_halo * pt_scale / distance(eye, frag.pos);
-  frag.dimming = clamp(1.5 / distance(eye, frag.pos),0.1, 2.0);
+  float d = distance(eye, frag.pos);
+  gl_PointSize = 2.0 * pt_halo * pt_scale / d;
+  frag.dimming = clamp(10.0 / (d*d), 0.2, 2.0);
   EmitVertex();
   EndPrimitive();
 }
