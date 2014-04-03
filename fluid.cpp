@@ -55,9 +55,11 @@ void FluidRS<REAL,SIZE>::init(GLPointCloudRS<REAL, SIZE> *glpc)
   m_glpc = glpc;
 
   m_accel.resizeLike(m_pos);
+  m_dinv.resize(m_pos.cols());
   m_extern_accel.resizeLike(m_pos);
   m_vel.resizeLike(m_pos);
   m_vel.setZero();
+  m_dinv.setConstant(m_rest_density);
   reset_accel();
 
   //const clock_t begin_time = clock();
@@ -74,16 +76,16 @@ void FluidRS<REAL,SIZE>::init(GLPointCloudRS<REAL, SIZE> *glpc)
 
 // clamp value d to min and max boundaries + epsilon,
 template<typename REAL, typename SIZE>
-inline bool FluidRS<REAL,SIZE>::clamp(REAL &d, REAL min, REAL max)
+inline bool FluidRS<REAL,SIZE>::clamp(REAL &d, REAL min, REAL max, REAL tol)
 {
   if ( d < min )
   {
-    d = min + 0.005;
+    d = min + tol;
     return true;
   }
   else if (d > max)
   {
-    d = max - 0.005;
+    d = max - tol;
     return true;
   }
   return false;
@@ -92,19 +94,24 @@ inline bool FluidRS<REAL,SIZE>::clamp(REAL &d, REAL min, REAL max)
 template<typename REAL, typename SIZE>
 void FluidRS<REAL,SIZE>::resolve_collisions()
 {
-  if (this->m_params->fluid_type != MCG03)
-    return;
-
   for (SIZE i = 0; i < this->get_num_vertices(); ++i)
   {
     for (unsigned char j = 0; j < 3; ++j)
     {
-      if (clamp(pos_at(i)[j], m_bmin[j], m_bmax[j]))
+      if (clamp(pos_at(i)[j], m_bmin[j], m_bmax[j], 0.005))
       {
         vel_at(i)[j] *= -m_recoil_velocity_damping;
       }
     }
   }
+}
+
+template<typename REAL, typename SIZE>
+void FluidRS<REAL,SIZE>::clamp()
+{
+  for (SIZE i = 0; i < this->get_num_vertices(); ++i)
+    for (unsigned char j = 0; j < 3; ++j)
+      clamp(pos_at(i)[j], m_bmin[j], m_bmax[j], 0.0f);
 }
 
 template<typename REAL, typename SIZE>

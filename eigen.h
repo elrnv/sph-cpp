@@ -32,6 +32,9 @@ template<typename T>
 using VectorXT = Matrix<T, Dynamic, 1>;
 
 template<typename REAL>
+using VectorXR = VectorXT<REAL>;
+
+template<typename REAL>
 using Vector3R = Matrix<REAL, 3, 1>;
 template<typename REAL>
 using Vector4R = Matrix<REAL, 3, 1>;

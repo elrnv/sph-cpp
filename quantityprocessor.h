@@ -94,15 +94,15 @@ template<typename REAL, typename SIZE, int FT>
 class CFDensityUpdateRST : public CFQ<REAL,SIZE,CFDensityUpdateRST<REAL,SIZE,FT> >
 {
 public:
-  inline void init_kernel(float h) { }
-  inline void init(float ts) { }
-  inline void init_particle(FluidParticleR<REAL> &p) { }
-  inline void fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p) { }
-  inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p) { }
-  inline void finish_particle(FluidParticleR<REAL> &p) { }
+  inline void init_kernel(float h);
+  inline void init(float ts);
+  inline void init_particle(FluidParticleR<REAL> &p);
+  inline void fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p);
+  inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p);
+  inline void finish_particle(FluidParticleR<REAL> &p);
 private:
   float m_timestep;
-  Poly6GradKernel m_kern;
+  CubicSplineGradKernel m_kern;
 };
 
 template<typename REAL, typename SIZE, int FT>

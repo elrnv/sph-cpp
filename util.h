@@ -186,6 +186,18 @@ loadScene( const std::string &filename )
     cfg.lookupValue("dynamics.substeps", global::dynset.substeps);
     cfg.lookupValue("dynamics.cachedir", global::dynset.cachedir);
 
+    global::dynset.gravity = Vector3f(0.0f,-9.81f,0.0f);
+    try
+    {
+      libconfig::Setting &gravset = cfg.lookup("dynamics.gravity");
+      global::dynset.gravity = Vector3f(gravset[0], gravset[1], gravset[2]);
+    }
+    catch (libconfig::SettingTypeException &te)
+    {
+      qWarning() << "Setting " << te.getPath() << "has the wrong type!";
+    }
+    catch (libconfig::SettingNotFoundException &nfe) { }
+
     global::sceneset.padx = Vector2f(0,0);
     global::sceneset.pady = Vector2f(0,0);
     global::sceneset.padz = Vector2f(0,0);

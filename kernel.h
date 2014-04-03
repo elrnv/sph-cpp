@@ -49,10 +49,9 @@ struct MKI04Kernel : public Kerneld<MKI04Kernel>
   inline double kern(const Vector3d &r)
   {
     double r2 = r.squaredNorm();
-    double rn = std::sqrt(r2);
-    double q = 3.0f*rn/h;
+    double q = std::sqrt(r2);
 
-    if (q > 0 && q < 2)
+    if (q >= 0 && q < 2)
     {
       if (q < 2.0f/3.0f)
         return 2.0f/(r2*3.0f);
@@ -68,6 +67,47 @@ struct MKI04Kernel : public Kerneld<MKI04Kernel>
 }; // MKI04Kernel
 
 
+struct CubicSplineKernel : public Kerneld<CubicSplineKernel>
+{
+  inline void init_coef() { coef = 1.0f/(4.0f*M_PI*h3); }
+  
+  inline double kern(const Vector3d &r)
+  {
+    double q = r.norm();
+
+    if (q >= 0 && q < 2)
+    {
+      if (q <= 1)
+        return pow3(2 - q) - 4.0f*pow3(1 - q);
+
+      return pow3(2 - q);
+    }
+
+    return 0;
+  }
+
+}; // CubicSplineKernel
+
+struct CubicSplineGradKernel : public Kernel3d<CubicSplineGradKernel>
+{
+  inline void init_coef() { coef = 3.0f/(4.0f*M_PI*h3); }
+  
+  inline Vector3d kern(const Vector3d &r)
+  {
+    double q = r.norm();
+
+    if (q > 0 && q < 2)
+    {
+      if (q <= 1)
+        return -r*((pow2(2 - q) - 4.0f*pow2(1 - q))/q);
+
+      return -r*(pow2(2 - q)/q);
+    }
+
+    return Vector3d(0.0f, 0.0f, 0.0f);
+  }
+
+}; // CubicSplineGradKernel
 
 struct Poly6Kernel : public Kerneld<Poly6Kernel>
 {

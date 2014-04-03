@@ -11,8 +11,9 @@
 
 // Compute routine used to compute SPH quantities
 
-template<typename REAL,typename SIZE>
+template<typename REAL, typename SIZE>
 class CBVolumeRS;
+
 // forward declarations
 template<typename REAL, typename SIZE>
 class FluidRS;
@@ -159,16 +160,6 @@ public:
   inline void compute_fluid_quantity()
   { compute_quantity<Func, FluidParticleRT<REAL, FT> >(); }
 
-#if 0
-  template<int FT>
-  inline void compute_pressure_accelT();
-  
-  template<int FT>
-  inline void compute_viscosity_accelT();
-
-  template<int FT>
-  inline void compute_surface_tension_accelT();
-#endif
   template<int FT>
   inline void compute_accelT();
 
@@ -180,11 +171,6 @@ public:
 
   template<int FT>
   inline void compute_pressureT();
-
-#if 0
-  void compute_initial_density();
-#endif
-
 
   // run dynamic simulation
   void run();

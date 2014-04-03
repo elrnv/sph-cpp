@@ -93,11 +93,10 @@ void UniformGridRS<REAL,SIZE>::init()
       glprintf_trcv(fl->get_color(), "sound speed: %.2e  \n", std::sqrt(fl->get_sound_speed2()));
     }
   }
-
   CBVolumeRS<REAL,SIZE> proc;
   proc.init_kernel(m_h);
   m_bound_volume_proc = &proc;
-  //compute_bound_quantity< CBVolumeRS<REAL,SIZE> >();
+  compute_bound_quantity< CBVolumeRS<REAL,SIZE> >();
   m_bound_volume_proc = NULL;
 }
 
@@ -141,7 +140,12 @@ void UniformGridRS<REAL,SIZE>::populate_fluid_data()
         Vector3R<REAL> pos(fl->get_pos().col(i));
         Vector3R<REAL> vel(fl->get_vel().col(i));
         typename UniformGridRS<REAL,SIZE>::Array3Index idx = get_voxel_index(pos);
-        m_grid(idx).fluidvec.push_back(FluidParticleR<REAL>( pos, vel, fl->accel_at(i), fl->extern_accel_at(i), id));
+        m_grid(idx).fluidvec.push_back(
+            FluidParticleR<REAL>( pos, vel, 
+              fl->accel_at(i), 
+              fl->extern_accel_at(i), 
+              fl->dinv_at(i), 
+              id));
       }
       id++;
     }
@@ -310,20 +314,6 @@ void UniformGridRS<REAL,SIZE>::populate_bound_data()
 #endif
 }
 
-#if 0
-template<typename REAL, typename SIZE> template<int FT>
-void UniformGridRS<REAL,SIZE>::compute_pressure_accelT()
-{ compute_fluid_quantity< CFPressureAccelRST<REAL, SIZE, FT>, FT >(); }
-template<typename REAL, typename SIZE> template<int FT>
-void UniformGridRS<REAL,SIZE>::compute_viscosity_accelT()
-{ compute_fluid_quantity< CFViscosityAccelRST<REAL, SIZE, FT>, FT >(); }
-template<typename REAL, typename SIZE> template<int FT>
-void UniformGridRS<REAL,SIZE>::compute_surface_tension_accelT()
-{ compute_fluid_quantity< CFSurfaceTensionAccelRST<REAL, SIZE, FT>, FT >(); }
-template<typename REAL, typename SIZE> template<int FT>
-void UniformGridRS<REAL,SIZE>::compute_pressureT()
-{ compute_fluid_quantity< CFPressureRST<REAL,SIZE,FT>, FT >(); }
-#endif
 template<typename REAL, typename SIZE> template<int FT>
 void UniformGridRS<REAL,SIZE>::compute_accelT()
 { compute_fluid_quantity< CFAccelRST<REAL, SIZE, FT>, FT >(); }
@@ -452,16 +442,6 @@ void FTiter<REAL,SIZE,FT>::compute_density(UniformGridRS<REAL,SIZE> &g)
   FTiter<REAL,SIZE,FT+1>::compute_density(g); // recurse
 }
 
-#if 0
-template<typename REAL, typename SIZE, int FT>
-void FTiter<REAL,SIZE,FT>::compute_pressure(UniformGridRS<REAL,SIZE> &g)
-{
-  if (g.m_fluids[FT].size())
-    g.template compute_pressureT<FT>();
-  FTiter<REAL,SIZE,FT+1>::compute_pressure(g); // recurse
-}
-#endif
-
 template<typename REAL, typename SIZE, int FT>
 void FTiter<REAL,SIZE,FT>::compute_accel(UniformGridRS<REAL,SIZE> &g)
 {
@@ -470,18 +450,19 @@ void FTiter<REAL,SIZE,FT>::compute_accel(UniformGridRS<REAL,SIZE> &g)
     for (auto &fl : g.m_fluids[FT])
       fl->template cast<FT>()->reset_accel();     // now may assume all accelerations are zero
 
-    //g.template compute_pressure_accelT<FT>();
-    //g.template compute_viscosity_accelT<FT>();
     g.template compute_accelT<FT>();
   }
 
   FTiter<REAL,SIZE,FT+1>::compute_accel(g); // recurse
 }
+
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::run()
 {
   if (m_num_fluids < 1)
     return;
+
+  FTiter<REAL,SIZE,DEFAULT>::compute_density(*this);
 
   // timestep
   float dt = 1.0f/(global::dynset.fps * global::dynset.substeps);
@@ -548,14 +529,14 @@ void UniformGridRS<REAL,SIZE>::run()
               fdt = std::min(fdt,
                   float(fl->get_radius() /
                     (fl->get_mass()*Vector3R<REAL>(fl->get_extern_accel().col(i)).norm())));
-              cvdt = std::min(cvdt,
-                  float(fl->get_radius()/(fl->get_sound_speed2()*(1+0.6*fl->get_viscosity()))));
               // check for nan and infs
               //if (!std::isfinite(fl->vel_at(i)[0]) ||
               //    !std::isfinite(fl->vel_at(i)[1]) || 
               //    !std::isfinite(fl->vel_at(i)[2]))
               //  qDebug() << "Found NaN at " << i;
             }
+            cvdt = std::min(cvdt,
+                float(fl->get_radius()/(fl->get_sound_speed2()*(1+0.6*fl->get_viscosity()))));
           }
 
         float new_rdt = std::min(0.25*fdt, 0.4*cvdt);
@@ -570,11 +551,11 @@ void UniformGridRS<REAL,SIZE>::run()
 
         clock_t prev_t = clock();
 
-        //if (count % 100)
-        //  update_density(dt);
+        //if (iter)
+         // FTiter<REAL,SIZE,DEFAULT>::update_density(*this, dt);
         //else
           FTiter<REAL,SIZE,DEFAULT>::compute_density(*this);
-        //FTiter<REAL,SIZE,DEFAULT>::compute_pressure(*this);
+
         FTiter<REAL,SIZE,DEFAULT>::compute_accel(*this); // update m_accel
         substep_t += float(clock() - prev_t) / CLOCKS_PER_SEC;
 
@@ -588,8 +569,10 @@ void UniformGridRS<REAL,SIZE>::run()
           {
             fl->get_vel() = fl->get_vel() + factor*dt*fl->get_accel();
             fl->get_pos() = (fl->get_pos() + dt*fl->get_vel()).eval();
-            if (j == MCG03)
+            //if (j == MCG03)
               fl->resolve_collisions();
+            //else
+            //  fl->clamp();
 
             // prepare velocities for acceleration computation
             fl->get_vel() = fl->get_vel() + 0.5*dt*fl->get_accel();
@@ -597,7 +580,6 @@ void UniformGridRS<REAL,SIZE>::run()
         }
 
         update_grid(); // prepare grid for next simulation step
-
 
         if (m_stop_requested) break;
 

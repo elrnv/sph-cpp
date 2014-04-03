@@ -28,14 +28,8 @@ void SimWindow::toggle_shortcuts()
   glprintf_bl("  View Modes: \n");
   glprintf_blc(GREEN, "    W - wireframe\n");
   glprintf_blc(RED,   "    S - phong\n");
-  glprintf_blc(BLUE,  "    P - particles\n");
-  glprintf_bl("  Models: \n");
-  glprintf_blc(GREEN, "    1 - cube\n");
-  glprintf_blc(GREEN, "    2 - cow\n");
-  glprintf_blc(GREEN, "    3 - bunny\n");
-  glprintf_blc(BLUE,  "    4 - sparse point cloud\n");
-  glprintf_blc(BLUE,  "    5 - normal point cloud\n");
-  glprintf_blc(BLUE,  "    6 - dense point cloud\n");
+  glprintf_blc(BLUE,  "    Q - particles\n");
+  glprintf_blc(BLUE,  "    A - additive particles\n");
   glprintf_bl("  Dynamics: \n");
   glprintf_blc(RED,  "    D - start/stop\n");
   glprintf_blc(RED,  "    C - clear cache\n");
@@ -64,6 +58,7 @@ void SimWindow::onClose()
 
 void SimWindow::clear_dynamics()
 {
+  m_dynamics = false;
   if (!m_grid)
     return;
 
@@ -182,9 +177,10 @@ void SimWindow::clear_cache()
 
 void SimWindow::toggle_dynamics()
 {
+  bool temp = m_dynamics;
   clear_dynamics();
 
-  m_dynamics = !m_dynamics;
+  m_dynamics = !temp; // toggle
 
   if (m_dynamics)
   {
@@ -279,14 +275,10 @@ void SimWindow::render()
       {
         GLPointCloud *glpc = static_cast<GLPointCloud*>(glprim);
         glprim->get_program()->setUniformValue( "pt_radius", GLfloat(glpc->get_radius()));
-        if (glpc->is_dynamic() && !glpc->is_halos())
-        {
+        if (!glpc->is_halos())
           glprim->get_program()->setUniformValue( "pt_halo", GLfloat(glpc->get_radius()));
-        }
         else
-        {
           glprim->get_program()->setUniformValue("pt_halo", GLfloat(glpc->get_halo_radius()));
-        }
       }
       else
       {

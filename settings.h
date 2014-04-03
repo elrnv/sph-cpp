@@ -10,6 +10,7 @@ struct DynSettings
   unsigned int frames;
   unsigned int fps;
   unsigned int substeps;
+  Vector3f gravity;
   std::string cachedir;
 };
 

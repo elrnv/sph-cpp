@@ -52,6 +52,7 @@ public:
   inline REAL *vel_at(SIZE i)    { return m_vel.data() + i*3; }
   inline REAL *accel_at(SIZE i)  { return m_accel.data() + i*3; }
   inline REAL *extern_accel_at(SIZE i)  { return m_extern_accel.data() + i*3; }
+  inline REAL *dinv_at(SIZE i)  { return m_dinv.data() + i; }
 
   inline Matrix3XR<REAL> &get_vel()          { return m_vel; }
   inline Matrix3XR<REAL> &get_accel()        { return m_accel; }
@@ -87,7 +88,8 @@ public:
 
   inline void reset_accel() { m_accel.setZero(); m_extern_accel.setZero(); }
 
-  inline bool clamp(REAL &d, REAL min, REAL max);
+  inline bool clamp(REAL &d, REAL min, REAL max, REAL tol);
+  inline void clamp();
   inline void resolve_collisions();
 
   inline void update_data(); // propagate changes to some viewer
@@ -117,9 +119,10 @@ protected:
   REAL m_recoil_velocity_damping; // only for impulse collision model
   REAL m_c2;
 
-  Matrix3XR<REAL> m_vel; // velocities
+  Matrix3XR<REAL> m_vel;   // velocities
   Matrix3XR<REAL> m_accel; // accelerations
   Matrix3XR<REAL> m_extern_accel; // accelerations
+  VectorXR<REAL>  m_dinv;  // density inverses
 
   GLPointCloudRS<REAL,SIZE> *m_glpc; // should only used for callback
 
