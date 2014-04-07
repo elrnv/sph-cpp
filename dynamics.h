@@ -2,6 +2,7 @@
 #define DYNAMICS_H
 
 #include <vector>
+#include <deque>
 #include <boost/multi_array.hpp>
 #include "kernel.h"
 #include "pointcloud.h"
@@ -84,7 +85,7 @@ public:
   typedef typename Array3::template array_view<3>::type GridView;
 
   // Define a set of different types of fluids
-  typedef std::vector< FluidPtrRS<REAL,SIZE> > FluidVec;
+  typedef std::deque< FluidPtrRS<REAL,SIZE> > FluidVec;
 
   // Constructors/Destructor
   UniformGridRS(const Vector3f &bmin, const Vector3f &bmax);
@@ -177,6 +178,22 @@ public:
 
   // request stop which will be checked by the owner thread
   void request_stop() { m_stop_requested = true; }
+  void toggle_pause() 
+  { 
+    std::unique_lock<std::mutex> locker(m_pause_lock);
+    m_pause = !m_pause;
+    if (!m_pause)
+      m_pause_cv.notify_all();
+  }
+  void un_pause() 
+  { 
+    std::unique_lock<std::mutex> locker(m_pause_lock);
+    if (m_pause)
+    {
+      m_pause = false;
+      m_pause_cv.notify_all();
+    }
+  }
 
   friend FTiter<REAL,SIZE,NOTFLUID>;
   friend FTiter<REAL,SIZE,DEFAULT>;
@@ -213,6 +230,10 @@ private: // member variables
   CBVolumeRS<REAL,SIZE> *m_bound_volume_proc;
 
   std::atomic<bool> m_stop_requested;
+
+  std::mutex m_pause_lock;
+  std::condition_variable m_pause_cv;
+  std::atomic<bool> m_pause;
 
 }; // class UniformGridRS
 

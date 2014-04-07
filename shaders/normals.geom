@@ -18,6 +18,9 @@ uniform vec4  wirecolor = vec4(0.2, 0.5, 0.2, 1.0);
 
 in vec3 vtxnml[];
 
+uniform vec3 diffuse;
+uniform float opacity;
+
 out vec4 color;
 
 void main()
@@ -25,13 +28,12 @@ void main()
   // wireframe
   for (int i = 0; i < 3; ++i)
   {
-    color = wirecolor;
-
+    color = vec4(diffuse, opacity);
     gl_Position = VPMtx * gl_in[i].gl_Position;
     EmitVertex();
   }
 
-  color = wirecolor;
+  color = vec4(diffuse, opacity);
 
   gl_Position = VPMtx * gl_in[0].gl_Position;
   EmitVertex();
@@ -44,7 +46,7 @@ void main()
   gl_Position = VPMtx * gl_in[0].gl_Position;
   EmitVertex();
 
-  color = vec4(1.0, 0.0, 0.0, 0.0);
+  color = vec4(1.0, 0.0, 0.0, 1.0);
 
   gl_Position = VPMtx * vec4(gl_in[0].gl_Position.xyz + vtxnml[0] * normal_length, 1.0);
   EmitVertex();

@@ -30,8 +30,14 @@ void SimWindow::toggle_shortcuts()
   glprintf_blc(RED,   "    S - phong\n");
   glprintf_blc(BLUE,  "    Q - particles\n");
   glprintf_blc(BLUE,  "    A - additive particles\n");
+  glprintf_bl("  Scenes: \n");
+  glprintf_blc(BLUE,  "    5 - MCG03 Surface Tension test\n");
+  glprintf_blc(BLUE,  "    6 - MCG03 No Surface Tension test\n");
+  glprintf_blc(BLUE,  "    7 - BT07 Surface Tension test\n");
+  glprintf_blc(BLUE,  "    8 - BT07 No Surface Tension test\n");
   glprintf_bl("  Dynamics: \n");
   glprintf_blc(RED,  "    D - start/stop\n");
+  glprintf_blc(RED,  "    G - pause/resume\n");
   glprintf_blc(RED,  "    C - clear cache\n");
   glprintf_blc(CYAN, "    H - show/hide halos\n");
 }
@@ -43,6 +49,7 @@ SimWindow::SimWindow()
   , m_viewmode(ShaderManager::ADDITIVE_PARTICLE)
   , m_change_prog(true)
   , m_shaderman(this)
+  , m_bbox_vao(this)
 {
   toggle_shortcuts();
 }
@@ -62,6 +69,8 @@ void SimWindow::clear_dynamics()
   if (!m_grid)
     return;
 
+  m_grid->un_pause();
+
   m_grid->request_stop(); // stop thread
   m_sim_thread.join();
   delete m_grid; m_grid = 0;
@@ -79,6 +88,9 @@ void SimWindow::init()
   m_ubo.bindToIndex();
 
   load_model(0);
+
+  init_bbox();
+  glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
 void SimWindow::load_model(int i)
@@ -123,19 +135,20 @@ void SimWindow::change_viewmode(ViewMode vm)
 void SimWindow::reset_viewmode()
 {
   glEnable(GL_BLEND);
-  glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
   if (m_viewmode == ViewMode::ADDITIVE_PARTICLE) 
   {
-    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
     //glDepthFunc(GL_NEVER);
+    glDepthMask(GL_FALSE);
 	  glDisable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     glEnable(GL_PROGRAM_POINT_SIZE);
   }
   else if (m_viewmode == ViewMode::PARTICLE) 
   {
-    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
 	  glDisable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_PROGRAM_POINT_SIZE);
@@ -143,6 +156,7 @@ void SimWindow::reset_viewmode()
   else
   {
     glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
     glEnable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDisable(GL_PROGRAM_POINT_SIZE);
@@ -178,6 +192,7 @@ void SimWindow::clear_cache()
 void SimWindow::toggle_dynamics()
 {
   bool temp = m_dynamics;
+
   clear_dynamics();
 
   m_dynamics = !temp; // toggle
@@ -210,9 +225,9 @@ void SimWindow::toggle_dynamics()
 
 void SimWindow::render()
 {
+  glDepthMask(GL_TRUE); // depthmask needs to be true before clearing the depth bit
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-  reset_viewmode();
   int i = 0;
 
   Affine3f vtrans(get_view_trans()); // view transformation
@@ -228,6 +243,11 @@ void SimWindow::render()
   m_ubo.release();
 
   glFinish(); // Finish writing uniform buffer before drawing
+
+  draw_bbox();
+
+  glFinish();
+  reset_viewmode();
 
   if (m_viewmode != ViewMode::ADDITIVE_PARTICLE)
   {
@@ -295,6 +315,7 @@ void SimWindow::render()
     glprim->get_vao().release();
     glprim->get_program()->release();
   }
+
   m_change_prog = false;
 }
 
@@ -310,6 +331,9 @@ void SimWindow::keyPressEvent(QKeyEvent *event)
     case Qt::Key_D:
       toggle_dynamics();
       break;
+    case Qt::Key_G:
+      toggle_simulation();
+      break;
     case Qt::Key_H:
       toggle_halos();
       break;
@@ -317,7 +341,7 @@ void SimWindow::keyPressEvent(QKeyEvent *event)
       clear_cache();
       break;
     case Qt::Key_W:
-      change_viewmode(ViewMode::WIREFRAME);
+      change_viewmode(ViewMode::NORMALS);
       break;
     case Qt::Key_S:
       change_viewmode(ViewMode::PHONG);
@@ -344,5 +368,64 @@ void SimWindow::keyPressEvent(QKeyEvent *event)
   }
 
   renderLater(); // queue rendering
+}
+
+void SimWindow::init_bbox()
+{
+  GLfloat vertices[24] = {
+    -1, -1, -1,   1, -1, -1,
+    -1, -1,  1,   1, -1,  1,
+    -1,  1,  1,   1,  1,  1,
+    -1,  1, -1,   1,  1, -1
+  };
+
+  GLubyte indices[24] = {
+    0, 2, 2, 4, 4, 6, 6, 0,
+    1, 3, 3, 5, 5, 7, 7, 1,
+    0, 1, 2, 3, 4, 5, 6, 7
+  };
+
+  m_bbox_vao.create();
+  m_bbox_vao.bind();
+
+  QOpenGLBuffer vtxbuf(QOpenGLBuffer::VertexBuffer);
+  vtxbuf.create();
+  vtxbuf.setUsagePattern( QOpenGLBuffer::StaticDraw );
+  vtxbuf.bind();
+  vtxbuf.allocate( vertices, sizeof( vertices ) );
+
+  m_bbox_prog = m_shaderman.get_flat_shader();
+  m_bbox_prog->enableAttributeArray( "pos" );
+  m_bbox_prog->setAttributeBuffer( "pos", GL_FLOAT, 0, 3 );
+
+  QOpenGLBuffer idxbuf(QOpenGLBuffer::IndexBuffer);
+  idxbuf.create();
+  idxbuf.setUsagePattern( QOpenGLBuffer::StaticDraw );
+  idxbuf.bind();
+  idxbuf.allocate( indices, sizeof( indices ) );
+
+  m_bbox_vao.release();
+
+  m_ubo.bindToProg(m_bbox_prog->programId(), "Globals");
+}
+
+void SimWindow::draw_bbox()
+{
+  glEnable(GL_BLEND);
+  glEnable(GL_DEPTH_TEST);
+  glDepthMask(GL_TRUE);
+  glDisable(GL_CULL_FACE);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glDisable(GL_PROGRAM_POINT_SIZE);
+
+  m_bbox_prog->bind();
+  m_bbox_prog->setUniformValue("diffuse", QVector3D(0.3f, 0.4f, 0.5f));
+  m_bbox_prog->setUniformValue("opacity", 0.5f);
+
+  m_bbox_vao.bind();
+  glDrawElements(GL_LINES, 24, GL_UNSIGNED_BYTE, 0);
+  m_bbox_vao.release();
+
+  m_bbox_prog->release();
 }
 

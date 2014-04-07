@@ -43,7 +43,7 @@ void main()
   gl_Position = VPMtx * frag.pos;
   float d = distance(eye, frag.pos);
   gl_PointSize = 2.0 * pt_halo * pt_scale / d;
-  frag.dimming = clamp(10.0 / (d*d), 0.2, 2.0);
+  frag.dimming = clamp(10.0 / (d*d), 0.4, 2.0);
   EmitVertex();
   EndPrimitive();
 }

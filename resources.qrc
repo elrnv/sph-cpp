@@ -1,18 +1,18 @@
 <RCC>
     <qresource prefix="/">
         <file alias="phong.frag">shaders/phong.frag</file>
-        <file alias="plain.frag">shaders/plain.frag</file>
         <file alias="phong.vert">shaders/phong.vert</file>
+        <file alias="plain.vert">shaders/plain.vert</file>
+        <file alias="plain.frag">shaders/plain.frag</file>
         <file alias="normals.vert">shaders/normals.vert</file>
         <file alias="normals.geom">shaders/normals.geom</file>
+        <file alias="normals.frag">shaders/normals.frag</file>
         <file alias="particle.vert">shaders/particle.vert</file>
         <file alias="particle.geom">shaders/particle.geom</file>
+        <file alias="addparticle.geom">shaders/addparticle.geom</file>
         <file alias="particle.frag">shaders/particle.frag</file>
         <file alias="text.vert">shaders/text.vert</file>
         <file alias="text.frag">shaders/text.frag</file>
-        <file alias="test.vert">shaders/test.vert</file>
-        <file alias="test.geom">shaders/test.geom</file>
-        <file alias="test.frag">shaders/test.frag</file>
     </qresource>
     <qresource prefix="/">
         <file alias="proggyclean.ttf">fonts/ProggyCleanSZ.ttf/ProggyCleanSZ.ttf</file>

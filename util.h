@@ -180,11 +180,11 @@ loadScene( const std::string &filename )
     global::dynset.fps = 60;
     global::dynset.frames = 250;
     global::dynset.substeps = 10;
-    global::dynset.cachedir = "";
+    global::dynset.savedir = "";
     cfg.lookupValue("dynamics.fps", global::dynset.fps);
     cfg.lookupValue("dynamics.frames", global::dynset.frames);
     cfg.lookupValue("dynamics.substeps", global::dynset.substeps);
-    cfg.lookupValue("dynamics.cachedir", global::dynset.cachedir);
+    cfg.lookupValue("dynamics.savedir", global::dynset.savedir);
 
     global::dynset.gravity = Vector3f(0.0f,-9.81f,0.0f);
     try
@@ -244,7 +244,21 @@ loadScene( const std::string &filename )
           size_t end = objfile.find_last_of(".");
           if( start == std::string::npos )
             start = -1;
-          params_ptr->cacheprefix = objfile.substr(start+1, end - start - 1);
+
+          size_t startd = dynfile.find_last_of("/");
+          size_t endd = dynfile.find_last_of(".");
+          if( startd == std::string::npos )
+            startd = -1;
+
+          size_t startf = filename.find_last_of("/");
+          size_t endf = filename.find_last_of(".");
+          if( startf == std::string::npos )
+            startf = -1;
+
+          params_ptr->saveprefix = 
+            filename.substr(startf+1, endf - startf - 1) + 
+            dynfile.substr(startd+1, endd - startd - 1) + 
+            objfile.substr(start+1, end - start - 1);
         }
 
         SceneNode *obj = loadObject( objdir + "/" + objfile, params_ptr );

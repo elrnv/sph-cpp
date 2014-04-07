@@ -9,7 +9,7 @@
 
 struct DynParams
 {
-  std::string cacheprefix;
+  std::string saveprefix;
 
   enum Type
   {

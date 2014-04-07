@@ -35,6 +35,18 @@ template<typename REAL, typename SIZE>
 class FluidRS : public PointCloudRS<REAL,SIZE>
 {
 public:
+  struct __attribute__ ((__packed__)) CachedFrame
+  {
+    Matrix3XR<REAL> pos;
+    bool valid;
+
+    CachedFrame() : valid(false) { }
+    CachedFrame(const Matrix3XR<REAL> &p, bool v) : pos(p), valid(v) { }
+  };
+
+  // Define a set of cached frames
+  typedef std::vector< CachedFrame > Cache;
+
   // dynamic point cloud from a regular updatable gl point cloud
   explicit FluidRS(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params);
   explicit FluidRS(const aiMesh *pc, FluidParamsPtr params);
@@ -89,7 +101,7 @@ public:
   inline void reset_accel() { m_accel.setZero(); m_extern_accel.setZero(); }
 
   inline bool clamp(REAL &d, REAL min, REAL max, REAL tol);
-  inline void clamp();
+  inline void clamp(float tol);
   inline void resolve_collisions();
 
   inline void update_data(); // propagate changes to some viewer
@@ -100,10 +112,15 @@ public:
     return static_cast<FluidRST<REAL,SIZE,FT> *>(this); 
   }
 
+  void clear_saved();
+  inline void save(unsigned int frame);
+  inline bool is_saved(unsigned int frame);
+  inline bool read_saved(unsigned int frame);
+
   void clear_cache();
-  inline void write_cache(unsigned int frame);
+  inline void cache(unsigned int frame);
   inline bool is_cached(unsigned int frame);
-  inline bool read_cache(unsigned int frame);
+  inline bool load_cached(unsigned int frame);
 
 protected:
   FluidParamsPtr m_params;
@@ -126,7 +143,9 @@ protected:
 
   GLPointCloudRS<REAL,SIZE> *m_glpc; // should only used for callback
 
-  std::string m_cachefmt;
+  std::string m_savefmt;
+
+  Cache m_cache;
 }; // class FluidRS
 
 

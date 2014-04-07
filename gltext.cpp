@@ -153,6 +153,7 @@ void GLTextPainter::draw_text(int xcur, int ycur)
 {
   glEnable(GL_BLEND);
   glDisable(GL_DEPTH_TEST);
+  glDepthMask(GL_TRUE);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   m_prog.bind();
 

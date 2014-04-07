@@ -220,12 +220,10 @@ public:
   inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p) { }
   inline void finish_particle(FluidParticleR<REAL> &p)
   {
-    REAL nnorm2 = p.n.squaredNorm();
+    REAL nnorm = p.n.norm();
     Vector3R<REAL> st(0.0f,0.0f,0.0f);
-    if (nnorm2 > 0.01)
-    {
-      st = -(this->m_st / std::sqrt(nnorm2)) * p.c * p.n;
-    }
+    if (nnorm > 0.05)
+      st = -(this->m_st / nnorm) * p.c * p.n;
 
     p.extern_accel[0] += global::dynset.gravity[0];
     p.extern_accel[1] += global::dynset.gravity[1];
@@ -249,10 +247,10 @@ class CFAccelRST<REAL,SIZE,BT07> : public CFQ<REAL,SIZE,CFAccelRST<REAL,SIZE,BT0
 public:
   inline void init_kernel(float h)
   {
-    m_splinegrad_kern.init(h);
+    m_maingrad_kern.init(h);
     m_spikygrad_kern.init(h);
     m_bound_kern.init(h);
-    m_poly6_kern.init(h);
+    m_st_kern.init(h);
   }
   inline void init_particle(FluidParticleR<REAL> &p)
   {
@@ -279,7 +277,12 @@ public:
       res -= nu*vx / (x_ab.squaredNorm() + 0.01*this->m_radius*this->m_radius);
     }
 
-    p.n = p.n - res * this->m_splinegrad_kern(x_ab);
+    p.n = p.n - res * this->m_maingrad_kern(x_ab);
+    
+    // surface tension 
+    // (apply surface tension only to particles from the same phase)
+    if (p.id == near_p.id)
+      p.n = p.n - this->m_st*this->m_st_kern(x_ab)*x_ab;
   }
   inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p)
   {
@@ -291,7 +294,7 @@ public:
         (this->m_cs2*massb/(this->m_mass + massb)) 
         * x_ab * m_bound_kern(x_ab));
 
-    p.n = p.n + res;
+    //p.n = p.n + res;
   }
   inline void finish_particle(FluidParticleR<REAL> &p)
   {
@@ -306,9 +309,9 @@ public:
   }
 private:
   SpikyGradKernel m_spikygrad_kern;
-  Poly6GradKernel m_splinegrad_kern;
-  MKI04Kernel     m_bound_kern; // for boundary particles
-  Poly6Kernel     m_poly6_kern; // for boundary particles
+  Poly6GradKernel m_maingrad_kern;
+  MKI04Kernel     m_bound_kern;
+  Poly6Kernel m_st_kern;
 }; // CFAccel
 
 template<typename REAL, typename SIZE, int FT>

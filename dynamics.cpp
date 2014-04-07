@@ -7,6 +7,11 @@
 #include "fluid.h"
 #include "settings.h"
 #include "quantityprocessor.h"
+#define BOOST_CHRONO_HEADER_ONLY
+#include <boost/chrono.hpp>
+
+typedef boost::chrono::process_real_cpu_clock real_clock;
+typedef real_clock::time_point real_t;
 
 // From [Solenthaler and Pajarola 2008], an alternative density
 // (number_density * mass) is used
@@ -43,6 +48,7 @@ UniformGridRS<REAL,SIZE>::UniformGridRS(
   , m_bmin(bmin) // smallest boundary corner
   , m_bmax(bmax) // largest boundary corner
   , m_stop_requested(false)
+  , m_pause(false)
 { }
 
 template<typename REAL, typename SIZE>
@@ -51,7 +57,8 @@ UniformGridRS<REAL,SIZE>::~UniformGridRS() { }
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::init()
 {
-  FTiter<REAL,SIZE,DEFAULT>::init_fluid_processors(*this); // populate grid with particles
+  FTiter<REAL,SIZE,DEFAULT>::init_fluid_processors(*this);
+
   // set cell size to be the maximum of the kernel support over all fluids;
   for (int j = 0; j < NUMTYPES; ++j)
     for (auto &fl : m_fluids[j])
@@ -75,15 +82,22 @@ void UniformGridRS<REAL,SIZE>::init()
 
   m_grid.resize( boost::extents[m_gridsize[0]][m_gridsize[1]][m_gridsize[2]] );
   
-  populate_fluid_data(); // populate grid with particles
+  //populate_fluid_data(); // populate grid with particles
   populate_bound_data();
 
-  int count = 0;
   for (int j = 0; j < NUMTYPES; ++j)
   {
     for (auto &fl : m_fluids[j])
     {
-      glprintf_trcv(fl->get_color(), "--- Fluid %d ---\n", ++count);
+      glprintf_trcv(fl->get_color(), " Fluid ---");
+      switch (j)
+      {
+        case 1: glprintf_trcv(fl->get_color(), "MCG03"); break;
+        case 2: glprintf_trcv(fl->get_color(), "BT07"); break;
+        case 3: glprintf_trcv(fl->get_color(), "AIAST12"); break;
+        default: break;
+      }
+      glprintf_trcv(fl->get_color(), "--- \n");
       glprintf_trcv(fl->get_color(), "# of particles: %d  \n", fl->get_num_vertices());
       glprintf_trcv(fl->get_color(), "rest density: %.2f  \n", fl->get_rest_density());
       glprintf_trcv(fl->get_color(), "particle mass: %.2f  \n", fl->get_mass());
@@ -462,26 +476,15 @@ void UniformGridRS<REAL,SIZE>::run()
   if (m_num_fluids < 1)
     return;
 
-  FTiter<REAL,SIZE,DEFAULT>::compute_density(*this);
-
   // timestep
   float dt = 1.0f/(global::dynset.fps * global::dynset.substeps);
 
   glprintf_tr("step: %.2es\n", dt);
   float rdt = dt;
 
-  bool cached = true; // true if frame is cached
-
-  // check if first frame is cached
-  for (int j = 0; j < NUMTYPES; ++j)
-    for (auto &fl : m_fluids[j])
-      cached &= fl->is_cached(0); // check if we have already cached the first frame
-
-  if (!cached)
-    for (int j = 0; j < NUMTYPES; ++j)
-      for (auto &fl : m_fluids[j])
-        fl->write_cache(0); // save frame to cache
-
+  bool all_cached = true;
+  
+  real_t start_time;
   float file_read_t = 0.0f;
   float frame_t = 0.0f;
   float substep_t = 0.0f;
@@ -491,28 +494,34 @@ void UniformGridRS<REAL,SIZE>::run()
 
   for ( ; ; ++frame, ++frame_count ) // for each frame
   {
-    // check if we have the next frame cached for ALL of the fluids
+    start_time = real_clock::now();
+
     clock_t s = clock();
-    cached = true;
+    // check if we have the next frame cached for ALL of the fluids
+    all_cached = true;
     for (int j = 0; j < NUMTYPES; ++j)
       for (auto &fl : m_fluids[j])
-        cached &= fl->is_cached(frame);
+        all_cached &= fl->is_cached(frame);
 
-    if (cached) // if frame is cached just load it up
+    if (all_cached)
     {
       for (int j = 0; j < NUMTYPES; ++j)
         for (auto &fl : m_fluids[j])
-          fl->read_cache(frame);
-
-      file_read_t += float(clock() - s) / CLOCKS_PER_SEC;
-      file_reads += 1;
+          fl->load_cached(frame);
 
       for (int j = 0; j < NUMTYPES; ++j)
         for (auto &fl : m_fluids[j])
           fl->update_data(); // notify gl we have new positions
 
+      file_reads += 1;
+      file_read_t += float(clock() - s) / CLOCKS_PER_SEC;
+
+      boost::chrono::nanoseconds elapsed = (real_clock::now() - start_time);
+      boost::chrono::nanoseconds perframe(boost::int_least64_t(1.0e9/global::dynset.fps));
+      if (elapsed < perframe)
+        std::this_thread::sleep_for(std::chrono::nanoseconds((perframe - elapsed).count()));
     }
-    else // compute next frame
+    else // if not all cached, compute substeps
     {
       substep_t = 0.0f;
       for (unsigned int iter = 0; iter < global::dynset.substeps; ++iter)
@@ -549,6 +558,8 @@ void UniformGridRS<REAL,SIZE>::run()
         //////// end of adaptive timestep test
 #endif
 
+        update_grid(); // prepare grid for simulation step
+
         clock_t prev_t = clock();
 
         //if (iter)
@@ -569,17 +580,12 @@ void UniformGridRS<REAL,SIZE>::run()
           {
             fl->get_vel() = fl->get_vel() + factor*dt*fl->get_accel();
             fl->get_pos() = (fl->get_pos() + dt*fl->get_vel()).eval();
-            //if (j == MCG03)
-              fl->resolve_collisions();
-            //else
-            //  fl->clamp();
+            fl->resolve_collisions();
 
-            // prepare velocities for acceleration computation
+            // prepare velocities for acceleration computation in next step
             fl->get_vel() = fl->get_vel() + 0.5*dt*fl->get_accel();
           }
         }
-
-        update_grid(); // prepare grid for next simulation step
 
         if (m_stop_requested) break;
 
@@ -591,7 +597,7 @@ void UniformGridRS<REAL,SIZE>::run()
 
       for (int j = 0; j < NUMTYPES; ++j)
         for (auto &fl : m_fluids[j])
-          fl->write_cache(frame); // save frame to cache
+          fl->cache(frame); // cache frame
 
     } // if not cached
 
@@ -601,6 +607,13 @@ void UniformGridRS<REAL,SIZE>::run()
         substep_t / float(global::dynset.substeps),
         frame_t / float(frame_count),
         file_read_t / float(file_reads));
+
+    {
+      std::unique_lock<std::mutex> locker(m_pause_lock);
+
+      while (m_pause) // avoid spurious wakeup
+        m_pause_cv.wait(locker);
+    }
 
     if (m_stop_requested) break;
 

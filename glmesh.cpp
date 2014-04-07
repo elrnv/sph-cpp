@@ -162,7 +162,7 @@ void GLMeshRS<REAL, SIZE>::update_shader(ShaderManager::ShaderType type)
   else if (type == ShaderManager::PARTICLE)
     this->m_prog = this->m_shaderman.get_particle_shader();
   else
-    this->m_prog = this->m_shaderman.get_wireframe_shader();
+    this->m_prog = this->m_shaderman.get_normals_shader();
 
   this->m_vao.bind();
 

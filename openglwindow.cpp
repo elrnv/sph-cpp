@@ -28,6 +28,7 @@ OpenGLWindow::OpenGLWindow(QWindow *parent)
   m_time.start();
 
   toggle_text();
+
 }
 
 OpenGLWindow::~OpenGLWindow()

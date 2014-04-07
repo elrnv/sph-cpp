@@ -52,6 +52,7 @@ INCLUDEPATH += /opt/local/include/eigen3
 INCLUDEPATH += /opt/local/include
 LIBS += -L/opt/local/lib 
 LIBS += -lassimp
+LIBS += -lboost_system-mt
 
 # LIBS += /opt/intel/lib/libiomp5.a
 

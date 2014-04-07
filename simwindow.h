@@ -21,11 +21,14 @@ public:
   void render();
 
   void load_model(int i);
+  void init_bbox();
+  void draw_bbox();
 
   typedef ShaderManager::ShaderType ViewMode;
   void change_viewmode(ViewMode vm);
   void reset_viewmode();
   void toggle_dynamics();
+  void toggle_simulation() { if (m_grid) { m_grid->toggle_pause(); } }
   void toggle_halos();
   void clear_cache();
 
@@ -63,6 +66,10 @@ private:
   bool m_change_prog; // flag true if m_viewmode is recently changed
 
   ShaderManager m_shaderman;
+
+  // bounding box
+  QOpenGLVertexArrayObject m_bbox_vao;
+  QOpenGLShaderProgram *m_bbox_prog;
 
   std::thread m_sim_thread;
 };

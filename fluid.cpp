@@ -14,12 +14,14 @@ template<typename REAL, typename SIZE>
 FluidRS<REAL,SIZE>::FluidRS(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params)
   : PointCloudRS<REAL,SIZE>(*pc)
   , m_params(params)
+  , m_cache(global::dynset.frames+1)
 { }
 
 template<typename REAL, typename SIZE>
 FluidRS<REAL,SIZE>::FluidRS(const aiMesh *pc, FluidParamsPtr params)
   : PointCloudRS<REAL,SIZE>(pc)
   , m_params(params)
+  , m_cache(global::dynset.frames+1)
 { }
 
 template<typename REAL, typename SIZE>
@@ -58,7 +60,8 @@ void FluidRS<REAL,SIZE>::init(GLPointCloudRS<REAL, SIZE> *glpc)
   m_dinv.resize(m_pos.cols());
   m_extern_accel.resizeLike(m_pos);
   m_vel.resizeLike(m_pos);
-  m_vel.setZero();
+  for (SIZE i = 0; i < this->get_num_vertices(); ++i)
+    m_vel.col(i) = m_params->velocity.template cast<REAL>();
   m_dinv.setConstant(m_rest_density);
   reset_accel();
 
@@ -71,7 +74,27 @@ void FluidRS<REAL,SIZE>::init(GLPointCloudRS<REAL, SIZE> *glpc)
   //qDebug() << float( t2 - t1 ) / CLOCKS_PER_SEC << " to get " << d2;
 
   // construct output filename (this can be done whenever)
-  m_cachefmt = global::dynset.cachedir + "/" + m_params->cacheprefix + "%03d.obj";
+  m_savefmt = global::dynset.savedir + "/" + m_params->saveprefix + "%03d.obj";
+
+  // check if cache was saved, if so load it, otherwise just
+  // cache positions to the first frame
+
+  if (!is_saved(0))
+  {
+    cache(0);
+    // ignore whatever else may be saved, since the first frame will not match
+    // anyways, this allows the user to simply remove the first frame to
+    // invalidate all of the saved cached files.
+  }
+  else
+  {
+    bool read_successful = true;
+    for (unsigned int fr = 0; fr <= global::dynset.frames; ++fr)
+      read_successful &= read_saved(fr);
+
+    if (!read_successful)
+      qWarning() << "Some cached files could not be found.";
+  }
 }
 
 // clamp value d to min and max boundaries + epsilon,
@@ -107,11 +130,11 @@ void FluidRS<REAL,SIZE>::resolve_collisions()
 }
 
 template<typename REAL, typename SIZE>
-void FluidRS<REAL,SIZE>::clamp()
+void FluidRS<REAL,SIZE>::clamp(float tol)
 {
   for (SIZE i = 0; i < this->get_num_vertices(); ++i)
     for (unsigned char j = 0; j < 3; ++j)
-      clamp(pos_at(i)[j], m_bmin[j], m_bmax[j], 0.0f);
+      clamp(pos_at(i)[j], m_bmin[j], m_bmax[j], tol);
 }
 
 template<typename REAL, typename SIZE>
@@ -121,26 +144,32 @@ inline void FluidRS<REAL,SIZE>::update_data()
     m_glpc->update_data();
 }
 
+
+// File stuff
+
 template<typename REAL, typename SIZE>
-inline void FluidRS<REAL,SIZE>::write_cache(unsigned int frame) 
+inline void FluidRS<REAL,SIZE>::save(unsigned int frame) 
 {
-  if (global::dynset.cachedir.empty())
+  if (global::dynset.savedir.empty())
     return;
 
   // open output file
   FILE * outfile = NULL;
   char buf[128];
-  sprintf(buf, m_cachefmt.c_str(), frame);
+  sprintf(buf, m_savefmt.c_str(), frame);
   outfile = fopen(buf,"w");
 
   if (!outfile)
   {
-    qWarning() << "Output file not opened!";
+    qWarning() << "Output file" << buf << "not opened!";
     return;
   }
 
   for (SIZE i = 0; i < this->get_num_vertices(); ++i)
-    fprintf(outfile, "v %f %f %f\n", pos_at(i)[0], pos_at(i)[1], pos_at(i)[2]);
+  {
+    REAL * posptr = m_cache[frame].pos.data() + i*3;
+    fprintf(outfile, "v %f %f %f\n", posptr[0], posptr[1], posptr[2]);
+  }
 
   for (SIZE i = 1; i <= this->get_num_vertices(); ++i)
     fprintf(outfile, "f %d\n", i);
@@ -149,15 +178,15 @@ inline void FluidRS<REAL,SIZE>::write_cache(unsigned int frame)
 }
 
 template<typename REAL, typename SIZE>
-inline bool FluidRS<REAL,SIZE>::is_cached(unsigned int frame) 
+inline bool FluidRS<REAL,SIZE>::is_saved(unsigned int frame) 
 {
-  if (global::dynset.cachedir.empty())
+  if (global::dynset.savedir.empty())
     return false;
 
-  // open cache file
+  // open save file
   FILE * infile = NULL;
   char buf[128];
-  sprintf(buf, m_cachefmt.c_str(), frame);
+  sprintf(buf, m_savefmt.c_str(), frame);
   infile = fopen(buf, "r");
   if (!infile)
     return false;
@@ -166,24 +195,21 @@ inline bool FluidRS<REAL,SIZE>::is_cached(unsigned int frame)
   return true;
 }
 
-// return if we successfully read from cached file and have a valid state
+// return if we successfully read from saved file and have a valid state
 template<typename REAL, typename SIZE>
-inline bool FluidRS<REAL,SIZE>::read_cache(unsigned int frame) 
+inline bool FluidRS<REAL,SIZE>::read_saved(unsigned int frame) 
 {
-  if (global::dynset.cachedir.empty())
+  if (global::dynset.savedir.empty())
     return false;
 
   // open input file
   std::ifstream infile;
   char buf[128];
-  sprintf(buf, m_cachefmt.c_str(), frame);
+  sprintf(buf, m_savefmt.c_str(), frame);
   infile.open(buf);
 
   if (!infile.is_open())
-  {
-    qWarning() << "Input file not opened!";
     return false;
-  }
 
   std::string line;
   SIZE i = 0;
@@ -198,83 +224,88 @@ inline bool FluidRS<REAL,SIZE>::read_cache(unsigned int frame)
     if (!boost::iequals(identifier, "v"))
       continue; // skip garbage
 
-    iss >> pos_at(i)[0];
-    iss >> pos_at(i)[1];
-    iss >> pos_at(i)[2];
+    REAL * posptr = m_cache[frame].pos.data() + i*3;
+    iss >> posptr[0];
+    iss >> posptr[1];
+    iss >> posptr[2];
     i += 1;
   }
 
   infile.close();
 
-  if (frame >= global::dynset.frames)
-    return true; // last frame, so we're done
+  return true; // last frame, so we're done
+}
 
-  // now we check if there exists the frames cached file, if not we must load
-  // a previous cached file and infer the current velocities
-  // this allows us to have partially cached data.
+template<typename REAL, typename SIZE>
+inline void FluidRS<REAL,SIZE>::clear_saved() 
+{
+  if (global::dynset.savedir.empty())
+    return;
 
-  // open input file
-  sprintf(buf, m_cachefmt.c_str(), frame+1);
-  infile.open(buf);
-
-  if (infile.is_open())
-  { // we're good for next frame, just return
-    infile.close();
-    return true;
-  }
-
-  // Oh no! there is no cached file for next frame. Quickly! Figure out what
-  // the velocities should be before next simulation step
-  // NOTE: this is only an approximation since the actual simulation timestep
-  // is often smaller than the time between frames. Alternatively, we may
-  // cache velocities separately, but thats expensive
- 
-  sprintf(buf, m_cachefmt.c_str(), frame-1);
-  infile.open(buf);
-
-  if (!infile.is_open())
-  { // no previous frame cached, oh well, just leave velocities as is
-    // alternatively we may zero out all velocities, not sure what's better
-    return true;
-  }
-
-  i = 0;
-  while ( getline(infile, line) )
+  for (unsigned int fr = 0; fr <= global::dynset.frames; ++fr)
   {
-    std::istringstream iss(line);
-    std::string identifier;
-    iss >> identifier;
-    if (boost::iequals(identifier, "f"))
-      break; // reached faces, done
+    char buf[128];
+    sprintf(buf, m_savefmt.c_str(), fr);
+    remove(buf);
+  }
+}
 
-    if (!boost::iequals(identifier, "v"))
-      continue; // skip garbage
 
-    float pos;
-    for (unsigned char j = 0; j < 3; ++j)
-    {
-      iss >> pos;
-      vel_at(i)[j] = (pos_at(i)[j] - pos)*global::dynset.fps;
-    }
-    i += 1;
+// Cache stuff
+
+template<typename REAL, typename SIZE>
+inline void FluidRS<REAL,SIZE>::cache(unsigned int frame) 
+{
+  m_cache[frame].pos = m_pos;
+  m_cache[frame].valid = true;
+
+  save(frame);
+}
+
+template<typename REAL, typename SIZE>
+inline bool FluidRS<REAL,SIZE>::is_cached(unsigned int frame) 
+{
+  return m_cache[frame].valid;
+}
+
+template<typename REAL, typename SIZE>
+inline bool FluidRS<REAL,SIZE>::load_cached(unsigned int frame) 
+{
+  // dont load if not cached or is first frame and next is not cached
+  if ( !m_cache[frame].valid
+      || (frame == 0 && !m_cache[frame+1].valid) ) 
+    return false;
+
+  m_pos = m_cache[frame].pos;
+  
+  if (m_cache[frame+1].valid)
+    return true;
+
+  // infer velocities from last frame
+  if (frame == 0 || !m_cache[frame-1].valid)
+  { // reset to initial velocity
+    for (SIZE i = 0; i < this->get_num_vertices(); ++i)
+      m_vel.col(i) = m_params->velocity.template cast<REAL>();
+    return true;
   }
 
-  infile.close();
+  m_vel = (m_pos - m_cache[frame-1].pos)*global::dynset.fps;
+
   return true;
 }
 
 template<typename REAL, typename SIZE>
 inline void FluidRS<REAL,SIZE>::clear_cache() 
 {
-  if (global::dynset.cachedir.empty())
-    return;
-
+  bool already_clear = true;
   for (unsigned int fr = 0; fr <= global::dynset.frames; ++fr)
   {
-    char buf[128];
-    sprintf(buf, m_cachefmt.c_str(), fr);
-    remove(buf);
+    already_clear &= !m_cache[fr].valid;
+    m_cache[fr].valid = false;
   }
+
+  if (already_clear)
+    clear_saved();
 }
 
 // Typed Fluid Stuff

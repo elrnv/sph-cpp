@@ -3,7 +3,8 @@
 
 ShaderManager::ShaderManager(OpenGLWindow *parent)
   : QObject(parent)
-  , m_wireframe_shader(this)
+  , m_normals_shader(this)
+  , m_flat_shader(this)
   , m_phong_shader(this)
   , m_particle_shader(this)
 {
@@ -15,11 +16,16 @@ ShaderManager::~ShaderManager()
 
 void ShaderManager::init()
 {
-  m_wireframe_shader.addShaderFromSourceFile(QOpenGLShader::Vertex,   ":/normals.vert");
-  m_wireframe_shader.addShaderFromSourceFile(QOpenGLShader::Geometry, ":/normals.geom");
-  m_wireframe_shader.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/plain.frag");
-  m_wireframe_shader.link();
-  qDebug() << "Wireframe Shader LOG:" << m_wireframe_shader.log();
+  m_normals_shader.addShaderFromSourceFile(QOpenGLShader::Vertex,   ":/normals.vert");
+  m_normals_shader.addShaderFromSourceFile(QOpenGLShader::Geometry, ":/normals.geom");
+  m_normals_shader.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/normals.frag");
+  m_normals_shader.link();
+  qDebug() << "Normals Shader LOG:" << m_flat_shader.log();
+
+  m_flat_shader.addShaderFromSourceFile(QOpenGLShader::Vertex,   ":/plain.vert");
+  m_flat_shader.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/plain.frag");
+  m_flat_shader.link();
+  qDebug() << "Flat Shader LOG:" << m_flat_shader.log();
 
   m_phong_shader.addShaderFromSourceFile(QOpenGLShader::Vertex,   ":/phong.vert");
   m_phong_shader.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/phong.frag");
@@ -33,7 +39,7 @@ void ShaderManager::init()
   qDebug() << "Particle Shader LOG:" << m_particle_shader.log();
 
   m_add_particle_shader.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/particle.vert");
-  m_add_particle_shader.addShaderFromSourceFile(QOpenGLShader::Geometry, ":/particle.geom");
+  m_add_particle_shader.addShaderFromSourceFile(QOpenGLShader::Geometry, ":/addparticle.geom");
   m_add_particle_shader.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/particle.frag");
   m_add_particle_shader.link();
   qDebug() << "Additive Particle Shader LOG:" << m_particle_shader.log();
