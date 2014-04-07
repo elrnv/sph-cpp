@@ -75,26 +75,6 @@ void FluidRS<REAL,SIZE>::init(GLPointCloudRS<REAL, SIZE> *glpc)
 
   // construct output filename (this can be done whenever)
   m_savefmt = global::dynset.savedir + "/" + m_params->saveprefix + "%03d.obj";
-
-  // check if cache was saved, if so load it, otherwise just
-  // cache positions to the first frame
-
-  if (!is_saved(0))
-  {
-    cache(0);
-    // ignore whatever else may be saved, since the first frame will not match
-    // anyways, this allows the user to simply remove the first frame to
-    // invalidate all of the saved cached files.
-  }
-  else
-  {
-    bool read_successful = true;
-    for (unsigned int fr = 0; fr <= global::dynset.frames; ++fr)
-      read_successful &= read_saved(fr);
-
-    if (!read_successful)
-      qWarning() << "Some cached files could not be found.";
-  }
 }
 
 // clamp value d to min and max boundaries + epsilon,
@@ -195,6 +175,28 @@ inline bool FluidRS<REAL,SIZE>::is_saved(unsigned int frame)
   return true;
 }
 
+// return true if loaded, false otherwise
+template<typename REAL, typename SIZE>
+inline bool FluidRS<REAL,SIZE>::load_saved_cache()
+{
+  // check if first frame was saved, if so load everything, otherwise ignore
+  if (is_saved(0))
+  {
+    bool read_successful = true;
+    for (unsigned int fr = 0; fr <= global::dynset.frames; ++fr)
+    {
+      read_successful &= read_saved(fr);
+      glprintf_trcv(get_color(), "\rLoading cache %d%%", 100*fr/global::dynset.frames);
+    }
+    glprintf_tr("\r   ");
+
+    if (!read_successful)
+      qWarning() << "Some cached files could not be found.";
+    return true;
+  } 
+  return false;
+}
+
 // return if we successfully read from saved file and have a valid state
 template<typename REAL, typename SIZE>
 inline bool FluidRS<REAL,SIZE>::read_saved(unsigned int frame) 
@@ -210,6 +212,8 @@ inline bool FluidRS<REAL,SIZE>::read_saved(unsigned int frame)
 
   if (!infile.is_open())
     return false;
+
+  m_cache[frame].pos.resizeLike(m_pos);
 
   std::string line;
   SIZE i = 0;
@@ -228,6 +232,7 @@ inline bool FluidRS<REAL,SIZE>::read_saved(unsigned int frame)
     iss >> posptr[0];
     iss >> posptr[1];
     iss >> posptr[2];
+    m_cache[frame].valid = true;
     i += 1;
   }
 

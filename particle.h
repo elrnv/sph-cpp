@@ -12,6 +12,7 @@ struct ParticleR
 
   Vector3R<REAL> pos;
   REAL dinv;
+  REAL vol;           // volume estimate
   REAL pressure;
 };
 
@@ -27,7 +28,6 @@ struct FluidParticleR : public ParticleR<REAL>
   REAL *accel;        // 3-array to which we write total acceleration
   REAL *extern_accel; // 3-array to which we write acceleration from external forces
   REAL *_dinv; // pointer to fluid entry
-  REAL vol;           // volume estimate
   REAL c;         // for surface tension computations
   Vector3R<REAL> n;         // for surface tension computations
   unsigned short id;  // index of the fluid this particle belongs to in the grid

@@ -10,6 +10,7 @@ struct DynSettings
   unsigned int frames;
   unsigned int fps;
   unsigned int substeps;
+  unsigned int init_steps;
   Vector3f gravity;
   std::string savedir;
 };
@@ -21,6 +22,7 @@ struct SceneSettings
   Vector2f padz;
   float rotx;
   float roty;
+  bool normalize;
 };
 
 namespace global

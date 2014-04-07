@@ -48,17 +48,16 @@ struct MKI04Kernel : public Kerneld<MKI04Kernel>
   
   inline double kern(const Vector3d &r)
   {
-    double r2 = r.squaredNorm();
-    double q = std::sqrt(r2);
+    double q = r.norm()/h;
 
     if (q >= 0 && q < 2)
     {
-      if (q < 2.0f/3.0f)
-        return 2.0f/(r2*3.0f);
+      if (3.0f*q < 2.0f)
+        return 2.0f/3.0f;
       if (q < 1)
-        return (2*q - 3.0f*q*q/2.0f)/r2;
+        return (2*q - (3.0f/2.0f)*q*q);
 
-      return 0.5*pow2(2 - q)/r2;
+      return 0.5*pow2(2 - q);
     }
 
     return 0;

@@ -264,7 +264,7 @@ public:
 
     // pressure
 
-    REAL res((p.pressure*p.dinv*p.dinv + near_p.pressure*near_p.dinv*near_p.dinv));
+    REAL res(p.pressure*p.dinv*p.dinv + near_p.pressure*near_p.dinv*near_p.dinv);
 
     // viscosity
 
@@ -272,29 +272,38 @@ public:
     REAL vx = x_ab.dot(p.vel - near_p.vel);
     if (vx < 0) // compute damping term
     {
-      REAL nu = 2*this->m_viscosity*this->m_radius*this->m_cs 
+      REAL nu = 2*this->m_viscosity*m_maingrad_kern.h*this->m_cs 
               * p.dinv * near_p.dinv / (p.dinv + near_p.dinv);
-      res -= nu*vx / (x_ab.squaredNorm() + 0.01*this->m_radius*this->m_radius);
+      res -= nu*vx / (x_ab.squaredNorm() + 0.01*m_maingrad_kern.h*m_maingrad_kern.h);
     }
 
-    p.n = p.n - res * this->m_maingrad_kern(x_ab);
+    p.n = p.n - res * m_maingrad_kern(x_ab);
     
     // surface tension 
     // (apply surface tension only to particles from the same phase)
     if (p.id == near_p.id)
-      p.n = p.n - this->m_st*this->m_st_kern(x_ab)*x_ab;
+      p.n = p.n - this->m_st * m_st_kern(x_ab) * x_ab;
   }
   inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p)
   {
     // pressure contribution from boundary particles
     float massb = this->m_rest_density * near_p.dinv;
     Vector3R<REAL> x_ab = p.pos - near_p.pos;
-    REAL kern = m_bound_kern((1.0f/this->m_radius)*x_ab);
+    REAL kern = m_bound_kern(x_ab);
+
+    if (0 && x_ab.norm() < 1.5f*m_bound_kern.h)
+    {
+      qDebug() << "xab = "  << x_ab[0] << x_ab[1] << x_ab[2];
+      qDebug() << "xab.norm = "  << x_ab.norm();
+      qDebug() << "h = "  << m_bound_kern.h;
+      qDebug() << "massb = "  << massb;
+      qDebug() << "kern = " << kern;
+    }
     Vector3R<REAL> res(
         (this->m_cs2*massb/(this->m_mass + massb)) 
-        * x_ab * m_bound_kern(x_ab));
+        * x_ab * kern / x_ab.squaredNorm());
 
-    //p.n = p.n + res;
+    p.n = p.n + res;
   }
   inline void finish_particle(FluidParticleR<REAL> &p)
   {

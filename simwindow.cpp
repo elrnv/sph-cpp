@@ -66,6 +66,7 @@ void SimWindow::onClose()
 void SimWindow::clear_dynamics()
 {
   m_dynamics = false;
+  set_animating(false);
   if (!m_grid)
     return;
 
@@ -101,16 +102,19 @@ void SimWindow::load_model(int i)
   if (!scene)
     return;
 
-  scene->normalize_model();
-  scene->rotate(global::sceneset.rotx, Vector3f::UnitX());
-  scene->rotate(global::sceneset.roty, Vector3f::UnitY());
-  scene->flatten();
+  if (global::sceneset.normalize)
+  {
+    scene->normalize_model();
+    scene->rotate(global::sceneset.rotx, Vector3f::UnitX());
+    scene->rotate(global::sceneset.roty, Vector3f::UnitY());
+    scene->flatten();
 
-  scene->normalize_model(
-      global::sceneset.padx,
-      global::sceneset.pady,
-      global::sceneset.padz);
-  scene->flatten();
+    scene->normalize_model(
+        global::sceneset.padx,
+        global::sceneset.pady,
+        global::sceneset.padz);
+    scene->flatten();
+  }
 
   scene->cube_bbox();
   m_udata.modelmtx.setIdentity();
@@ -288,7 +292,7 @@ void SimWindow::render()
 
     glprim->get_vao().bind();
     if (m_viewmode == ShaderManager::PARTICLE ||
-        m_viewmode == ShaderManager::ADDITIVE_PARTICLE )
+        m_viewmode == ShaderManager::ADDITIVE_PARTICLE)
     {
       glprim->get_program()->setUniformValue("pt_scale", float(14.5*window_dim()[1]*m_near));
       if (glprim->is_pointcloud())

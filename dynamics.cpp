@@ -169,163 +169,59 @@ void UniformGridRS<REAL,SIZE>::populate_fluid_data()
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::populate_bound_data()
 {
-  // walk through all boundary cells
-  SIZE nx = m_gridsize[0];
-  SIZE ny = m_gridsize[1];
-  SIZE nz = m_gridsize[2];
-  float h = m_h;
-  Vector3R<REAL> bmin = m_bmin.template cast<REAL>();
+  unsigned char particles_per_cell_length = 2;
 
-  unsigned char inflate = 3;
-  float d = h/inflate;
+  // place boundary particles slightly away from the actual boundary
+  float pad = 0.5f*3.0f*m_h;
 
-  SIZE i = 0;
-  for (SIZE j = 0; j < ny; ++j)
-    for (SIZE k = 0; k < nz; ++k)
-    {
-      StaticParticles &boundvec = m_grid[i][j][k].boundvec;
-      for (unsigned char n = 0; n < inflate; ++n)
-        for (unsigned char m = 0; m < inflate; ++m)
-          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0, h*j+d*n, h*k+d*m) + bmin) );
+  SIZE nx = particles_per_cell_length*(m_gridsize[0]+2);
+  SIZE ny = particles_per_cell_length*(m_gridsize[1]+2);
+  SIZE nz = particles_per_cell_length*(m_gridsize[2]+2);
+  float incx = (m_bmax[0] - m_bmin[0] + 2*pad)/nx;
+  float incy = (m_bmax[1] - m_bmin[1] + 2*pad)/ny;
+  float incz = (m_bmax[2] - m_bmin[2] + 2*pad)/nz;
 
-      if (k == nz-1)
-        for (unsigned char n = 0; n < inflate; ++n)
-          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0, h*j+d*n, h*nz) + bmin) );
-      if (j == ny-1)
-        for (unsigned char n = 0; n < inflate; ++n)
-          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0, h*ny, h*k + d*n) + bmin) );
-      if (j == ny-1 && k == nz-1)
-        boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0, h*ny, h*nz) + bmin) );
-    }
-
-  // cover strip near i=0
-  for (SIZE k = 0; k < nz; ++k)
-  {
-    for (unsigned char n = 1; n < inflate; ++n)
-      for (unsigned char m = 0; m < inflate; ++m)
-      {
-        m_grid[0][0][k].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*n, 0, h*k + d*m) + bmin) );
-        m_grid[0][ny-1][k].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*n, h*ny, h*k + d*m) + bmin) );
-      }
-  }
-
-  for (unsigned char n = 1; n < inflate; ++n)
-  {
-    m_grid[0][0][nz-1].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*n, 0, h*nz) + bmin) );
-    m_grid[0][ny-1][nz-1].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*n, h*ny, h*nz) + bmin) );
-  }
-
-  // two blocks near i=0, j=0
-  for (unsigned char n = 1; n < inflate; ++n)
-    for (unsigned char m = 1; m < inflate; ++m)
-    {
-      m_grid[0][0][0].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*m, 0+d*n, 0) + bmin) );
-      m_grid[0][0][nz-1].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*m, 0+d*n, h*nz) + bmin) );
-    }
-
-  for (SIZE j = 1; j < ny; ++j)
-  {
-    for (unsigned char n = 0; n < inflate; ++n)
-      for (unsigned char m = 1; m < inflate; ++m)
-      {
-        m_grid[i][j][0].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*m, h*j+d*n, 0) + bmin) );
-        m_grid[i][j][nz-1].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(0 + d*m, h*j+d*n, h*nz) + bmin) );
-      }
-  }
+  SIZE i,j,k; // indices
   
-  for (i = 1; i < nx; ++i)
+  auto f = [&](SIZE i, SIZE j, SIZE k)
   {
-    SIZE j = 0;
-    for (SIZE k = 0; k < nz; ++k)
-    {
-      StaticParticles &boundvec = m_grid[i][j][k].boundvec;
-      for (unsigned char n = 0; n < inflate; ++n)
-        for (unsigned char m = 0; m < inflate; ++m)
-          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i + d*n, 0, h*k + d*m) + bmin) );
+    Vector3R<REAL> pos( m_bmin[0] - pad + i*incx, 
+                        m_bmin[1] - pad + j*incy,
+                        m_bmin[2] - pad + k*incz );
+    m_grid( get_voxel_index(pos) ).boundvec.push_back(ParticleR<REAL>(pos));
+    //fprintf(stderr, "v %f %f %f\n", pos[0], pos[1], pos[2]);
+  };
 
-      if (k == nz-1)
-        for (unsigned char n = 0; n < inflate; ++n)
-          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i + d*n, 0, h*nz) + bmin) );
-    }
+  k = 0;
+  for (i = 0; i < nx; ++i)
+    for (j = 0; j < ny; ++j)
+      f(i,j,k);
+  k = nz;
+  for (i = nx; i > 0; --i)
+    for (j = ny; j > 0; --j)
+      f(i,j,k);
 
-    // cover strip where j=0
-    for (unsigned char n = 0; n < inflate; ++n)
-      for (unsigned char m = 1; m < inflate; ++m)
-      {
-        m_grid[i][j][0].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i + d*n, 0 + d*m, 0) + bmin) );
-        m_grid[i][j][nz-1].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i + d*n, 0 + d*m, h*nz) + bmin) );
-      }
+  j = 0;
+  for (i = nx; i > 0; --i)
+    for (k = nz; k > 0; --k)
+      f(i,j,k);
+  j = ny;
+  for (i = 0; i < nx; ++i)
+    for (k = 0; k < nz; ++k)
+      f(i,j,k);
 
-    for (j = 1; j < ny; ++j)
-    {
-      for (unsigned char n = 0; n < inflate; ++n)
-      {
-        for (unsigned char m = 0; m < inflate; ++m)
-        {
-          m_grid[i][j][0].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i+d*n, h*j+d*m, 0) + bmin) );
-          m_grid[i][j][nz-1].boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i+d*n, h*j+d*m, h*nz) + bmin) );
-        }
-      }
-    }
+  i = 0;
+  for (j = 0; j < ny; ++j)
+    for (k = nz; k > 0; --k)
+      f(i,j,k);
+  i = nx;
+  for (j = ny; j > 0; --j)
+    for (k = 0; k < nz; ++k)
+      f(i,j,k);
 
-    j = ny-1;
-    for (SIZE k = 0; k < nz; ++k)
-    {
-      StaticParticles &boundvec = m_grid[i][j][k].boundvec;
-      for (unsigned char n = 0; n < inflate; ++n)
-        for (unsigned char m = 0; m < inflate; ++m)
-          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i+d*n, h*ny, h*k+d*m) + bmin) );
-      if (k == nz-1)
-        for (unsigned char n = 0; n < inflate; ++n)
-          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*i+d*n, h*ny, h*nz) + bmin) );
-    }
-
-  } // for i
-
-  i = nx-1; // cap off the right side
-  for (SIZE j = 0; j < ny; ++j)
-    for (SIZE k = 0; k < nz; ++k)
-    {
-      StaticParticles &boundvec = m_grid[i][j][k].boundvec;
-      for (unsigned char n = 0; n < inflate; ++n)
-        for (unsigned char m = 0; m < inflate; ++m)
-          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*nx, h*j+d*n, h*k+d*m) + bmin) );
-      if (k == nz-1)
-        for (unsigned char n = 0; n < inflate; ++n)
-          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*nx, h*j+d*n, h*nz) + bmin) );
-      if (j == ny-1)
-        for (unsigned char n = 0; n < inflate; ++n)
-          boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*nx, h*ny, h*k+d*n) + bmin) );
-      if (j == ny-1 && k == nz-1)
-        boundvec.push_back( ParticleR<REAL>(Vector3R<REAL>(h*nx, h*ny, h*nz) + bmin) );
-    }
-
-#if 0
-  // check to make sure we didn't add the same particle twice
-  for (SIZE i = 0; i < nx; ++i)
-    for (SIZE j = 0; j < ny; ++j)
-      for (SIZE k = 0; k < nz; ++k)
-      {
-        StaticParticles &bv1 = m_grid[i][j][k].boundvec;
-        for (SIZE ni = 0; ni < nx; ++ni)
-          for (SIZE nj = 0; nj < ny; ++nj)
-            for (SIZE nk = 0; nk < nz; ++nk)
-            {
-              StaticParticles &bv2 = m_grid[ni][nj][nk].boundvec;
-              for (auto &p1 : bv1)
-              {
-                for (auto &p2 : bv2)
-                {
-                  if (&p1 == &p2)
-                    continue;
-                  if (p1.pos[0] == p2.pos[0] && p1.pos[1] == p2.pos[1] && p1.pos[2] == p2.pos[2])
-                    qDebug() << "cells " << i << j << k << " and " << ni << nj << nk;
-
-                }
-              }
-            }
-      }
-#endif
+  // two points not filled
+  f(0, ny, nz);
+  f(nx, 0, 0);
 }
 
 template<typename REAL, typename SIZE> template<int FT>
@@ -483,7 +379,61 @@ void UniformGridRS<REAL,SIZE>::run()
   float rdt = dt;
 
   bool all_cached = true;
+
+  for (int j = 0; j < NUMTYPES; ++j)
+    for (auto &fl : m_fluids[j])
+      all_cached &= fl->load_saved_cache();
   
+  if (!all_cached)
+  {
+    // Initialize the fluid for init_steps steps before simulating
+    // temporarily disable gravity
+    Vector3f grav = global::dynset.gravity;
+    global::dynset.gravity = Vector3f(0.0,0.0,0.0);
+    for (unsigned int iter = 0; iter < global::dynset.init_steps; ++iter)
+    { // for each simulation substep
+
+      update_grid(); // prepare grid for simulation step
+
+      FTiter<REAL,SIZE,DEFAULT>::compute_density(*this);
+      FTiter<REAL,SIZE,DEFAULT>::compute_accel(*this); // update m_accel
+
+      float factor = 1.0f; // leap-frog method has a different first step
+      if (iter == 0)
+        factor = 0.5f;
+
+      for (int j = 0; j < NUMTYPES; ++j)
+      {
+        for (auto &fl : m_fluids[j])
+        {
+          fl->get_vel() = fl->get_vel() + factor*dt*fl->get_accel();
+          fl->get_pos() = (fl->get_pos() + dt*fl->get_vel()).eval();
+          if (j == MCG03)
+            fl->resolve_collisions();
+
+          // prepare velocities for acceleration computation in next step
+          fl->get_vel() = fl->get_vel() + 0.5*dt*fl->get_accel();
+        }
+      }
+
+      if (m_stop_requested) break;
+
+      for (int j = 0; j < NUMTYPES; ++j)
+        for (auto &fl : m_fluids[j])
+          fl->update_data(); // notify gl we have new positions
+
+    } // for each substep
+
+    global::dynset.gravity = grav; // restore gravity
+
+    if (m_stop_requested)
+      return;
+
+    for (int j = 0; j < NUMTYPES; ++j)
+      for (auto &fl : m_fluids[j])
+        fl->cache(0);
+  }
+
   real_t start_time;
   float file_read_t = 0.0f;
   float frame_t = 0.0f;
@@ -571,7 +521,7 @@ void UniformGridRS<REAL,SIZE>::run()
         substep_t += float(clock() - prev_t) / CLOCKS_PER_SEC;
 
         float factor = 1.0f; // leap-frog method has a different first step
-        if (iter == 0 && frame == 1)
+        if (iter == 0 && frame == 1 && global::dynset.init_steps == 0)
           factor = 0.5f;
 
         for (int j = 0; j < NUMTYPES; ++j)
@@ -580,7 +530,8 @@ void UniformGridRS<REAL,SIZE>::run()
           {
             fl->get_vel() = fl->get_vel() + factor*dt*fl->get_accel();
             fl->get_pos() = (fl->get_pos() + dt*fl->get_vel()).eval();
-            fl->resolve_collisions();
+            if (j == MCG03)
+              fl->resolve_collisions();
 
             // prepare velocities for acceleration computation in next step
             fl->get_vel() = fl->get_vel() + 0.5*dt*fl->get_accel();

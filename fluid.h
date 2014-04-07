@@ -35,6 +35,12 @@ template<typename REAL, typename SIZE>
 class FluidRS : public PointCloudRS<REAL,SIZE>
 {
 public:
+  // explicitly state that we use some base class members (convenience)
+  using PointCloudRS<REAL,SIZE>::get_radius;
+  using PointCloudRS<REAL,SIZE>::pos_at;
+  using PointCloudRS<REAL,SIZE>::m_pos;
+  using PointCloudRS<REAL,SIZE>::m_bbox;
+
   struct __attribute__ ((__packed__)) CachedFrame
   {
     Matrix3XR<REAL> pos;
@@ -51,12 +57,6 @@ public:
   explicit FluidRS(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params);
   explicit FluidRS(const aiMesh *pc, FluidParamsPtr params);
   ~FluidRS();
-
-  // explicitly state that we use some base class members (convenience)
-  using PointCloudRS<REAL,SIZE>::get_radius;
-  using PointCloudRS<REAL,SIZE>::pos_at;
-  using PointCloudRS<REAL,SIZE>::m_pos;
-  using PointCloudRS<REAL,SIZE>::m_bbox;
 
   void init(GLPointCloudRS<REAL, SIZE> *glpc);
 
@@ -115,6 +115,7 @@ public:
   void clear_saved();
   inline void save(unsigned int frame);
   inline bool is_saved(unsigned int frame);
+  inline bool load_saved_cache();
   inline bool read_saved(unsigned int frame);
 
   void clear_cache();

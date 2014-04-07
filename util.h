@@ -181,10 +181,12 @@ loadScene( const std::string &filename )
     global::dynset.frames = 250;
     global::dynset.substeps = 10;
     global::dynset.savedir = "";
+    global::dynset.init_steps = 0;
     cfg.lookupValue("dynamics.fps", global::dynset.fps);
     cfg.lookupValue("dynamics.frames", global::dynset.frames);
     cfg.lookupValue("dynamics.substeps", global::dynset.substeps);
     cfg.lookupValue("dynamics.savedir", global::dynset.savedir);
+    cfg.lookupValue("dynamics.init_steps", global::dynset.init_steps);
 
     global::dynset.gravity = Vector3f(0.0f,-9.81f,0.0f);
     try
@@ -220,6 +222,9 @@ loadScene( const std::string &filename )
     cfg.lookupValue("scene.rotation.x", global::sceneset.rotx);
     cfg.lookupValue("scene.rotation.y", global::sceneset.roty);
     
+    global::sceneset.normalize = true;
+    cfg.lookupValue("scene.normalize", global::sceneset.normalize);
+
     std::string objdir = cfg.lookup("scene.objdir");
     libconfig::Setting& objset = cfg.lookup("scene.objects");
 
@@ -232,33 +237,43 @@ loadScene( const std::string &filename )
     {
       try
       {
-        std::string dynfile = objset[i]["dynfile"];
-
-        DynParamsPtr params_ptr(loadDynamics( objdir + "/" + dynfile ));
-
         std::string objfile = objset[i]["objfile"];
-        
-        if (params_ptr)
+        DynParamsPtr params_ptr(NULL);
+        try
         {
-          size_t start = objfile.find_last_of("/");
-          size_t end = objfile.find_last_of(".");
-          if( start == std::string::npos )
-            start = -1;
+          std::string dynfile = objset[i]["dynfile"];
 
-          size_t startd = dynfile.find_last_of("/");
-          size_t endd = dynfile.find_last_of(".");
-          if( startd == std::string::npos )
-            startd = -1;
+          params_ptr = DynParamsPtr(loadDynamics( objdir + "/" + dynfile ));
+          if (params_ptr)
+          {
+            size_t start = objfile.find_last_of("/");
+            size_t end = objfile.find_last_of(".");
+            if( start == std::string::npos )
+              start = -1;
 
-          size_t startf = filename.find_last_of("/");
-          size_t endf = filename.find_last_of(".");
-          if( startf == std::string::npos )
-            startf = -1;
+            size_t startd = dynfile.find_last_of("/");
+            size_t endd = dynfile.find_last_of(".");
+            if( startd == std::string::npos )
+              startd = -1;
 
-          params_ptr->saveprefix = 
-            filename.substr(startf+1, endf - startf - 1) + 
-            dynfile.substr(startd+1, endd - startd - 1) + 
-            objfile.substr(start+1, end - start - 1);
+            size_t startf = filename.find_last_of("/");
+            size_t endf = filename.find_last_of(".");
+            if( startf == std::string::npos )
+              startf = -1;
+
+            params_ptr->saveprefix = 
+              filename.substr(startf+1, endf - startf - 1) + 
+              dynfile.substr(startd+1, endd - startd - 1) + 
+              objfile.substr(start+1, end - start - 1);
+          }
+        }
+        catch (libconfig::SettingTypeException &te)
+        {
+          qWarning() << "Setting " << te.getPath() << "has the wrong type!";
+        }
+        catch (libconfig::SettingNotFoundException &nfe)
+        {
+          qWarning() << "Setting " << nfe.getPath() << "not found!";
         }
 
         SceneNode *obj = loadObject( objdir + "/" + objfile, params_ptr );
