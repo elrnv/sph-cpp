@@ -169,7 +169,7 @@ void UniformGridRS<REAL,SIZE>::populate_fluid_data()
 template<typename REAL, typename SIZE>
 void UniformGridRS<REAL,SIZE>::populate_bound_data()
 {
-  unsigned char particles_per_cell_length = 2;
+  unsigned char particles_per_cell_length = 4;
 
   // place boundary particles slightly away from the actual boundary
   float pad = 0.5f*3.0f*m_h;

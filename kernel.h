@@ -12,7 +12,7 @@ public:
 
   inline void init(float _h) 
   { 
-    h = _h; h2 = h*h; h3 = h2*h; h4 = h3*h; 
+    h = _h; h2 = h*h; h3 = h2*h; h4 = h3*h; hinv = 1.0f/h; hinv2 = hinv*hinv;
     static_cast<KernelType*>(this)->init_coef();
   } 
 
@@ -33,7 +33,7 @@ public:
   inline double pow2(double x) { return x*x; }
 
   // precompute values
-  float h, h2, h3, h4;
+  float h, h2, h3, h4, hinv, hinv2;
 };
 
 template<typename KernelType>
@@ -48,7 +48,7 @@ struct MKI04Kernel : public Kerneld<MKI04Kernel>
   
   inline double kern(const Vector3d &r)
   {
-    double q = r.norm()/h;
+    double q = r.norm()*hinv;
 
     if (q >= 0 && q < 2)
     {
@@ -68,18 +68,18 @@ struct MKI04Kernel : public Kerneld<MKI04Kernel>
 
 struct CubicSplineKernel : public Kerneld<CubicSplineKernel>
 {
-  inline void init_coef() { coef = 1.0f/(4.0f*M_PI*h3); }
+  inline void init_coef() { coef = 16.0f/(M_PI*h3); }
   
   inline double kern(const Vector3d &r)
   {
-    double q = r.norm();
+    double q = r.norm()*hinv;
 
-    if (q >= 0 && q < 2)
+    if (q >= 0 && q < 1)
     {
-      if (q <= 1)
-        return pow3(2 - q) - 4.0f*pow3(1 - q);
+      if (q <= 0.5)
+        return pow3(1 - q) - 4.0f*pow3(0.5f - q);
 
-      return pow3(2 - q);
+      return pow3(1 - q);
     }
 
     return 0;
@@ -89,18 +89,18 @@ struct CubicSplineKernel : public Kerneld<CubicSplineKernel>
 
 struct CubicSplineGradKernel : public Kernel3d<CubicSplineGradKernel>
 {
-  inline void init_coef() { coef = 3.0f/(4.0f*M_PI*h3); }
+  inline void init_coef() { coef = 48.0f/(M_PI*h4*h); }
   
   inline Vector3d kern(const Vector3d &r)
   {
-    double q = r.norm();
+    double q = r.norm()*hinv;
 
-    if (q > 0 && q < 2)
+    if (q > 0 && q < 1)
     {
-      if (q <= 1)
-        return -r*((pow2(2 - q) - 4.0f*pow2(1 - q))/q);
+      if (q <= 0.5)
+        return -r*((pow2(1 - q) - 4.0f*pow2(0.5f - q))/q);
 
-      return -r*(pow2(2 - q)/q);
+      return -r*(pow2(1 - q)/q);
     }
 
     return Vector3d(0.0f, 0.0f, 0.0f);
@@ -108,37 +108,58 @@ struct CubicSplineGradKernel : public Kernel3d<CubicSplineGradKernel>
 
 }; // CubicSplineGradKernel
 
+struct CubicSplineLapKernel : public Kerneld<CubicSplineLapKernel>
+{
+  inline void init_coef() { coef = 96.0f/(M_PI*h4*h); }
+  
+  inline double kern(const Vector3d &r)
+  {
+    double q = r.norm()*hinv;
+
+    if (q > 0 && q < 1)
+    {
+      if (q <= 0.5)
+        return 3.0f*(2.0f*q - 1.0f);
+
+      return (1.0f - 2*q)*(q - 1.0f)/q;
+    }
+
+    return 0;
+  }
+
+}; // CubicSplineLapKernel
+
 struct Poly6Kernel : public Kerneld<Poly6Kernel>
 {
-  inline void init_coef() { coef = 315.0f/(64*M_PI*h3*h3*h3); }
+  inline void init_coef() { coef = 315.0f/(64*M_PI*h3); }
   
   // main kernel without coefficient
   inline double kern(const Vector3d &r)
   {
-    double r2 = r.squaredNorm();
-    return r2 <= h2 ? pow3(h2 - r2) : 0;
+    double q2 = r.squaredNorm()*hinv2;
+    return q2 <= 1 ? pow3(1 - q2) : 0;
   }
 }; // Poly6Kernel
 
 struct Poly6GradKernel : public Kernel3d<Poly6GradKernel>
 {
-  inline void init_coef() { coef = 1890.0f/(64*M_PI*h3*h3*h3); }
+  inline void init_coef() { coef = 1890.0f/(64*M_PI*h3*h2); }
 
   inline Vector3d kern(const Vector3d &r)
   {
-    double r2 = r.squaredNorm();
-    return r2 <= h2 ? -r*pow2(h2-r2) : Vector3d(0,0,0);
+    double q2 = r.squaredNorm()*hinv2;
+    return q2 <= 1 ? -r*pow2(1-q2) : Vector3d(0,0,0);
   }
 }; // Poly6GradKernel
 
 struct Poly6LapKernel : public Kerneld<Poly6LapKernel>
 {
-  inline void init_coef() { coef = 1890.0f/(64*M_PI*h3*h3*h3); }
+  inline void init_coef() { coef = 1890.0f/(64*M_PI*h3*h2); }
 
   inline double kern(const Vector3d &r)
   {
-    double r2 = r.squaredNorm();
-    return r2 <= h2 ? (h2-r2)*(7*r2 - 3*h2) : 0;
+    double q2 = r.squaredNorm()*hinv2;
+    return q2 <= 1 ? (1.0f-q2)*(7*q2 - 3.0f) : 0;
   }
 }; // Poly6LapKernel
 

@@ -76,11 +76,11 @@ void CFDensityRST<REAL,SIZE,FT>::fluid(FluidParticleR<REAL> &p, FluidParticleR<R
 template<typename REAL, typename SIZE, int FT>
 void CFDensityRST<REAL,SIZE,FT>::bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p)
 {
-  if (FT == BT07)
-    return;
+  //if (FT == BT07)
+  //  return;
 
-  p.dinv += this->m_rest_density * near_p.dinv * this->m_kern[ p.pos - near_p.pos ];
-  p.vol += this->m_kern[ p.pos - near_p.pos ];
+  //p.dinv += this->m_rest_density * near_p.dinv * this->m_kern[ p.pos - near_p.pos ];
+  //p.vol += this->m_kern[ p.pos - near_p.pos ];
 }
 template<typename REAL, typename SIZE, int FT>
 void CFDensityRST<REAL,SIZE,FT>::finish_particle(FluidParticleR<REAL> &p)
@@ -103,12 +103,12 @@ void CFDensityRST<REAL,SIZE,FT>::finish_particle(FluidParticleR<REAL> &p)
     *max_var = var;
   *avg_var += var;
 
-#if 1
+#if 0
     p.pressure = this->m_cs2 * (1.0f/p.dinv - this->m_rest_density);
 #else
   p.pressure =
     this->m_rest_density * this->m_cs2 * 0.14285714285714 * 
-    (pow7(1.0f / (p.dinv * this->m_rest_density)) - 1);
+    (pow7(1.0f / (p.dinv * this->m_rest_density)) - 1.0f);
 #endif
 }
 
@@ -200,18 +200,23 @@ public:
     if (&p == &near_p)
       return;
     
+    Vector3R<REAL> v_ab(p.vel - near_p.vel);
+    Vector3R<REAL> x_ab(p.pos - near_p.pos);
+
     Vector3R<REAL> res(
     // pressure
-         -0.5 * near_p.dinv * (p.pressure + near_p.pressure) 
-              * m_spikygrad_kern(p.pos - near_p.pos)
+         0.5 * near_p.dinv * (p.pressure + near_p.pressure) 
+              * m_spikygrad_kern(x_ab)
            +
     // viscosity
-          this->m_viscosity * near_p.dinv * (near_p.vel - p.vel) 
-              * m_visclap_kern(p.pos - near_p.pos)
+//          (v_ab.dot(x_ab) < 0 ? 
+          this->m_viscosity * near_p.dinv * v_ab
+              * m_visclap_kern(x_ab) 
+             // : Vector3R<REAL>(0.0,0.0,0.0))
     );
 
     for (unsigned char i = 0; i < 3; ++i)
-      p.accel[i] += res[i]; // copy intermediate result
+      p.accel[i] -= res[i]; // copy intermediate result
 
     // surface tension
     p.n = p.n + near_p.dinv * m_colorgrad_kern(p.pos - near_p.pos);
@@ -270,11 +275,11 @@ public:
 
     Vector3R<REAL> x_ab = p.pos - near_p.pos;
     REAL vx = x_ab.dot(p.vel - near_p.vel);
-    if (vx < 0) // compute damping term
+    if (vx < 0)
     {
       REAL nu = 2*this->m_viscosity*m_maingrad_kern.h*this->m_cs 
               * p.dinv * near_p.dinv / (p.dinv + near_p.dinv);
-      res -= nu*vx / (x_ab.squaredNorm() + 0.01*m_maingrad_kern.h*m_maingrad_kern.h);
+      res -= nu*vx / (x_ab.squaredNorm() + 0.01*m_maingrad_kern.h2);
     }
 
     p.n = p.n - res * m_maingrad_kern(x_ab);
@@ -318,9 +323,9 @@ public:
   }
 private:
   SpikyGradKernel m_spikygrad_kern;
-  Poly6GradKernel m_maingrad_kern;
+  CubicSplineGradKernel m_maingrad_kern;
   MKI04Kernel     m_bound_kern;
-  Poly6Kernel m_st_kern;
+  CubicSplineKernel m_st_kern;
 }; // CFAccel
 
 template<typename REAL, typename SIZE, int FT>
