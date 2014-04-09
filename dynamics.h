@@ -195,6 +195,17 @@ public:
     }
   }
 
+  bool check_and_write_hash();
+
+  friend std::size_t hash_value( const UniformGridRS<REAL,SIZE> &ug )
+  {
+    std::size_t seed = 0;
+    for (int j = 0; j < NUMTYPES; ++j)
+      for (auto &fl : ug.m_fluids[j])
+        boost::hash_combine(seed, hash_value(*fl));
+    return seed;
+  }
+
   friend FTiter<REAL,SIZE,NOTFLUID>;
   friend FTiter<REAL,SIZE,DEFAULT>;
   friend FTiter<REAL,SIZE,MCG03>;

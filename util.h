@@ -167,6 +167,18 @@ loadObject( const std::string &filename, DynParamsPtr params_ptr )
   return processScene(scene, scene->mRootNode, params_ptr);
 }
 
+// helper function to find the root filename from the path
+std::string
+extractRoot( const std::string &path )
+{
+  size_t start = path.find_last_of("/");
+  size_t end = path.find_last_of(".");
+  if( start == std::string::npos )
+    start = -1;
+
+  return path.substr(start+1, end - start - 1);
+}
+
 SceneNode *
 loadScene( const std::string &filename )
 {
@@ -199,6 +211,11 @@ loadScene( const std::string &filename )
       qWarning() << "Setting " << te.getPath() << "has the wrong type!";
     }
     catch (libconfig::SettingNotFoundException &nfe) { }
+
+    global::dynset.hashfile = "";
+    if (!global::dynset.savedir.empty()) 
+      global::dynset.hashfile = 
+        global::dynset.savedir + "/" + extractRoot(filename) + ".hash";
 
     global::sceneset.padx = Vector2f(0,0);
     global::sceneset.pady = Vector2f(0,0);
@@ -246,25 +263,10 @@ loadScene( const std::string &filename )
           params_ptr = DynParamsPtr(loadDynamics( objdir + "/" + dynfile ));
           if (params_ptr)
           {
-            size_t start = objfile.find_last_of("/");
-            size_t end = objfile.find_last_of(".");
-            if( start == std::string::npos )
-              start = -1;
-
-            size_t startd = dynfile.find_last_of("/");
-            size_t endd = dynfile.find_last_of(".");
-            if( startd == std::string::npos )
-              startd = -1;
-
-            size_t startf = filename.find_last_of("/");
-            size_t endf = filename.find_last_of(".");
-            if( startf == std::string::npos )
-              startf = -1;
-
             params_ptr->saveprefix = 
-              filename.substr(startf+1, endf - startf - 1) + 
-              dynfile.substr(startd+1, endd - startd - 1) + 
-              objfile.substr(start+1, end - start - 1);
+              extractRoot(filename) +
+              extractRoot(dynfile) +
+              extractRoot(objfile);
           }
         }
         catch (libconfig::SettingTypeException &te)

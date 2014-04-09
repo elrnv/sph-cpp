@@ -175,6 +175,7 @@ inline bool FluidRS<REAL,SIZE>::is_saved(unsigned int frame)
   return true;
 }
 
+
 // return true if loaded, false otherwise
 template<typename REAL, typename SIZE>
 inline bool FluidRS<REAL,SIZE>::load_saved_cache()

@@ -1,6 +1,8 @@
 #include <ctime>
 #include <algorithm>
 #include <limits>
+#include <fstream>
+#include <iomanip>
 #include "dynamics.h"
 #include "glpointcloud.h"
 #include "gltext.h"
@@ -378,11 +380,12 @@ void UniformGridRS<REAL,SIZE>::run()
   glprintf_tr("step: %.2es\n", dt);
   float rdt = dt;
 
-  bool all_cached = true;
+  bool all_cached = check_and_write_hash();
 
-  for (int j = 0; j < NUMTYPES; ++j)
-    for (auto &fl : m_fluids[j])
-      all_cached &= fl->load_saved_cache();
+  if (all_cached) // try to load cached frames into the fluid objects
+    for (int j = 0; j < NUMTYPES; ++j)
+      for (auto &fl : m_fluids[j])
+        all_cached &= fl->load_saved_cache();
   
   if (!all_cached)
   {
@@ -581,6 +584,40 @@ void UniformGridRS<REAL,SIZE>::run()
     }
   }
 
+}
+
+template<typename REAL, typename SIZE>
+inline bool UniformGridRS<REAL,SIZE>::check_and_write_hash() 
+{
+  if (global::dynset.savedir.empty())
+    return false;
+
+  // open save hash file
+  std::fstream fs(global::dynset.hashfile, std::fstream::in );
+
+  std::size_t savedhash = 0;
+
+  if (fs.is_open())
+  {
+    fs >> std::hex >> savedhash;
+    fs.close();
+  }
+
+  fs.open(global::dynset.hashfile, std::fstream::out);
+
+  std::size_t curhash = 0;
+  boost::hash_combine(curhash, hash_value(global::dynset));
+  boost::hash_combine(curhash, hash_value(global::sceneset));
+  boost::hash_combine(curhash, hash_value(*this));
+
+  fs.seekp(0);
+  fs << std::setfill('0') << std::setw(sizeof(std::size_t) >> 1) << std::hex << curhash;
+  fs.close();
+
+  if (savedhash == curhash)
+    return true;
+
+  return false;
 }
 
 template class UniformGridRS<double, unsigned int>;

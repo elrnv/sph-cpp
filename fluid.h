@@ -90,6 +90,9 @@ public:
   inline REAL get_sound_speed2() const    { return m_c2; }
   inline FluidType get_type() const       { return m_params->fluid_type; }
 
+  friend std::size_t hash_value( const FluidRS<REAL,SIZE> &fl ) 
+  { return hash_value(*(fl.m_params)); }
+
   inline Vector3f get_color() const 
   { 
     const QVector3D &diffuse = m_glpc->get_diffuse();

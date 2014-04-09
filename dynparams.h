@@ -2,6 +2,7 @@
 #define DYNPARAMS_H
 
 #include <boost/shared_ptr.hpp>
+#include <boost/functional/hash.hpp>
 #include <string>
 #include "eigen.h"
 
@@ -29,6 +30,19 @@ struct DynParams
   { }
 
   ~DynParams() { }
+
+  friend std::size_t hash_value( const DynParams &dp )
+  {
+    std::size_t seed = 0;
+    boost::hash_combine(seed, int(dp.type));
+    boost::hash_combine(seed, dp.velocity[0]);
+    boost::hash_combine(seed, dp.velocity[1]);
+    boost::hash_combine(seed, dp.velocity[2]);
+    boost::hash_combine(seed, dp.angular_velocity[0]);
+    boost::hash_combine(seed, dp.angular_velocity[1]);
+    boost::hash_combine(seed, dp.angular_velocity[2]);
+    return seed;
+  }
 };
 
 
@@ -74,10 +88,25 @@ struct FluidParams : public DynParams
   }
 
   ~FluidParams() { }
+
+  friend std::size_t hash_value( const FluidParams &fp )
+  {
+    std::size_t seed = 0;
+    boost::hash_combine(seed, int(fp.fluid_type));
+    boost::hash_combine(seed, fp.density);
+    boost::hash_combine(seed, fp.viscosity);
+    boost::hash_combine(seed, fp.surface_tension);
+    boost::hash_combine(seed, fp.sound_speed);
+    boost::hash_combine(seed, fp.compressibility);
+    boost::hash_combine(seed, fp.kernel_inflation);
+    boost::hash_combine(seed, fp.recoil_velocity_damping);
+    boost::hash_combine(seed, hash_value(static_cast<const DynParams &>(fp)));
+    return seed;
+  }
 };
 
 // DynParams should not need to be owned by anybody
-typedef boost::shared_ptr<DynParams> DynParamsPtr;
+typedef boost::shared_ptr<DynParams>   DynParamsPtr;
 typedef boost::shared_ptr<FluidParams> FluidParamsPtr;
 
 #endif // DYNPARAMS_H
