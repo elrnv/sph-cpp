@@ -40,11 +40,13 @@ void SimWindow::toggle_shortcuts()
   glprintf_blc(RED,  "    G - pause/resume\n");
   glprintf_blc(RED,  "    C - clear cache\n");
   glprintf_blc(CYAN, "    H - show/hide halos\n");
+  glprintf_blc(CYAN, "    B - show/hide bounding box\n");
 }
 
 SimWindow::SimWindow()
   : m_show_shortcuts(true) // immediately toggled below
   , m_dynamics(false)
+  , m_show_bbox(true)
   , m_grid(NULL)
   , m_viewmode(ShaderManager::ADDITIVE_PARTICLE)
   , m_change_prog(true)
@@ -167,6 +169,11 @@ void SimWindow::reset_viewmode()
   }
 }
 
+void SimWindow::toggle_bbox()
+{
+  m_show_bbox = !m_show_bbox;
+  renderLater();
+}
 void SimWindow::toggle_halos()
 {
   for ( auto &glprim : m_glprims )
@@ -248,7 +255,8 @@ void SimWindow::render()
 
   glFinish(); // Finish writing uniform buffer before drawing
 
-  draw_bbox();
+  if (m_show_bbox)
+    draw_bbox();
 
   glFinish();
   reset_viewmode();
@@ -355,6 +363,9 @@ void SimWindow::keyPressEvent(QKeyEvent *event)
       break;
     case Qt::Key_A:
       change_viewmode(ViewMode::ADDITIVE_PARTICLE);
+      break;
+    case Qt::Key_B:
+      toggle_bbox();
       break;
     case Qt::Key_1: load_model(1); break;
     case Qt::Key_2: load_model(2); break;

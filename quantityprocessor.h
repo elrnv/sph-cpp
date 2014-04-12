@@ -52,6 +52,9 @@ public:
     m_st = fl.get_surface_tension();
     m_cs2 = fl.get_sound_speed2();
     m_cs = std::sqrt(m_cs2);
+    m_compressibility = fl.get_compressibility();
+    m_bmin = fl.get_bmin();
+    m_bmax = fl.get_bmax();
   }
 
 protected:
@@ -62,6 +65,9 @@ protected:
   REAL m_st;
   REAL m_cs2;
   REAL m_cs;
+  REAL m_compressibility;
+  Vector3f m_bmin;
+  Vector3f m_bmax;
 };
 
 template<typename REAL, typename SIZE, class ComputeType>

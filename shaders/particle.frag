@@ -40,7 +40,7 @@ void main()
 
   vec3 E = normalize((eye - frag.pos).xyz);
   vec2 rel_whole = 2.0*(gl_PointCoord - vec2(0.5));
-  vec2 rel = 0.9*(1/frag.halo_ratio)*rel_whole;
+  vec2 rel = (1/frag.halo_ratio)*rel_whole;
 
   float len_rel = length(rel_whole);
   if (len_rel < frag.halo_ratio)
@@ -64,9 +64,9 @@ void main()
 
     frag_color = vec4((ambient + acc), opacity);
   }
-  else if (len_rel < 1 && len_rel > 0.95)
+  else if (len_rel < 1 && len_rel > 0.97)
   {
-    frag_color = vec4(0.2*(ambient + lights[0].col.xyz), opacity);
+    frag_color = vec4(0.2*(ambient + 1.5*frag.dimming*lights[0].col.xyz), opacity);
   }
   else
     discard;

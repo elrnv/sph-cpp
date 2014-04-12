@@ -291,24 +291,118 @@ public:
   }
   inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p)
   {
-    // pressure contribution from boundary particles
-    float massb = this->m_rest_density * near_p.dinv;
-    Vector3R<REAL> x_ab = p.pos - near_p.pos;
-    REAL kern = m_bound_kern(x_ab);
+    // BT07 fluids dont interact with static boundary particles, instead they
+    // mirror fluid particles on the boundary, and compute repulsion forces
+    // this way (in the finish_particle method)
+  }
+  inline void finish_particle(FluidParticleR<REAL> &p)
+  {
+    // if the particle is close to the boundary and add a repulsive force
+    // (assume boundary particle is infinitely more massive than the fluid
+    // particle, such that m_b / (m_a + m_b) == 1 where m_a and m_b are the
+    // masses of the fluid and boundary particles respectively
+    Vector3R<REAL> hvec(m_bound_kern.h,m_bound_kern.h,m_bound_kern.h);
+    Vector3R<REAL> res(0.0f, 0.0f, 0.0f);
+    Vector3R<REAL> dmin =  // distances to min boundaries
+       hvec + p.pos - this->m_bmin.template cast<REAL>();
+    Vector3R<REAL> dmax =  // distances to max boundaries
+      hvec + this->m_bmax.template cast<REAL>() - p.pos;
+    if ( dmin[0] < m_bound_kern.h )
+      res[0] += m_bound_kern(Vector3d(dmin[0],0,0));// / dmin[0];
+    else if ( dmax[0] < m_bound_kern.h)
+      res[0] -= m_bound_kern(Vector3d(dmax[0],0,0));// / dmax[0];
 
-    if (0 && x_ab.norm() < 1.5f*m_bound_kern.h)
+    if ( dmin[1] < m_bound_kern.h )
+      res[1] += m_bound_kern(Vector3d(dmin[1],0,0));// / dmin[1];
+    else if ( dmax[1] < m_bound_kern.h)
+      res[1] -= m_bound_kern(Vector3d(dmax[1],0,0));// / dmax[1];
+
+    if ( dmin[2] < m_bound_kern.h )
+      res[2] += m_bound_kern(Vector3d(dmin[2],0,0));// / dmin[2];
+    else if ( dmax[2] < m_bound_kern.h)
+      res[2] -= m_bound_kern(Vector3d(dmax[2],0,0));// / dmax[2];
+
+    p.n = p.n + this->m_compressibility*this->m_cs2*res;
+
+    p.extern_accel[0] += global::dynset.gravity[0];
+    p.extern_accel[1] += global::dynset.gravity[1];
+    p.extern_accel[2] += global::dynset.gravity[2];
+    for (unsigned char i = 0; i < 3; ++i)
     {
-      qDebug() << "xab = "  << x_ab[0] << x_ab[1] << x_ab[2];
-      qDebug() << "xab.norm = "  << x_ab.norm();
-      qDebug() << "h = "  << m_bound_kern.h;
-      qDebug() << "massb = "  << massb;
-      qDebug() << "kern = " << kern;
+      p.extern_accel[i] += this->m_mass * p.n[i];
+      p.accel[i] += p.extern_accel[i];
     }
-    Vector3R<REAL> res(
-        (this->m_cs2*massb/(this->m_mass + massb)) 
-        * x_ab * kern / x_ab.squaredNorm());
+  }
+private:
+  SpikyGradKernel m_spikygrad_kern;
+  CubicSplineGradKernel m_maingrad_kern;
+  MKI04Kernel     m_bound_kern;
+  CubicSplineKernel m_st_kern;
+}; // CFAccel
 
-    p.n = p.n + res;
+
+template<typename REAL, typename SIZE>
+class CFAccelRST<REAL,SIZE,ICS13> : public CFQ<REAL,SIZE,CFAccelRST<REAL,SIZE,ICS13> >
+{
+public:
+  inline void init_kernel(float h)
+  {
+    m_maingrad_kern.init(h);
+    m_spikygrad_kern.init(h);
+    m_bound_kern.init(h);
+    m_st_kern.init(h);
+  }
+  inline void init_particle(FluidParticleR<REAL> &p)
+  {
+    p.n[0] = p.n[1] = p.n[2] = 0.0f;
+  }
+
+  inline void fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p)
+  {
+    if (&p == &near_p)
+      return;
+
+    // pressure
+
+    REAL res(p.pressure*p.dinv*p.dinv + near_p.pressure*near_p.dinv*near_p.dinv);
+
+    // viscosity
+
+    Vector3R<REAL> x_ab = p.pos - near_p.pos;
+    REAL vx = x_ab.dot(p.vel - near_p.vel);
+    if (vx < 0)
+    {
+      REAL nu = 2*this->m_viscosity*m_maingrad_kern.h*this->m_cs 
+              * p.dinv * near_p.dinv / (p.dinv + near_p.dinv);
+      res -= nu*vx / (x_ab.squaredNorm() + 0.01*m_maingrad_kern.h2);
+    }
+
+    p.n = p.n - res * m_maingrad_kern(x_ab);
+    
+    // surface tension 
+    // (apply surface tension only to particles from the same phase)
+    if (p.id == near_p.id)
+      p.n = p.n - this->m_st * m_st_kern(x_ab) * x_ab;
+  }
+  inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p)
+  {
+    // pressure contribution from boundary particles
+    //float massb = this->m_rest_density * near_p.dinv;
+    //Vector3R<REAL> x_ab = p.pos - near_p.pos;
+    //Vector3d kern = m_bound_kern(x_ab);
+
+    //if (0 && x_ab.norm() < 1.5f*m_bound_kern.h)
+    //{
+    //  qDebug() << "xab = "  << x_ab[0] << x_ab[1] << x_ab[2];
+    //  qDebug() << "xab.norm = "  << x_ab.norm();
+    //  qDebug() << "h = "  << m_bound_kern.h;
+    //  qDebug() << "massb = "  << massb;
+    //  qDebug() << "kern = " << kern[0] << kern[1] << kern[2];
+    //}
+    //Vector3R<REAL> res(
+    //    (this->m_cs2*massb/(this->m_mass + massb)) * kern / x_ab.norm());
+
+    //p.n = p.n + res;
   }
   inline void finish_particle(FluidParticleR<REAL> &p)
   {

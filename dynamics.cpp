@@ -96,7 +96,7 @@ void UniformGridRS<REAL,SIZE>::init()
       {
         case 1: glprintf_trcv(fl->get_color(), "MCG03"); break;
         case 2: glprintf_trcv(fl->get_color(), "BT07"); break;
-        case 3: glprintf_trcv(fl->get_color(), "AIAST12"); break;
+        case 3: glprintf_trcv(fl->get_color(), "ICS13"); break;
         default: break;
       }
       glprintf_trcv(fl->get_color(), "--- \n");
@@ -174,7 +174,7 @@ void UniformGridRS<REAL,SIZE>::populate_bound_data()
   unsigned char particles_per_cell_length = 4;
 
   // place boundary particles slightly away from the actual boundary
-  float pad = 0.5f*3.0f*m_h;
+  float pad = m_h;
 
   SIZE nx = particles_per_cell_length*(m_gridsize[0]+2);
   SIZE ny = particles_per_cell_length*(m_gridsize[1]+2);

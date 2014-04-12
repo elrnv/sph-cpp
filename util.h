@@ -114,8 +114,8 @@ loadDynamics( const std::string &filename )
             fparams.fluid_type = MCG03;
           else if (boost::iequals(fluid_type, "bt07"))
             fparams.fluid_type = BT07;
-          else if (boost::iequals(fluid_type, "aiast12"))
-            fparams.fluid_type = AIAST12;
+          else if (boost::iequals(fluid_type, "ics13"))
+            fparams.fluid_type = ICS13;
         }
         else if (boost::iequals(var_name, "d"))
           iss >> fparams.density;

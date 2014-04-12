@@ -44,23 +44,24 @@ using Kernel3d = Kernel<Vector3d, KernelType>;
 
 struct MKI04Kernel : public Kerneld<MKI04Kernel>
 {
-  inline void init_coef() { coef = 0.02; }
+  inline void init_coef() { coef = (27.0f/11.0f)*hinv; }
   
   inline double kern(const Vector3d &r)
   {
-    double q = r.norm()*hinv;
+    // only use the first coordinate (reusing Kernel class for something else)
+    double q = r[0]*hinv; 
 
-    if (q >= 0 && q < 2)
+    if (q < 1)
     {
-      if (3.0f*q < 2.0f)
-        return 2.0f/3.0f;
-      if (q < 1)
-        return (2*q - (3.0f/2.0f)*q*q);
+      if (3.0f*q < 1)
+        return 1.0f/3.0f;
+      if (q < 0.5)
+        return 2.0f*q - 3.0f*q*q;
 
-      return 0.5*pow2(2 - q);
+      return pow2(1 - q);
     }
 
-    return 0;
+    return 0.0f;
   }
 
 }; // MKI04Kernel
@@ -74,10 +75,10 @@ struct CubicSplineKernel : public Kerneld<CubicSplineKernel>
   {
     double q = r.norm()*hinv;
 
-    if (q >= 0 && q < 1)
+    if (q < 1)
     {
       if (q <= 0.5)
-        return pow3(1 - q) - 4.0f*pow3(0.5f - q);
+        return 3.0f*pow3(q) - 3.0f*pow2(q) + 0.5f;
 
       return pow3(1 - q);
     }
@@ -98,7 +99,7 @@ struct CubicSplineGradKernel : public Kernel3d<CubicSplineGradKernel>
     if (q > 0 && q < 1)
     {
       if (q <= 0.5)
-        return -r*((pow2(1 - q) - 4.0f*pow2(0.5f - q))/q);
+        return r*(3.0f*q - 2.0f);
 
       return -r*(pow2(1 - q)/q);
     }

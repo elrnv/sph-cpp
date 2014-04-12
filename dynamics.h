@@ -206,11 +206,13 @@ public:
     return seed;
   }
 
-  friend FTiter<REAL,SIZE,NOTFLUID>;
-  friend FTiter<REAL,SIZE,DEFAULT>;
-  friend FTiter<REAL,SIZE,MCG03>;
-  friend FTiter<REAL,SIZE,BT07>;
-  friend FTiter<REAL,SIZE,AIAST12>;
+  //friend FTiter<REAL,SIZE,NOTFLUID>;
+  //friend FTiter<REAL,SIZE,DEFAULT>;
+  //friend FTiter<REAL,SIZE,MCG03>;
+  //friend FTiter<REAL,SIZE,BT07>;
+  //friend FTiter<REAL,SIZE,ICS13>;
+  template <typename R, typename S, int FT>
+  friend struct FTiter;
 
 private: // member functions
 

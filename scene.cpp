@@ -167,8 +167,8 @@ GeometryNode::GeometryNode(
           m_primitive = PrimitivePtr(new FluidT<int(MCG03)>(mesh, fparams)); break;
         case BT07: 
           m_primitive = PrimitivePtr(new FluidT<int(BT07)>(mesh, fparams)); break;
-        case AIAST12:
-          m_primitive = PrimitivePtr(new FluidT<int(AIAST12)>(mesh, fparams)); break;
+        case ICS13:
+          m_primitive = PrimitivePtr(new FluidT<int(ICS13)>(mesh, fparams)); break;
         default: 
           m_primitive = PrimitivePtr(new FluidT<int(DEFAULT)>(mesh, fparams)); break;
       }

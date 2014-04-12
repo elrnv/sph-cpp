@@ -30,6 +30,7 @@ public:
   void toggle_dynamics();
   void toggle_simulation() { if (m_grid) { m_grid->toggle_pause(); } }
   void toggle_halos();
+  void toggle_bbox();
   void clear_cache();
 
   void clear_dynamics();
@@ -45,6 +46,7 @@ protected:
 private:
   bool m_show_shortcuts;
   bool m_dynamics;
+  bool m_show_bbox;
 
   UniformBuffer m_ubo;
 

@@ -57,7 +57,7 @@ enum __attribute__ ((__packed__)) FluidType
   DEFAULT = 0,
   MCG03 = 1,
   BT07 = 2,
-  AIAST12 = 3,
+  ICS13 = 3,
   NUMTYPES = 4
 };
 

@@ -345,5 +345,5 @@ void FluidRST<REAL,SIZE,FT>::init_processors()
 template class FluidRS<double, unsigned int>;
 template class FluidRST<double, unsigned int, 0>; //MCG03
 template class FluidRST<double, unsigned int, 1>; //BT07
-template class FluidRST<double, unsigned int, 2>; //AIAST12
+template class FluidRST<double, unsigned int, 2>; //ICS13
 template class FluidRST<double, unsigned int, 3>; //DEFAULT

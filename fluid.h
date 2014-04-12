@@ -88,6 +88,7 @@ public:
   inline REAL get_surface_tension() const { return m_st; }
   inline REAL get_recoil_velocity_damping() const { return m_recoil_velocity_damping; }
   inline REAL get_sound_speed2() const    { return m_c2; }
+  inline REAL get_compressibility() const { return m_params->compressibility; }
   inline FluidType get_type() const       { return m_params->fluid_type; }
 
   friend std::size_t hash_value( const FluidRS<REAL,SIZE> &fl ) 
