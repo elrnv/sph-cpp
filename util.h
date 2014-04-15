@@ -127,6 +127,8 @@ loadDynamics( const std::string &filename )
           iss >> fparams.sound_speed;
         else if (boost::iequals(var_name, "c"))
           iss >> fparams.compressibility;
+        else if (boost::iequals(var_name, "f"))
+          iss >> fparams.friction;
         else if (boost::iequals(var_name, "ki"))
           iss >> fparams.kernel_inflation;
         else if (boost::iequals(var_name, "rvd"))

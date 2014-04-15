@@ -5,31 +5,39 @@
 #include "dynparams.h"
 
 template<typename REAL>
-struct ParticleR
+struct __attribute__ ((__packed__)) ParticleR
 {
   ParticleR(Vector3R<REAL> p) : pos(p){ }
   ~ParticleR() { }
 
   Vector3R<REAL> pos;
   REAL dinv;
-  REAL vol;           // volume estimate
+  REAL vol; // volume estimate used for shepard filter
   REAL pressure;
 };
 
 template<typename REAL>
-struct FluidParticleR : public ParticleR<REAL>
+struct __attribute__ ((__packed__)) FluidParticleR : public ParticleR<REAL>
 {
   explicit FluidParticleR(Vector3R<REAL> p, Vector3R<REAL> v,
-      REAL *a, REAL *ea, REAL *dinv, unsigned short i)
-    : ParticleR<REAL>(p), vel(v), accel(a), extern_accel(ea), _dinv(dinv), id(i) { }
+      REAL *a, REAL *ea, REAL *dinv, unsigned short i, REAL c)
+    : ParticleR<REAL>(p)
+    , vel(v)
+    , _accel(a)
+    , _extern_accel(ea)
+    , _dinv(dinv)
+    , color(c)
+    , id(i) { }
   ~FluidParticleR() { }
 
   Vector3R<REAL> vel;
-  REAL *accel;        // 3-array to which we write total acceleration
-  REAL *extern_accel; // 3-array to which we write acceleration from external forces
+  Vector3R<REAL> n;    // for various computations
+  Vector3R<REAL> m;    // for various computations
+  REAL *_accel;        // 3-array to which we write total acceleration
+  REAL *_extern_accel; // 3-array to which we write acceleration from external forces
   REAL *_dinv; // pointer to fluid entry
-  REAL c;         // for surface tension computations
-  Vector3R<REAL> n;         // for surface tension computations
+  REAL c;      // intermediate for surface tension computations
+  REAL color;  // used for surface tension computations
   unsigned short id;  // index of the fluid this particle belongs to in the grid
 };
 

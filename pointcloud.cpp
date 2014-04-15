@@ -31,13 +31,13 @@ PointCloudRS<REAL,SIZE>::~PointCloudRS()
 { }
 
 template<typename REAL, typename SIZE>
-void PointCloudRS<REAL,SIZE>::transform_in_place(const AffineCompact3f &trans)
+inline void PointCloudRS<REAL,SIZE>::transform_in_place(const AffineCompact3f &trans)
 {
   m_pos = trans.template cast<REAL>() * m_pos;
 }
 
 template<typename REAL, typename SIZE>
-AlignedBox3f &PointCloudRS<REAL,SIZE>::compute_bbox()
+inline AlignedBox3f &PointCloudRS<REAL,SIZE>::compute_bbox()
 {
   m_bbox.setEmpty();
   SIZE num_verts = m_pos.cols();

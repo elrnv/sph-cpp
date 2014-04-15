@@ -68,7 +68,7 @@ LIBS += -lconfig++
 #QMAKE_CXXFLAGS += -DMKL_LP64 -m64
 
 # use the following to boost performance
-# QMAKE_CXXFLAGS += -DBOOST_DISABLE_ASSERTS
+QMAKE_CXXFLAGS += -DBOOST_DISABLE_ASSERTS
 
 # show warnings if a function is not inlined
 QMAKE_CXXFLAGS += -stdlib=libc++ -Winline -Wno-unused-parameter

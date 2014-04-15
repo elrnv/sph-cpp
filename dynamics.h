@@ -35,11 +35,11 @@ template<typename REAL, typename SIZE, int FT>
 struct FTiter
 {
   // high level processing (ones that should be called by the integrator)
-  inline static void init_fluid_processors(UniformGridRS<REAL,SIZE> &);
-  inline static void update_density(UniformGridRS<REAL,SIZE> &, float);
-  inline static void compute_density(UniformGridRS<REAL,SIZE> &);
-  inline static void compute_accel(UniformGridRS<REAL,SIZE> &);
-  inline static void compute_pressure(UniformGridRS<REAL,SIZE> &);
+  static void init_fluid_processors(UniformGridRS<REAL,SIZE> &);
+  static void update_density(UniformGridRS<REAL,SIZE> &, float);
+  static void compute_density(UniformGridRS<REAL,SIZE> &);
+  static void compute_accel(UniformGridRS<REAL,SIZE> &);
+  static void compute_pressure(UniformGridRS<REAL,SIZE> &);
 };
 
 template<typename REAL, typename SIZE> // base case
@@ -110,10 +110,10 @@ public:
   }
 
   void init();
-  inline void update_grid();
-  inline void populate_fluid_data();
-  inline void populate_bound_data();
-  inline void clear_fluid_data();
+  void update_grid();
+  void populate_fluid_data();
+  void populate_bound_data();
+  void clear_fluid_data();
 
   inline Index clamp(Index d, Index min, Index max)
   {
@@ -151,7 +151,7 @@ public:
 
   // Low level quantity processing functions
   template<typename ProcessPairFunc, typename ParticleType>
-  inline void compute_quantity();
+  void compute_quantity();
 
   template<typename Func>
   inline void compute_bound_quantity()
@@ -161,20 +161,21 @@ public:
   inline void compute_fluid_quantity()
   { compute_quantity<Func, FluidParticleRT<REAL, FT> >(); }
 
-  template<int FT>
-  inline void compute_accelT();
+  template<int FT> void compute_accelT();
+  template<int FT> void compute_surface_normalT();
+  template<int FT> void compute_surface_tensionT();
 
-  template<int FT>
-  inline void compute_densityT();
+  template<int FT> void compute_densityT();
 
-  template<int FT>
-  inline void compute_density_updateT();
+  template<int FT> void compute_density_updateT();
 
-  template<int FT>
-  inline void compute_pressureT();
+  void jacobi_pressure_solve();
 
   // run dynamic simulation
   void run();
+
+  // execute one substep
+  bool step(float dt, bool first_step, float *substep_t = NULL);
 
   // request stop which will be checked by the owner thread
   void request_stop() { m_stop_requested = true; }

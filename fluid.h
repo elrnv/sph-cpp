@@ -6,22 +6,6 @@
 #include "quantityprocessor.h"
 #include "dynparams.h"
 
-//#define MCG03
-//
-//#if defined MCG03
-//  #define BOUNDARY_IMPULSE
-//  #define IDEAL_GAS_PRESSURE
-//  #define MCG03_VISCOSITY_FORCE
-//  #define MCG03_PRESSURE_FORCE
-//  #define VELOCITY_DAMPING 0.4f
-//#elif defined BT07
-//  #define BOUNDARY_PARTICLE
-//  #define BOUNDARY_PENALTY_FORCE
-//
-//#endif
-
-//#define REPORT_DENSITY_VARIATION
-
 // Fluid Stuff
 
 // Forward declaration
@@ -89,6 +73,7 @@ public:
   inline REAL get_recoil_velocity_damping() const { return m_recoil_velocity_damping; }
   inline REAL get_sound_speed2() const    { return m_c2; }
   inline REAL get_compressibility() const { return m_params->compressibility; }
+  inline REAL get_friction() const        { return m_params->friction; }
   inline FluidType get_type() const       { return m_params->fluid_type; }
 
   friend std::size_t hash_value( const FluidRS<REAL,SIZE> &fl ) 
@@ -104,11 +89,11 @@ public:
 
   inline void reset_accel() { m_accel.setZero(); m_extern_accel.setZero(); }
 
-  inline bool clamp(REAL &d, REAL min, REAL max, REAL tol);
-  inline void clamp(float tol);
-  inline void resolve_collisions();
+  bool clamp(REAL &d, REAL min, REAL max, REAL tol);
+  void clamp(float tol);
+  void resolve_collisions();
 
-  inline void update_data(); // propagate changes to some viewer
+  void update_data(); // propagate changes to some viewer
 
   template<int FT>
   inline FluidRST<REAL,SIZE,FT> *cast() 
@@ -117,15 +102,15 @@ public:
   }
 
   void clear_saved();
-  inline void save(unsigned int frame);
-  inline bool is_saved(unsigned int frame);
-  inline bool load_saved_cache();
-  inline bool read_saved(unsigned int frame);
+  void save(unsigned int frame);
+  bool is_saved(unsigned int frame);
+  bool load_saved_cache();
+  bool read_saved(unsigned int frame);
 
   void clear_cache();
-  inline void cache(unsigned int frame);
-  inline bool is_cached(unsigned int frame);
-  inline bool load_cached(unsigned int frame);
+  void cache(unsigned int frame);
+  bool is_cached(unsigned int frame);
+  bool load_cached(unsigned int frame);
 
 protected:
   FluidParamsPtr m_params;
@@ -166,14 +151,7 @@ public:
   // explicitly state that we use some base class members (convenience)
 
   using FluidRS<REAL,SIZE>::m_kernel_radius;
-  using FluidRS<REAL,SIZE>::m_rest_density;
-  using FluidRS<REAL,SIZE>::m_viscosity;
-  using FluidRS<REAL,SIZE>::m_st;
-  using FluidRS<REAL,SIZE>::m_mass;
-  using FluidRS<REAL,SIZE>::m_recoil_velocity_damping;
-  using FluidRS<REAL,SIZE>::m_c2;
-
-  inline void init_processors();
+  void init_processors();
 
   // compile time type checked proc getters
 #define GET_PROC(proc_type) \
@@ -182,14 +160,24 @@ public:
     std::is_same< ProcessPairFunc, proc_type<REAL,SIZE,FT>  >::value, \
     proc_type<REAL,SIZE,FT> >::type &get_proc()
 
-  GET_PROC( CFDensityRST ) { return m_fluid_density_proc; }
-  GET_PROC( CFDensityUpdateRST ) { return m_fluid_density_update_proc; }
-  GET_PROC( CFAccelRST ) { return m_fluid_accel_proc; }
+  GET_PROC( CFDensityRST )        { return m_fluid_density_proc; }
+  GET_PROC( CFDensityUpdateRST )  { return m_fluid_density_update_proc; }
+  GET_PROC( CFAccelRST )          { return m_fluid_accel_proc; }
+  GET_PROC( CFSurfaceNormalRST )  { return m_fluid_surface_normal_proc; }
+  GET_PROC( CFSurfaceTensionRST ) { return m_fluid_surface_tension_proc; }
+  GET_PROC( CFPrepareJacobiRST )  { return m_fluid_prepare_jacobi_proc; }
+  GET_PROC( CFJacobiSolveFirstRST )    { return m_fluid_jacobi_solve1_proc; }
+  GET_PROC( CFJacobiSolveSecondRST )    { return m_fluid_jacobi_solve2_proc; }
 
   // Quantity Processors
-  CFDensityRST<REAL,SIZE,FT>              m_fluid_density_proc;
-  CFDensityUpdateRST<REAL,SIZE,FT>        m_fluid_density_update_proc;
-  CFAccelRST<REAL,SIZE,FT>             m_fluid_accel_proc;
+  CFDensityRST<REAL,SIZE,FT>        m_fluid_density_proc;
+  CFDensityUpdateRST<REAL,SIZE,FT>  m_fluid_density_update_proc;
+  CFAccelRST<REAL,SIZE,FT>          m_fluid_accel_proc;
+  CFSurfaceNormalRST<REAL,SIZE,FT>  m_fluid_surface_normal_proc;
+  CFSurfaceTensionRST<REAL,SIZE,FT> m_fluid_surface_tension_proc;
+  CFPrepareJacobiRST<REAL,SIZE,FT>  m_fluid_prepare_jacobi_proc;
+  CFJacobiSolveFirstRST<REAL,SIZE,FT>    m_fluid_jacobi_solve1_proc;
+  CFJacobiSolveSecondRST<REAL,SIZE,FT>   m_fluid_jacobi_solve2_proc;
 }; // FluidRST
 
 template<int FT>

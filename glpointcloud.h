@@ -36,13 +36,13 @@ public:
   void update_glbuf();
   void update_shader(ShaderManager::ShaderType type);
 
-  //inline PointCloudRS<REAL,SIZE> *init_dynamics();
+  //PointCloudRS<REAL,SIZE> *init_dynamics();
   //FluidRS<REAL,SIZE> *make_dynamic(FluidParamsPtr params);
 
   void print() const { std::cerr << *m_pc << std::endl; }
 
   void update_data();
-  inline void clear_cache();
+  void clear_cache();
 
   bool is_halos() const { return m_halos; }
   void toggle_halos() { m_halos = !m_halos; }

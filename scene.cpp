@@ -157,7 +157,7 @@ GeometryNode::GeometryNode(
 {
   if ( mesh->mPrimitiveTypes & aiPrimitiveType_POINT )
   {
-    if ( dyn_params.get() && dyn_params->type == DynParams::FLUID )
+    if ( dyn_params && dyn_params->type == DynParams::FLUID )
     {
       // interpret as fluid
       FluidParamsPtr fparams = boost::static_pointer_cast<FluidParams>(dyn_params);

@@ -71,6 +71,7 @@ struct FluidParams : public DynParams
   float surface_tension;
   float sound_speed;
   float compressibility;
+  float friction;
   float kernel_inflation;
   float recoil_velocity_damping;
 
@@ -81,6 +82,7 @@ struct FluidParams : public DynParams
    , surface_tension(0.0728f)
    , sound_speed(8.0f)
    , compressibility(0.01f)
+   , friction(0.5f)
    , kernel_inflation(3.0f)
    , recoil_velocity_damping(0.4f)
   {

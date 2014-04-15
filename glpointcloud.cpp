@@ -63,7 +63,7 @@ void GLPointCloudRS<REAL,SIZE>::update_data()
 }
 
 template<typename REAL, typename SIZE>
-void GLPointCloudRS<REAL,SIZE>::clear_cache()
+inline void GLPointCloudRS<REAL,SIZE>::clear_cache()
 {
   std::lock_guard<std::mutex> guard(this->m_lock);
   if (is_dynamic())

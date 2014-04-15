@@ -46,7 +46,7 @@ void FluidRS<REAL,SIZE>::init(GLPointCloudRS<REAL, SIZE> *glpc)
 
   if ( m_params->fluid_type == MCG03 )
     m_c2 = m_params->sound_speed * m_params->sound_speed;
-  else if ( m_params->fluid_type == BT07 )
+  else //if ( m_params->fluid_type == BT07 )
   {
     // a heuristic to determine the speed of sound based on the maximum
     // possible velocity of a particle in the fluid
@@ -95,13 +95,13 @@ inline bool FluidRS<REAL,SIZE>::clamp(REAL &d, REAL min, REAL max, REAL tol)
 }
 
 template<typename REAL, typename SIZE>
-void FluidRS<REAL,SIZE>::resolve_collisions()
+inline void FluidRS<REAL,SIZE>::resolve_collisions()
 {
   for (SIZE i = 0; i < this->get_num_vertices(); ++i)
   {
     for (unsigned char j = 0; j < 3; ++j)
     {
-      if (clamp(pos_at(i)[j], m_bmin[j], m_bmax[j], 0.005))
+      if (clamp(pos_at(i)[j], m_bmin[j], m_bmax[j], 0.001))
       {
         vel_at(i)[j] *= -m_recoil_velocity_damping;
       }
@@ -110,7 +110,7 @@ void FluidRS<REAL,SIZE>::resolve_collisions()
 }
 
 template<typename REAL, typename SIZE>
-void FluidRS<REAL,SIZE>::clamp(float tol)
+inline void FluidRS<REAL,SIZE>::clamp(float tol)
 {
   for (SIZE i = 0; i < this->get_num_vertices(); ++i)
     for (unsigned char j = 0; j < 3; ++j)
@@ -331,15 +331,25 @@ FluidRST<REAL,SIZE,FT>::~FluidRST()
 { }
 
 template<typename REAL, typename SIZE, int FT>
-void FluidRST<REAL,SIZE,FT>::init_processors()
+inline void FluidRST<REAL,SIZE,FT>::init_processors()
 {
   m_fluid_density_proc.init_kernel(m_kernel_radius);
   m_fluid_density_update_proc.init_kernel(m_kernel_radius);
   m_fluid_accel_proc.init_kernel(m_kernel_radius);
+  m_fluid_surface_normal_proc.init_kernel(m_kernel_radius);
+  m_fluid_surface_tension_proc.init_kernel(m_kernel_radius);
+  m_fluid_prepare_jacobi_proc.init_kernel(m_kernel_radius);
+  m_fluid_jacobi_solve1_proc.init_kernel(m_kernel_radius);
+  m_fluid_jacobi_solve2_proc.init_kernel(m_kernel_radius);
 
   m_fluid_density_proc.copy_fluid_params(*this);
   m_fluid_density_update_proc.copy_fluid_params(*this);
   m_fluid_accel_proc.copy_fluid_params(*this);
+  m_fluid_surface_normal_proc.copy_fluid_params(*this);
+  m_fluid_surface_tension_proc.copy_fluid_params(*this);
+  m_fluid_prepare_jacobi_proc.copy_fluid_params(*this);
+  m_fluid_jacobi_solve1_proc.copy_fluid_params(*this);
+  m_fluid_jacobi_solve2_proc.copy_fluid_params(*this);
 }
 
 template class FluidRS<double, unsigned int>;
