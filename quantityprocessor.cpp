@@ -471,9 +471,7 @@ class CFAccelRST<REAL,SIZE,ICS13> : public CFQ<REAL,SIZE,CFAccelRST<REAL,SIZE,IC
 public:
   inline void init_kernel(float h)
   {
-    m_maingrad_kern.init(h);
-    m_spikygrad_kern.init(h);
-    m_bound_kern.init(h);
+    m_grad_kern.init(h);
     m_st_kern.init(h);
   }
   inline void init_particle(FluidParticleR<REAL> &p)
@@ -494,27 +492,27 @@ public:
     REAL vx = x_ab.dot(p.vel - near_p.vel);
     if (vx < 0)
     {
-      REAL nu = 2*this->m_viscosity*m_maingrad_kern.h*this->m_cs 
+      REAL nu = 2*this->m_viscosity*m_grad_kern.h*this->m_cs 
               * p.dinv * near_p.dinv / (p.dinv + near_p.dinv);
-      res -= nu*vx / (x_ab.squaredNorm() + 0.01*m_maingrad_kern.h2);
+      res -= nu*vx / (x_ab.squaredNorm() + 0.01*m_grad_kern.h2);
     }
 
-    p.n = p.n - this->m_mass * res * m_maingrad_kern(x_ab);
+    p.n = p.n - this->m_mass * res * m_grad_kern(x_ab);
     
     // surface tension 
     // (apply surface tension only to particles from the same phase)
     if (p.color == near_p.color)
       p.n = p.n - this->m_st * m_st_kern(x_ab) * x_ab;
 
-    p.m = p.m - p.vol*p.vol*m_maingrad_kern(x_ab); // d_ii
+    p.m = p.m - p.vol*p.vol*m_grad_kern(x_ab); // d_ii
   }
   inline void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p)
   {
-    p.m = p.m - (this->m_rest_density*near_p.dinv*p.dinv*p.dinv)*m_maingrad_kern(x_ab); // d_ii
+    p.m = p.m - (this->m_rest_density*near_p.dinv*p.dinv*p.dinv)*m_grad_kern(p.pos - near_p.pos); // d_ii
   }
   inline void finish_particle(FluidParticleR<REAL> &p)
   {
-    p.m = p.m * (dt*dt/this->m_mass); // d_ii
+    p.m = p.m * (1.0f/this->m_mass); // d_ii
 
     for (unsigned char i = 0; i < 3; ++i)
     {
@@ -523,10 +521,10 @@ public:
     }
   }
 private:
-  SpikyGradKernel m_spikygrad_kern;
-  CubicSplineGradKernel m_maingrad_kern;
-  CubicSplineGradKernel m_bound_kern;
+  CubicSplineGradKernel m_grad_kern;
   CubicSplineKernel m_st_kern;
+  SpikyGradKernel m_spikygrad_kern;
+  Poly6Kernel m_kern;
 }; // CFAccel
 
 // default implementation
@@ -553,7 +551,7 @@ inline void CFPrepareJacobiRST<REAL,SIZE,FT>::init(float ts)
 template<typename REAL, typename SIZE, int FT>
 inline void CFPrepareJacobiRST<REAL,SIZE,FT>::init_particle(FluidParticleR<REAL> &p)
 {
-  p.n[0] = p.n[1] = p.n[2] = 0.0f; // intermediate values for density guess
+  p.b = 0.0f; // intermediate value for density guess
   p.c = 0.0f;
 }
 template<typename REAL, typename SIZE, int FT>
@@ -564,18 +562,20 @@ inline void CFPrepareJacobiRST<REAL,SIZE,FT>::fluid(FluidParticleR<REAL> &p, Flu
 
   Vector3R<REAL> x_ab(p.pos - near_p.pos);
   Vector3R<REAL> v_ab(p.vel - near_p.vel);
-  p.n = p.n + p.dinv*near_p.vol*v_ab.dot(m_grad_kern(x_ab)); // density guess
-  p.c += near_p.vol*(-dt*dt*p.vol*p.vol*near_p.dinv/(near_p.vol) - p.m).dot(m_grad_kern(x_ab));
+  p.b = p.b + p.dinv*near_p.vol*v_ab.dot(m_grad_kern(x_ab)); // density guess
+  p.c += near_p.vol*(-dt*dt*p.vol*p.vol*near_p.dinv/(near_p.vol)*m_grad_kern(-x_ab) 
+      - dt*dt*p.m).dot(m_grad_kern(x_ab));
 }
 template<typename REAL, typename SIZE, int FT>
 inline void CFPrepareJacobiRST<REAL,SIZE,FT>::bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p)
 {
-  p.n = p.n + this->m_rest_density*near_p.dinv*p.vel.dot(m_grad_kern(x_ab)); // density guess
+  Vector3R<REAL> x_ab(p.pos - near_p.pos);
+  p.b += this->m_rest_density*near_p.dinv*p.vel.dot(m_grad_kern(x_ab)); // density guess
 }
 template<typename REAL, typename SIZE, int FT>
 inline void CFPrepareJacobiRST<REAL,SIZE,FT>::finish_particle(FluidParticleR<REAL> &p)
 {  
-  p.dinv = p.dinv - dt*p.n; // density guess
+  p.dinv = p.dinv - dt*p.b; // density guess
   p.c *= p.dinv;
   p.pressure = 0.5*p.pressure;     // initial pressure guess
 }
@@ -620,7 +620,7 @@ inline void CFJacobiSolveSecondRST<REAL,SIZE,FT>::init(float ts)
 template<typename REAL, typename SIZE, int FT>
 inline void CFJacobiSolveSecondRST<REAL,SIZE,FT>::init_particle(FluidParticleR<REAL> &p)
 {
-  p.n[0] = p.n[1] = p.n[2] = 0.0f;
+  p.b = 0.0f;
 }
 template<typename REAL, typename SIZE, int FT>
 inline void CFJacobiSolveSecondRST<REAL,SIZE,FT>::fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p)
@@ -629,7 +629,7 @@ inline void CFJacobiSolveSecondRST<REAL,SIZE,FT>::fluid(FluidParticleR<REAL> &p,
     return;
   
   Vector3R<REAL> x_ab(p.pos - near_p.pos);
-  p.n = p.n - (near_p.pressure*near_p.vol*near_p.vol/this->m_mass)*m_grad_kern(x_ab);
+  p.b += near_p.vol*(near_p.n - p.n + dt*dt*p.m*near_p.pressure).dot(m_grad_kern(x_ab));
 }
 template<typename REAL, typename SIZE, int FT>
 inline void CFJacobiSolveSecondRST<REAL,SIZE,FT>::bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p)
@@ -637,9 +637,69 @@ inline void CFJacobiSolveSecondRST<REAL,SIZE,FT>::bound(FluidParticleR<REAL> &p,
 template<typename REAL, typename SIZE, int FT>
 inline void CFJacobiSolveSecondRST<REAL,SIZE,FT>::finish_particle(FluidParticleR<REAL> &p)
 {  
-  0.5*(p.pressure + (1.0f/this->m_rest_density - p.dinv)/p.c);
+  p.pressure = std::max(REAL(0), // clamp negative pressures
+      0.5*(p.pressure + (1.0f/this->m_rest_density - p.dinv - p.b*p.vol/(this->m_mass))/p.c));
 }
 
+// update pressure accelerations
+template<typename REAL, typename SIZE, int FT>
+inline void CFPressureAccelRST<REAL,SIZE,FT>::init_kernel(float h)
+{ m_grad_kern.init(h); }
+template<typename REAL, typename SIZE, int FT>
+inline void CFPressureAccelRST<REAL,SIZE,FT>::init_particle(FluidParticleR<REAL> &p)
+{  
+  p.n[0] = p.n[1] = p.n[2] = 0.0f;
+  p.m[0] = p.m[1] = p.m[2] = 0.0f;
+}
+template<typename REAL, typename SIZE, int FT>
+inline void CFPressureAccelRST<REAL,SIZE,FT>::fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p)
+{ 
+  if (&p == &near_p)
+    return;
+  
+  Vector3R<REAL> x_ab(p.pos - near_p.pos);
+  p.n -= (p.pressure*p.vol*p.vol + near_p.pressure*near_p.vol*near_p.vol) * m_grad_kern(x_ab);
+}
+template<typename REAL, typename SIZE, int FT>
+inline void CFPressureAccelRST<REAL,SIZE,FT>::bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p)
+{
+  Vector3R<REAL> x_ab = p.pos - near_p.pos;
+  float massb = this->m_rest_density * near_p.dinv;
+
+  Vector3d kern = m_grad_kern(x_ab);
+
+  if (0 && x_ab.norm() < 1.5f*m_grad_kern.h)
+  {
+    qDebug() << "xab = "  << x_ab[0] << x_ab[1] << x_ab[2];
+    qDebug() << "xab.norm = "  << x_ab.norm();
+    qDebug() << "h = "  << m_grad_kern.h;
+    qDebug() << "massb = "  << massb;
+    qDebug() << "kern = " << kern[0] << kern[1] << kern[2];
+  }
+
+  // pressure force contribution from boundary particles
+  REAL res( p.pressure * p.dinv * p.dinv);
+
+  REAL vx = x_ab.dot(p.vel);
+  // viscosity foces contribution from boundary particles
+
+  if (vx < 0)
+  {
+    REAL nu = 0.5*this->m_friction*m_grad_kern.h*this->m_cs*p.dinv;
+    res -= nu*vx / (x_ab.squaredNorm() + 0.01*m_grad_kern.h2);
+  }
+
+  p.m = p.m - massb * res * kern;
+}
+template<typename REAL, typename SIZE, int FT>
+inline void CFPressureAccelRST<REAL,SIZE,FT>::finish_particle(FluidParticleR<REAL> &p)
+{  
+  for (unsigned char i = 0; i < 3; ++i)
+  {
+    p._extern_accel[i] += global::dynset.gravity[i] + p.m[i];
+    p._accel[i] += p._extern_accel[i] + p.n[i];
+  }
+}
 
 #define INSTANTIATE_PROC_TYPE( proc, type ) \
   template class proc<double, unsigned int, type>
@@ -657,5 +717,6 @@ INSTANTIATE_PROC(CFSurfaceTensionRST)
 INSTANTIATE_PROC(CFPrepareJacobiRST)
 INSTANTIATE_PROC(CFJacobiSolveFirstRST)
 INSTANTIATE_PROC(CFJacobiSolveSecondRST)
+INSTANTIATE_PROC(CFPressureAccelRST)
 INSTANTIATE_PROC(CFDensityRST)
 INSTANTIATE_PROC(CFDensityUpdateRST)

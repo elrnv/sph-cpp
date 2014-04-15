@@ -35,7 +35,7 @@ public:
     p.dinv = 1.0f/(p.dinv * this->m_kern.coef);
   }
 private:
-  Poly6Kernel m_kern;
+  CubicSplineKernel m_kern;
 };
 
 // UniformGrid stuff
@@ -383,13 +383,20 @@ inline void FTiter<REAL,SIZE,FT>::compute_accel(UniformGridRS<REAL,SIZE> &g)
 }
 
 template<typename REAL, typename SIZE>
-inline void UniformGridRS<REAL,SIZE>::jacobi_pressure_solve()
+inline void UniformGridRS<REAL,SIZE>::jacobi_pressure_solve(float dt)
 {
   if (!m_fluids[ICS13].size())
     return;
   
   compute_fluid_quantity< CFPrepareJacobiRST<REAL, SIZE, ICS13>, ICS13 >();
-  compute_fluid_quantity< CFJacobiSolveRST<REAL, SIZE, ICS13>, ICS13 >();
+  compute_fluid_quantity< CFJacobiSolveFirstRST<REAL, SIZE, ICS13>, ICS13 >();
+  compute_fluid_quantity< CFJacobiSolveSecondRST<REAL, SIZE, ICS13>, ICS13 >();
+  compute_fluid_quantity< CFJacobiSolveFirstRST<REAL, SIZE, ICS13>, ICS13 >();
+  compute_fluid_quantity< CFJacobiSolveSecondRST<REAL, SIZE, ICS13>, ICS13 >();
+  compute_fluid_quantity< CFPressureAccelRST<REAL, SIZE, ICS13>, ICS13 >();
+
+  for (auto &fl : m_fluids[ICS13])
+    fl->get_vel() = fl->get_vel() + dt*fl->get_accel();
 }
 
 template<typename REAL, typename SIZE>
@@ -475,7 +482,8 @@ void UniformGridRS<REAL,SIZE>::run()
       for (unsigned int iter = 0; iter < global::dynset.substeps; ++iter)
       { // for each simulation substep
         bool first_step = iter == 0 && frame == 1 && global::dynset.init_steps == 0;
-        step(dt, first_step, &substep_t);
+        if (!step(dt, first_step, &substep_t))
+          break;
       } // for each substep
 
       for (int j = 0; j < NUMTYPES; ++j)
@@ -576,7 +584,7 @@ inline bool UniformGridRS<REAL,SIZE>::step(float dt, bool first_step, float *sub
     for (auto &fl : m_fluids[j])
       fl->get_vel() = fl->get_vel() + factor*dt*fl->get_accel();
 
-  jacobi_pressure_solve(); // only relevant for IISPH fluids
+  jacobi_pressure_solve(dt); // only relevant for IISPH fluids
 
   for (int j = 0; j < NUMTYPES; ++j)
   {
@@ -598,6 +606,8 @@ inline bool UniformGridRS<REAL,SIZE>::step(float dt, bool first_step, float *sub
   for (int j = 0; j < NUMTYPES; ++j)
     for (auto &fl : m_fluids[j])
       fl->update_data(); // notify gl we have new positions
+
+  return true;
 }
 
 

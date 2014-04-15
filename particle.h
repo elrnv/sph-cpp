@@ -36,7 +36,8 @@ struct __attribute__ ((__packed__)) FluidParticleR : public ParticleR<REAL>
   REAL *_accel;        // 3-array to which we write total acceleration
   REAL *_extern_accel; // 3-array to which we write acceleration from external forces
   REAL *_dinv; // pointer to fluid entry
-  REAL c;      // intermediate for surface tension computations
+  REAL c;      // intermediate for various computations
+  REAL b;      // intermediate for various computations
   REAL color;  // used for surface tension computations
   unsigned short id;  // index of the fluid this particle belongs to in the grid
 };

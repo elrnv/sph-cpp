@@ -341,6 +341,7 @@ inline void FluidRST<REAL,SIZE,FT>::init_processors()
   m_fluid_prepare_jacobi_proc.init_kernel(m_kernel_radius);
   m_fluid_jacobi_solve1_proc.init_kernel(m_kernel_radius);
   m_fluid_jacobi_solve2_proc.init_kernel(m_kernel_radius);
+  m_fluid_pressure_accel_proc.init_kernel(m_kernel_radius);
 
   m_fluid_density_proc.copy_fluid_params(*this);
   m_fluid_density_update_proc.copy_fluid_params(*this);
@@ -350,6 +351,7 @@ inline void FluidRST<REAL,SIZE,FT>::init_processors()
   m_fluid_prepare_jacobi_proc.copy_fluid_params(*this);
   m_fluid_jacobi_solve1_proc.copy_fluid_params(*this);
   m_fluid_jacobi_solve2_proc.copy_fluid_params(*this);
+  m_fluid_pressure_accel_proc.copy_fluid_params(*this);
 }
 
 template class FluidRS<double, unsigned int>;

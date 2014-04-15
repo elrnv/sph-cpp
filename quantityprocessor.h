@@ -161,6 +161,24 @@ private:
   CubicSplineKernel  m_kern;
 };
 
+
+
+// Only used for IISPH
+template<typename REAL, typename SIZE, int FT>
+class CFPressureAccelRST : public CFQ<REAL,SIZE,CFPressureAccelRST<REAL,SIZE,FT> >
+{
+public:
+  void init_kernel(float h);
+  void init_particle(FluidParticleR<REAL> &p);
+  void fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p);
+  void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p);
+  void finish_particle(FluidParticleR<REAL> &p);
+
+private:
+  CubicSplineGradKernel m_grad_kern;
+  CubicSplineKernel     m_st_kern;
+};
+
 template<typename REAL, typename SIZE, int FT>
 class CFPrepareJacobiRST 
   : public CFQ<REAL,SIZE,CFPrepareJacobiRST<REAL,SIZE,FT> >

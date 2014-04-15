@@ -169,7 +169,7 @@ public:
 
   template<int FT> void compute_density_updateT();
 
-  void jacobi_pressure_solve();
+  void jacobi_pressure_solve(float dt);
 
   // run dynamic simulation
   void run();

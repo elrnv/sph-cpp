@@ -166,8 +166,9 @@ public:
   GET_PROC( CFSurfaceNormalRST )  { return m_fluid_surface_normal_proc; }
   GET_PROC( CFSurfaceTensionRST ) { return m_fluid_surface_tension_proc; }
   GET_PROC( CFPrepareJacobiRST )  { return m_fluid_prepare_jacobi_proc; }
-  GET_PROC( CFJacobiSolveFirstRST )    { return m_fluid_jacobi_solve1_proc; }
-  GET_PROC( CFJacobiSolveSecondRST )    { return m_fluid_jacobi_solve2_proc; }
+  GET_PROC( CFJacobiSolveFirstRST )  { return m_fluid_jacobi_solve1_proc; }
+  GET_PROC( CFJacobiSolveSecondRST ) { return m_fluid_jacobi_solve2_proc; }
+  GET_PROC( CFPressureAccelRST )     { return m_fluid_pressure_accel_proc; }
 
   // Quantity Processors
   CFDensityRST<REAL,SIZE,FT>        m_fluid_density_proc;
@@ -176,8 +177,9 @@ public:
   CFSurfaceNormalRST<REAL,SIZE,FT>  m_fluid_surface_normal_proc;
   CFSurfaceTensionRST<REAL,SIZE,FT> m_fluid_surface_tension_proc;
   CFPrepareJacobiRST<REAL,SIZE,FT>  m_fluid_prepare_jacobi_proc;
-  CFJacobiSolveFirstRST<REAL,SIZE,FT>    m_fluid_jacobi_solve1_proc;
-  CFJacobiSolveSecondRST<REAL,SIZE,FT>   m_fluid_jacobi_solve2_proc;
+  CFJacobiSolveFirstRST<REAL,SIZE,FT>   m_fluid_jacobi_solve1_proc;
+  CFJacobiSolveSecondRST<REAL,SIZE,FT>  m_fluid_jacobi_solve2_proc;
+  CFPressureAccelRST<REAL,SIZE,FT>      m_fluid_pressure_accel_proc;
 }; // FluidRST
 
 template<int FT>
