@@ -12,6 +12,8 @@
 #define BOOST_CHRONO_HEADER_ONLY
 #include <boost/chrono.hpp>
 
+//#define REPORT_DENSITY_VARIATION
+
 typedef boost::chrono::process_real_cpu_clock real_clock;
 typedef real_clock::time_point real_t;
 
@@ -179,7 +181,7 @@ void UniformGridRS<REAL,SIZE>::populate_bound_data()
   unsigned char particles_per_cell_length = 4;
 
   // place boundary particles slightly away from the actual boundary
-  float pad = m_h;
+  float pad = 0.5*m_h;
 
   SIZE nx = particles_per_cell_length*(m_gridsize[0]+2);
   SIZE ny = particles_per_cell_length*(m_gridsize[1]+2);
@@ -357,10 +359,10 @@ inline void FTiter<REAL,SIZE,FT>::compute_density(UniformGridRS<REAL,SIZE> &g)
     i = 0;
     for (auto &fl : g.m_fluids[FT] )
     {
-      avg_var[i] = avg_var[i]/fl->cast<FT>()->get_num_vertices();
+      avg_var[i] = avg_var[i]/fl->template cast<FT>()->get_num_vertices();
       qDebug("Fluid %d:  max: %.0f, %.1f percent;    avg: %.0f, %.1f percent", i,
-          max_var[i], 100.00f*max_var[i]/fl->cast<FT>()->get_rest_density(), 
-          avg_var[i], 100.00f*avg_var[i]/fl->cast<FT>()->get_rest_density());
+          max_var[i], 100.00f*max_var[i]/fl->template cast<FT>()->get_rest_density(), 
+          avg_var[i], 100.00f*avg_var[i]/fl->template cast<FT>()->get_rest_density());
       i++;
     }
 #endif
@@ -388,11 +390,31 @@ inline void UniformGridRS<REAL,SIZE>::jacobi_pressure_solve(float dt)
   if (!m_fluids[ICS13].size())
     return;
   
+  for (auto &fl : m_fluids[ICS13])
+  {
+    fl->template cast<ICS13>()->m_fluid_prepare_jacobi_proc.init( dt );
+    fl->template cast<ICS13>()->m_fluid_jacobi_solve1_proc.init( dt );
+    fl->template cast<ICS13>()->m_fluid_jacobi_solve2_proc.init( dt, fl->get_avg_density(), fl->get_avg_pressure() );
+  }
+
   compute_fluid_quantity< CFPrepareJacobiRST<REAL, SIZE, ICS13>, ICS13 >();
-  compute_fluid_quantity< CFJacobiSolveFirstRST<REAL, SIZE, ICS13>, ICS13 >();
-  compute_fluid_quantity< CFJacobiSolveSecondRST<REAL, SIZE, ICS13>, ICS13 >();
-  compute_fluid_quantity< CFJacobiSolveFirstRST<REAL, SIZE, ICS13>, ICS13 >();
-  compute_fluid_quantity< CFJacobiSolveSecondRST<REAL, SIZE, ICS13>, ICS13 >();
+
+  bool proceed = false;
+  do
+  {
+    compute_fluid_quantity< CFJacobiSolveFirstRST<REAL, SIZE, ICS13>, ICS13 >();
+    compute_fluid_quantity< CFJacobiSolveSecondRST<REAL, SIZE, ICS13>, ICS13 >();
+    proceed = false;
+    for (auto &fl : m_fluids[ICS13])
+    {
+      proceed |= std::abs(fl->get_avg_density()/fl->get_num_vertices() -
+          fl->get_rest_density()) > 5;
+      qDebug() << "avg density = " << fl->get_avg_density()/fl->get_num_vertices();
+  //    qDebug() << "avg pressure = " << fl->get_avg_pressure()/fl->get_num_vertices();
+      fl->get_avg_density() = 0.0f;
+    }
+  } while(proceed);
+
   compute_fluid_quantity< CFPressureAccelRST<REAL, SIZE, ICS13>, ICS13 >();
 
   for (auto &fl : m_fluids[ICS13])

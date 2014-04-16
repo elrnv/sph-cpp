@@ -221,7 +221,7 @@ class CFJacobiSolveSecondRST
 {
 public:
   void init_kernel(float h);
-  void init(float ts);
+  void init(float ts, REAL &avg_d, REAL &avg_p);
   void init_particle(FluidParticleR<REAL> &p);
   void fluid(FluidParticleR<REAL> &p, FluidParticleR<REAL> &near_p);
   void bound(FluidParticleR<REAL> &p, ParticleR<REAL> &near_p);
@@ -229,6 +229,8 @@ public:
 
 private:
   float dt;
+  REAL *avg_density;
+  REAL *avg_pressure;
   CubicSplineGradKernel m_grad_kern;
   CubicSplineKernel  m_kern;
 };

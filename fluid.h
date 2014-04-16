@@ -28,10 +28,12 @@ public:
   struct __attribute__ ((__packed__)) CachedFrame
   {
     Matrix3XR<REAL> pos;
+    Matrix3XR<REAL> vel;
     bool valid;
 
     CachedFrame() : valid(false) { }
-    CachedFrame(const Matrix3XR<REAL> &p, bool v) : pos(p), valid(v) { }
+    CachedFrame(const Matrix3XR<REAL> &p, const Matrix3XR<REAL> &v, bool good)
+      : pos(p), vel(v), valid(good) { }
   };
 
   // Define a set of cached frames
@@ -49,6 +51,9 @@ public:
   inline REAL *accel_at(SIZE i)  { return m_accel.data() + i*3; }
   inline REAL *extern_accel_at(SIZE i)  { return m_extern_accel.data() + i*3; }
   inline REAL *dinv_at(SIZE i)  { return m_dinv.data() + i; }
+
+  inline REAL &get_avg_density()  { return m_avg_density; }
+  inline REAL &get_avg_pressure()  { return m_avg_pressure; }
 
   inline Matrix3XR<REAL> &get_vel()          { return m_vel; }
   inline Matrix3XR<REAL> &get_accel()        { return m_accel; }
@@ -125,6 +130,8 @@ protected:
   REAL m_mass;
   REAL m_recoil_velocity_damping; // only for impulse collision model
   REAL m_c2;
+  REAL m_avg_density; // used in ICS13 computations
+  REAL m_avg_pressure; // used in ICS13 computations
 
   Matrix3XR<REAL> m_vel;   // velocities
   Matrix3XR<REAL> m_accel; // accelerations

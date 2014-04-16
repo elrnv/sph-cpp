@@ -42,6 +42,8 @@ using Kerneld = Kernel<double, KernelType>;
 template<typename KernelType>
 using Kernel3d = Kernel<Vector3d, KernelType>;
 
+// This is a pseudo kernel (doesn't actually have kernel properties but it
+// is used like a kernel for penalty based boundary forces)
 struct MKI04Kernel : public Kerneld<MKI04Kernel>
 {
   inline void init_coef() { coef = (27.0f/11.0f)*hinv; }
@@ -132,7 +134,7 @@ struct CubicSplineLapKernel : public Kerneld<CubicSplineLapKernel>
 
 struct Poly6Kernel : public Kerneld<Poly6Kernel>
 {
-  inline void init_coef() { coef = 315.0f/(64*M_PI*h3); }
+  inline void init_coef() { coef = 315.0f/(64.0f*M_PI*h3); }
   
   // main kernel without coefficient
   inline double kern(const Vector3d &r)
@@ -144,7 +146,7 @@ struct Poly6Kernel : public Kerneld<Poly6Kernel>
 
 struct Poly6GradKernel : public Kernel3d<Poly6GradKernel>
 {
-  inline void init_coef() { coef = 1890.0f/(64*M_PI*h3*h2); }
+  inline void init_coef() { coef = 945.0f/(32.0f*M_PI*h3*h2); }
 
   inline Vector3d kern(const Vector3d &r)
   {
@@ -155,7 +157,7 @@ struct Poly6GradKernel : public Kernel3d<Poly6GradKernel>
 
 struct Poly6LapKernel : public Kerneld<Poly6LapKernel>
 {
-  inline void init_coef() { coef = 1890.0f/(64*M_PI*h3*h2); }
+  inline void init_coef() { coef = 945.0f/(32.0f*M_PI*h3*h2); }
 
   inline double kern(const Vector3d &r)
   {

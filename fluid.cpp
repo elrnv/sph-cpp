@@ -14,6 +14,8 @@ template<typename REAL, typename SIZE>
 FluidRS<REAL,SIZE>::FluidRS(const PointCloudRS<REAL,SIZE> *pc, FluidParamsPtr params)
   : PointCloudRS<REAL,SIZE>(*pc)
   , m_params(params)
+  , m_avg_density(0.0f)
+  , m_avg_pressure(0.0f)
   , m_cache(global::dynset.frames+1)
 { }
 
@@ -21,6 +23,8 @@ template<typename REAL, typename SIZE>
 FluidRS<REAL,SIZE>::FluidRS(const aiMesh *pc, FluidParamsPtr params)
   : PointCloudRS<REAL,SIZE>(pc)
   , m_params(params)
+  , m_avg_density(0.0f)
+  , m_avg_pressure(0.0f)
   , m_cache(global::dynset.frames+1)
 { }
 
@@ -74,7 +78,7 @@ void FluidRS<REAL,SIZE>::init(GLPointCloudRS<REAL, SIZE> *glpc)
   //qDebug() << float( t2 - t1 ) / CLOCKS_PER_SEC << " to get " << d2;
 
   // construct output filename (this can be done whenever)
-  m_savefmt = global::dynset.savedir + "/" + m_params->saveprefix + "%03d.obj";
+  m_savefmt = global::dynset.savedir + "/" + m_params->saveprefix + "%03d.sim";
 }
 
 // clamp value d to min and max boundaries + epsilon,
@@ -134,27 +138,39 @@ inline void FluidRS<REAL,SIZE>::save(unsigned int frame)
     return;
 
   // open output file
-  FILE * outfile = NULL;
+  std::ofstream outfile;
   char buf[128];
   sprintf(buf, m_savefmt.c_str(), frame);
-  outfile = fopen(buf,"w");
+  outfile.open(buf, std::ios::out | std::ios::binary);
 
-  if (!outfile)
+  if (!outfile.is_open())
   {
     qWarning() << "Output file" << buf << "not opened!";
     return;
   }
 
-  for (SIZE i = 0; i < this->get_num_vertices(); ++i)
+  SIZE num = this->get_num_vertices();
+  outfile.write(reinterpret_cast<const char *>(&num), sizeof num);
+  float radius = this->get_radius();
+  float lev = 0.0f;
+
+  for (SIZE i = 0; i < num; ++i)
   {
     REAL * posptr = m_cache[frame].pos.data() + i*3;
-    fprintf(outfile, "v %f %f %f\n", posptr[0], posptr[1], posptr[2]);
+    REAL * velptr = m_cache[frame].vel.data() + i*3;
+    float x = posptr[0]; float y = posptr[1]; float z = posptr[2];
+    float u = velptr[0]; float v = velptr[1]; float w = velptr[2];
+    outfile.write(reinterpret_cast<const char *>(&x), sizeof(float));
+    outfile.write(reinterpret_cast<const char *>(&y), sizeof(float));
+    outfile.write(reinterpret_cast<const char *>(&z), sizeof(float));
+    outfile.write(reinterpret_cast<const char *>(&radius), sizeof(float));
+    outfile.write(reinterpret_cast<const char *>(&lev), sizeof(float));
+    outfile.write(reinterpret_cast<const char *>(&u), sizeof(float));
+    outfile.write(reinterpret_cast<const char *>(&v), sizeof(float));
+    outfile.write(reinterpret_cast<const char *>(&w), sizeof(float));
   }
 
-  for (SIZE i = 1; i <= this->get_num_vertices(); ++i)
-    fprintf(outfile, "f %d\n", i);
-
-  fclose(outfile);
+  outfile.close();
 }
 
 template<typename REAL, typename SIZE>
@@ -209,32 +225,35 @@ inline bool FluidRS<REAL,SIZE>::read_saved(unsigned int frame)
   std::ifstream infile;
   char buf[128];
   sprintf(buf, m_savefmt.c_str(), frame);
-  infile.open(buf);
+  infile.open(buf, std::ios::in | std::ios::binary);
 
   if (!infile.is_open())
     return false;
 
-  m_cache[frame].pos.resizeLike(m_pos);
+  SIZE num;
+  infile.read(reinterpret_cast<char *>(&num), sizeof num);
 
-  std::string line;
-  SIZE i = 0;
-  while ( getline(infile, line) )
+  m_cache[frame].pos.resize(NoChange,num);
+  m_cache[frame].vel.resize(NoChange,num);
+
+  for (SIZE i = 0; i < num; ++i)
   {
-    std::istringstream iss(line);
-    std::string identifier;
-    iss >> identifier;
-    if (boost::iequals(identifier, "f"))
-      break; // reached faces, done
-
-    if (!boost::iequals(identifier, "v"))
-      continue; // skip garbage
-
+    float x,y,z,r,l,u,v,w;
+    infile.read(reinterpret_cast<char *>(&x), sizeof(float));
+    infile.read(reinterpret_cast<char *>(&y), sizeof(float));
+    infile.read(reinterpret_cast<char *>(&z), sizeof(float));
+    infile.read(reinterpret_cast<char *>(&r), sizeof(float)); // ignore
+    infile.read(reinterpret_cast<char *>(&l), sizeof(float)); // ignore
+    infile.read(reinterpret_cast<char *>(&u), sizeof(float));
+    infile.read(reinterpret_cast<char *>(&v), sizeof(float));
+    infile.read(reinterpret_cast<char *>(&w), sizeof(float));
+    
     REAL * posptr = m_cache[frame].pos.data() + i*3;
-    iss >> posptr[0];
-    iss >> posptr[1];
-    iss >> posptr[2];
+    REAL * velptr = m_cache[frame].vel.data() + i*3;
+    posptr[0] = REAL(x); posptr[1] = REAL(y); posptr[2] = REAL(z);
+    velptr[0] = REAL(u); velptr[1] = REAL(v); velptr[2] = REAL(w);
+
     m_cache[frame].valid = true;
-    i += 1;
   }
 
   infile.close();
@@ -263,6 +282,7 @@ template<typename REAL, typename SIZE>
 inline void FluidRS<REAL,SIZE>::cache(unsigned int frame) 
 {
   m_cache[frame].pos = m_pos;
+  m_cache[frame].vel = m_vel;
   m_cache[frame].valid = true;
 
   save(frame);
@@ -278,24 +298,11 @@ template<typename REAL, typename SIZE>
 inline bool FluidRS<REAL,SIZE>::load_cached(unsigned int frame) 
 {
   // dont load if not cached or is first frame and next is not cached
-  if ( !m_cache[frame].valid
-      || (frame == 0 && !m_cache[frame+1].valid) ) 
+  if ( !is_cached(frame) ) 
     return false;
 
   m_pos = m_cache[frame].pos;
-  
-  if (m_cache[frame+1].valid)
-    return true;
-
-  // infer velocities from last frame
-  if (frame == 0 || !m_cache[frame-1].valid)
-  { // reset to initial velocity
-    for (SIZE i = 0; i < this->get_num_vertices(); ++i)
-      m_vel.col(i) = m_params->velocity.template cast<REAL>();
-    return true;
-  }
-
-  m_vel = (m_pos - m_cache[frame-1].pos)*global::dynset.fps;
+  m_vel = m_cache[frame].vel;
 
   return true;
 }
