@@ -12,6 +12,7 @@ struct __attribute__ ((__packed__)) ParticleR
 
   Vector3R<REAL> pos;
   REAL dinv;
+  REAL d;
   REAL vol; // volume estimate used for shepard filter
   REAL pressure;
 };

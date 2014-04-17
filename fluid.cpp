@@ -114,11 +114,35 @@ inline void FluidRS<REAL,SIZE>::resolve_collisions()
 }
 
 template<typename REAL, typename SIZE>
-inline void FluidRS<REAL,SIZE>::clamp(float tol)
+inline void FluidRS<REAL,SIZE>::clamp(float adjust, float push)
 {
   for (SIZE i = 0; i < this->get_num_vertices(); ++i)
+  {
     for (unsigned char j = 0; j < 3; ++j)
-      clamp(pos_at(i)[j], m_bmin[j], m_bmax[j], tol);
+    {
+      REAL &d = pos_at(i)[j];
+      REAL &a = accel_at(i)[j];
+      REAL &v = vel_at(i)[j];
+      REAL min = m_bmin[j]-adjust;
+      REAL max = m_bmax[j]+adjust;
+      if ( d < min )
+      {
+        d = min + push;
+        if (a < 0)
+          a = 0;
+        if (v < 0)
+          v = 0;
+      }
+      else if (d > max)
+      {
+        d = max - push;
+        if (a > 0)
+          a = 0;
+        if (v > 0)
+          v = 0;
+      }
+    }
+  }
 }
 
 template<typename REAL, typename SIZE>

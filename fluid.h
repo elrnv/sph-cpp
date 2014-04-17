@@ -93,9 +93,10 @@ public:
   inline bool is_dynamic() const { return true; }
 
   inline void reset_accel() { m_accel.setZero(); m_extern_accel.setZero(); }
+  inline void reset_extern_accel() { m_extern_accel.setZero(); }
 
   bool clamp(REAL &d, REAL min, REAL max, REAL tol);
-  void clamp(float tol);
+  void clamp(float adjust, float push);
   void resolve_collisions();
 
   void update_data(); // propagate changes to some viewer

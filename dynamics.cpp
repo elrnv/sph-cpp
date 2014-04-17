@@ -342,8 +342,8 @@ inline void FTiter<REAL,SIZE,FT>::compute_density(UniformGridRS<REAL,SIZE> &g)
   if (g.m_fluids[FT].size())
   {
 
-    REAL max_var[g.m_num_fluids];
-    REAL avg_var[g.m_num_fluids];
+    REAL max_var[g.m_fluids[FT].size()];
+    REAL avg_var[g.m_fluids[FT].size()];
     
     int i = 0;
     for (auto &fl : g.m_fluids[FT] )
@@ -385,7 +385,7 @@ inline void FTiter<REAL,SIZE,FT>::compute_accel(UniformGridRS<REAL,SIZE> &g)
 }
 
 template<typename REAL, typename SIZE>
-inline void UniformGridRS<REAL,SIZE>::jacobi_pressure_solve(float dt)
+inline void UniformGridRS<REAL,SIZE>::jacobi_pressure_solve(float dt, float factor)
 {
   if (!m_fluids[ICS13].size())
     return;
@@ -395,11 +395,13 @@ inline void UniformGridRS<REAL,SIZE>::jacobi_pressure_solve(float dt)
     fl->template cast<ICS13>()->m_fluid_prepare_jacobi_proc.init( dt );
     fl->template cast<ICS13>()->m_fluid_jacobi_solve1_proc.init( dt );
     fl->template cast<ICS13>()->m_fluid_jacobi_solve2_proc.init( dt, fl->get_avg_density(), fl->get_avg_pressure() );
+    fl->template cast<ICS13>()->reset_extern_accel();     // now may assume all accelerations are zero
   }
 
   compute_fluid_quantity< CFPrepareJacobiRST<REAL, SIZE, ICS13>, ICS13 >();
 
   bool proceed = false;
+  int iter = 0;
   do
   {
     compute_fluid_quantity< CFJacobiSolveFirstRST<REAL, SIZE, ICS13>, ICS13 >();
@@ -408,17 +410,18 @@ inline void UniformGridRS<REAL,SIZE>::jacobi_pressure_solve(float dt)
     for (auto &fl : m_fluids[ICS13])
     {
       proceed |= std::abs(fl->get_avg_density()/fl->get_num_vertices() -
-          fl->get_rest_density()) > 5;
-      qDebug() << "avg density = " << fl->get_avg_density()/fl->get_num_vertices();
-  //    qDebug() << "avg pressure = " << fl->get_avg_pressure()/fl->get_num_vertices();
+          fl->get_rest_density()) > 1;
+      qDebug() << "avg density  = " << fl->get_avg_density()/fl->get_num_vertices();
+      qDebug() << "avg pressure = " << fl->get_avg_pressure()/fl->get_num_vertices();
       fl->get_avg_density() = 0.0f;
+      fl->get_avg_pressure() = 0.0f;
     }
   } while(proceed);
 
   compute_fluid_quantity< CFPressureAccelRST<REAL, SIZE, ICS13>, ICS13 >();
 
   for (auto &fl : m_fluids[ICS13])
-    fl->get_vel() = fl->get_vel() + dt*fl->get_accel();
+    fl->get_vel() = fl->get_vel() + factor*dt*fl->get_extern_accel();
 }
 
 template<typename REAL, typename SIZE>
@@ -448,7 +451,8 @@ void UniformGridRS<REAL,SIZE>::run()
     global::dynset.gravity = Vector3f(0.0,0.0,0.0);
     for (unsigned int iter = 0; iter < global::dynset.init_steps; ++iter)
     { // for each simulation substep
-      step(dt, iter == 0);
+      if (!step(dt, iter == 0))
+        break;
     } // for each substep
 
     global::dynset.gravity = grav; // restore gravity
@@ -606,7 +610,7 @@ inline bool UniformGridRS<REAL,SIZE>::step(float dt, bool first_step, float *sub
     for (auto &fl : m_fluids[j])
       fl->get_vel() = fl->get_vel() + factor*dt*fl->get_accel();
 
-  jacobi_pressure_solve(dt); // only relevant for IISPH fluids
+  jacobi_pressure_solve(dt,factor); // only relevant for IISPH fluids
 
   for (int j = 0; j < NUMTYPES; ++j)
   {
@@ -615,8 +619,8 @@ inline bool UniformGridRS<REAL,SIZE>::step(float dt, bool first_step, float *sub
       fl->get_pos() = (fl->get_pos() + dt*fl->get_vel()).eval();
       if (j == MCG03)
         fl->resolve_collisions();
-      //    else
-      //      fl->clamp(0.0f);
+      else
+        fl->clamp(0.5*m_h-0.01,0.01f);
 
       // prepare velocities for acceleration computation in next step
       fl->get_vel() = fl->get_vel() + 0.5*dt*fl->get_accel();
