@@ -7,9 +7,8 @@
 #include "simwindow.h"
 #include "fluid.h"
 
-#ifndef CONFIGDIR
-  #define CONFIGDIR "/Users/egor/proj/sim2/data/"
-#endif
+#define STRINGIZE(x) #x
+#define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
 
 void SimWindow::toggle_shortcuts()
 {
@@ -99,7 +98,7 @@ void SimWindow::init()
 void SimWindow::load_model(int i)
 {
   clear_dynamics();
-  SceneNode *scene = Util::loadScene(std::string(CONFIGDIR) + "scene" + std::to_string(i) + ".cfg");
+  SceneNode *scene = Util::loadScene(std::string(STRINGIZE_VALUE_OF(CONFIGDIR)) + "/scene" + std::to_string(i) + ".cfg");
 
   if (!scene)
     return;
