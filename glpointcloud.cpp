@@ -85,6 +85,7 @@ void GLPointCloudRS<REAL,SIZE>::sort_by_depth(const AffineCompact3f &mvtrans)
   std::lock_guard<std::mutex> guard(this->m_lock); // prevent others from reading buffers
 
   // Sort all vertices by the z value
+  clock_t s = clock();
   Matrix3XR<GLfloat> mvpos = mvtrans * m_vertices; // TODO: mem alloc expensive?
   SIZE num_verts = get_num_vertices();
   VectorXT<SIZE> perm_vec(num_verts);
@@ -95,8 +96,12 @@ void GLPointCloudRS<REAL,SIZE>::sort_by_depth(const AffineCompact3f &mvtrans)
 
   std::sort(perm_data, perm_data + num_verts,
       [mvpos](SIZE i, SIZE j) { return mvpos.col(i)[2] < mvpos.col(j)[2]; });
+  clock_t sort_t = clock();
 
   m_vertices = m_vertices * PermutationMatrix<Dynamic, Dynamic, SIZE>(perm_vec);
+
+  clock_t mult_t = clock();
+  fprintf(stderr, "\rsort: %05.2e  mult: %05.2e", float(sort_t - s), float(mult_t - sort_t));
 
   m_insync = false;
 }
