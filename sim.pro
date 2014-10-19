@@ -15,11 +15,11 @@ SOURCES += \
   material.cpp \
   uniformbuffer.cpp \
   shadermanager.cpp \
-  quantityprocessor.cpp \
+#  quantityprocessor.cpp \
   fluid.cpp \
   dynamics.cpp \
   glmesh.cpp \
-  glpointcloud.cpp \
+  glpointcloud.cpp
 
 HEADERS += \
   gltext.h \
@@ -34,7 +34,8 @@ HEADERS += \
   material.h \
   uniformbuffer.h \
   shadermanager.h \
-  quantityprocessor.h \
+  fluidmanager.h \
+#  quantityprocessor.h \
   fluid.h \
   dynamics.h \
   glmesh.h \
@@ -44,6 +45,8 @@ HEADERS += \
   eigen.h \
   util.h \
   kernel.h
+
+DESTDIR = ../bin
 
 # compile with latest c++ specs
 CONFIG += c++11
@@ -72,5 +75,8 @@ QMAKE_CXXFLAGS += -DBOOST_DISABLE_ASSERTS
 
 # show warnings if a function is not inlined
 QMAKE_CXXFLAGS += -stdlib=libc++ -Winline -Wno-unused-parameter
+
+# directory containing scene configurations
+QMAKE_CXXFLAGS += -DCONFIGDIR=/Users/egor/proj/sph/data
 
 RESOURCES += resources.qrc
