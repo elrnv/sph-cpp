@@ -17,6 +17,8 @@ SOURCES += \
   shadermanager.cpp \
 #  quantityprocessor.cpp \
   fluid.cpp \
+  fluidimpl.cpp \
+  boundary.cpp \
   dynamics.cpp \
   glmesh.cpp \
   glpointcloud.cpp
@@ -34,9 +36,11 @@ HEADERS += \
   material.h \
   uniformbuffer.h \
   shadermanager.h \
-  fluidmanager.h \
+  dynamicsmanager.h \
 #  quantityprocessor.h \
   fluid.h \
+  fluidimpl.h \
+  boundary.h \
   dynamics.h \
   glmesh.h \
   glpointcloud.h \
