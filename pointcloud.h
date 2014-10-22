@@ -9,44 +9,37 @@
 
 // Partially resolve matrix template for convenience
 
-template<typename REAL, typename SIZE>
-class PointCloudRS;
+class PointCloud;
 
-template<typename REAL, typename SIZE>
-std::ostream& operator<<(std::ostream& out, const PointCloudRS<REAL,SIZE>& pc);
+std::ostream& operator<<(std::ostream& out, const PointCloud& pc);
 
 // A cloud of points
-template<typename REAL, typename SIZE>
-class PointCloudRS : public Primitive 
+class PointCloud : public Primitive 
 {
 public:
-  explicit PointCloudRS(const aiMesh *pc);
-  ~PointCloudRS();
+  explicit PointCloud(const aiMesh *pc);
+  ~PointCloud();
 
-  inline REAL get_radius() { return 0.5*compute_mindist(); }
-  virtual REAL get_halo_radius() { return get_radius(); }
-  inline SIZE get_num_vertices() const { return m_pos.cols(); }
-  inline REAL *pos_at(SIZE i)    { return m_pos.data() + i*3; }
-  inline Matrix3XR<REAL> &get_pos() { return m_pos; }
+  inline Real get_radius() { return 0.5*compute_mindist(); }
+  virtual Real get_halo_radius() { return get_radius(); }
+  inline Size get_num_vertices() const { return m_pos.cols(); }
+  inline Real *pos_at(Size i)    { return m_pos.data() + i*3; }
+  inline Matrix3XR<Real> &get_pos() { return m_pos; }
+  inline void set_pos(const Matrix3XR<Real> &pos) { m_pos = pos; }
   inline bool is_pointcloud() const { return true; }
 
   void transform_in_place(const AffineCompact3f &trans);
   AlignedBox3f &compute_bbox();
-  REAL compute_mindist();
-  REAL compute_mindist_brute();
+  Real compute_mindist();
+  Real compute_mindist_brute();
 
-  friend std::ostream& operator<< <>(std::ostream& out, const PointCloudRS<REAL,SIZE>& pc);
+  friend std::ostream& operator<<(std::ostream& out, const PointCloud& pc);
 
 protected:
-  REAL m_mindist;
-  Matrix3XR<REAL> m_pos;
-}; // class PointCloudRS
+  Real m_mindist;
+  Matrix3XR<Real> m_pos;
+}; // class PointCloud
 
-template<typename REAL, typename SIZE>
-using PointCloudPtrRS = boost::shared_ptr< PointCloudRS<REAL, SIZE> >;
-
-// defaults
-typedef PointCloudRS<double, unsigned int> PointCloud;
-typedef PointCloudPtrRS<double, unsigned int> PointCloudPtr;
+typedef boost::shared_ptr< PointCloud > PointCloudPtr;
 
 #endif // POINTCLOUD_H

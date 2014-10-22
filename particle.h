@@ -1,62 +1,61 @@
 #ifndef PARTICLE_H
 #define PARTICLE_H
 
+#include "types.h"
 #include "eigen.h"
 #include "dynparams.h"
 
-template<typename REAL>
-struct __attribute__ ((__packed__)) ParticleR
+struct __attribute__ ((__packed__)) Particle
 {
-  ParticleR(Vector3R<REAL> p) : pos(p){ }
-  ~ParticleR() { }
+  Particle(Vector3R<Real> p) : pos(p){ }
+  ~Particle() { }
 
-  Vector3R<REAL> pos;
-  REAL dinv;
-  REAL d;
-  REAL vol; // volume estimate used for shepard filter
-  REAL pressure;
+  Vector3R<Real> pos;
+  Real dinv;
+  Real d;
+  Real vol; // volume estimate used for shepard filter
+  Real pressure;
 };
 
-template<typename REAL>
-struct __attribute__ ((__packed__)) FluidParticleR : public ParticleR<REAL>
+struct __attribute__ ((__packed__)) FluidParticle : public Particle
 {
-  explicit FluidParticleR(Vector3R<REAL> p, Vector3R<REAL> v,
-      REAL *a, REAL *ea, REAL *dinv, unsigned short i, REAL c)
-    : ParticleR<REAL>(p)
+  explicit FluidParticle(Vector3R<Real> p, Vector3R<Real> v,
+      Real *a, Real *ea, Real *dinv, unsigned int i, Real c)
+    : Particle(p)
     , vel(v)
     , _accel(a)
     , _extern_accel(ea)
     , _dinv(dinv)
     , color(c)
     , id(i) { }
-  ~FluidParticleR() { }
+  ~FluidParticle() { }
 
-  Vector3R<REAL> vel;
-  Vector3R<REAL> n;    // for various computations
-  Vector3R<REAL> m;    // for various computations
-  REAL *_accel;        // 3-array to which we write total acceleration
-  REAL *_extern_accel; // 3-array to which we write acceleration from external forces
-  REAL *_dinv; // pointer to fluid entry
-  REAL c;      // intermediate for various computations
-  REAL b;      // intermediate for various computations
-  REAL color;  // used for surface tension computations
-  unsigned short id;  // index of the fluid this particle belongs to in the grid
+  Vector3R<Real> vel;
+  Vector3R<Real> n;    // for various computations
+  Vector3R<Real> m;    // for various computations
+  Real *_accel;        // 3-array to which we write total acceleration
+  Real *_extern_accel; // 3-array to which we write acceleration from external forces
+  Real *_dinv; // pointer to fluid entry
+  Real c;      // intermediate for various computations
+  Real b;      // intermediate for various computations
+  Real color;  // used for surface tension computations
+  unsigned int id;  // index of the fluid this particle belongs to in the grid
 };
 
-template<typename REAL, int FT>
-struct FluidParticleRT : public FluidParticleR<REAL>
+template<int FT>
+struct FluidParticleT : public FluidParticle
 { 
-  explicit FluidParticleRT(Vector3R<REAL> p, Vector3R<REAL> v,
-      REAL *a, REAL *ea, REAL *dinv, unsigned short i)
-    : FluidParticleR<REAL>(p, v, a, ea, dinv, i) { }
+  explicit FluidParticleT(Vector3R<Real> p, Vector3R<Real> v,
+      Real *a, Real *ea, Real *dinv, unsigned int i, Real c)
+    : FluidParticle(p, v, a, ea, dinv, i, c) { }
 };
 
 // would like to infer the Type of fluid for a particular particle type:
 template <typename>
 struct extract_fluid_type;
 
-template <typename REAL, int FT>
-struct extract_fluid_type< FluidParticleRT<REAL, FT> >
+template <int FT>
+struct extract_fluid_type< FluidParticleT<FT> >
 {
   static const int type = FT;
 };

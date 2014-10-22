@@ -6,13 +6,13 @@
 #include "glmesh.h"
 
 // GLMesh stuff
-template<typename REAL, typename SIZE>
-GLMeshRS<REAL,SIZE>::GLMeshRS(
-    MeshPtrRS<REAL,SIZE> mesh,
+
+GLMesh::GLMesh(
+    MeshPtr mesh,
     MaterialConstPtr mat,
     UniformBuffer &ubo,
     ShaderManager &shaderman)
-  : GLPrimitiveS<SIZE>(mat, ubo, shaderman)
+  : GLPrimitive(mat, ubo, shaderman)
   , m_mesh(mesh)
   , m_vertices(3, get_num_vertices())
   , m_normals(3, get_num_vertices())
@@ -27,25 +27,29 @@ GLMeshRS<REAL,SIZE>::GLMeshRS(
   VertexVec::const_iterator v_it = verts.cbegin();
   int i = 0;
   for ( ; v_it != verts.cend(); ++v_it)
+  {
     for (short j = 0; j < 3; ++j)
     {
       vertices[i] = GLfloat(v_it->pos[j]);
       normals[i++]  = GLfloat(v_it->nml[j]);
     }
+  }
 
   // collect indices
-  const FaceVecRS<REAL, SIZE> &faces = mesh->get_faces();
+  const FaceVec &faces = mesh->get_faces();
 
   GLuint indices[faces.size()*3];
 
-  typename FaceVecRS<REAL, SIZE>::const_iterator f_it = faces.begin();
+  typename FaceVec::const_iterator f_it = faces.begin();
   i = 0;
   for ( ; f_it != faces.end(); ++f_it)
+  {
     for (short j = 0; j < 3; ++j)
     {
       indices[i] = GLuint((*f_it)[j]);
       ++i;
     }
+  }
 
   this->m_vao.create();
   this->m_vao.bind();
@@ -72,13 +76,14 @@ GLMeshRS<REAL,SIZE>::GLMeshRS(
   update_shader(ShaderManager::PHONG);
 }
 
-template<typename REAL, typename SIZE>
-GLMeshRS<REAL,SIZE>::~GLMeshRS()
+
+GLMesh::~GLMesh()
 {
 }
 
-template<typename REAL, typename SIZE>
-void GLMeshRS<REAL, SIZE>::update_data()
+
+void
+GLMesh::update_data()
 {
   std::lock_guard<std::mutex> guard(this->m_lock);
 
@@ -99,8 +104,9 @@ void GLMeshRS<REAL, SIZE>::update_data()
   m_insync = false;
 }
 
-template<typename REAL, typename SIZE>
-void GLMeshRS<REAL, SIZE>::sort_by_depth(const AffineCompact3f &mvtrans)
+
+void
+GLMesh::sort_by_depth(const AffineCompact3f &mvtrans)
 {
   return;
   // TODO: implement this
@@ -108,32 +114,33 @@ void GLMeshRS<REAL, SIZE>::sort_by_depth(const AffineCompact3f &mvtrans)
 
   // Sort all vertices by the z value
   Matrix3XR<GLfloat> mvpos = (mvtrans * m_vertices).eval(); // TODO: mem alloc expensive?
-  SIZE num_verts = get_num_vertices();
-  VectorXT<SIZE> perm_vec(num_verts);
-  for (SIZE i = 0; i < num_verts; ++i)
+  Size num_verts = get_num_vertices();
+  VectorXT<Size> perm_vec(num_verts);
+  for (Size i = 0; i < num_verts; ++i)
     perm_vec[i] = i;
 
-  SIZE *perm_data = perm_vec.data();
+  Size *perm_data = perm_vec.data();
 
   std::sort(perm_data, perm_data + num_verts,
-      [mvpos](SIZE i, SIZE j) { return mvpos.col(i)[2] < mvpos.col(j)[2]; });
+      [mvpos](Size i, Size j) { return mvpos.col(i)[2] < mvpos.col(j)[2]; });
 
-  PermutationMatrix<Dynamic, Dynamic, SIZE> perm_mat(perm_vec);
+  PermutationMatrix<Dynamic, Dynamic, Size> perm_mat(perm_vec);
   m_vertices = m_vertices * perm_mat;
   m_normals  = m_normals * perm_mat;
 
-  for (SIZE i = 0; i < num_verts; ++i)
+  for (Size i = 0; i < num_verts; ++i)
     std::cerr << m_vertices.col(i)[0] << " " << m_vertices.col(i)[1] << " " << m_vertices.col(i)[2] << std::endl;
 
   m_insync = false;
 }
 
-template<typename REAL, typename SIZE>
-void GLMeshRS<REAL, SIZE>::update_glbuf()
+
+void
+GLMesh::update_glbuf()
 {
   std::lock_guard<std::mutex> guard(this->m_lock);
   
-  if (m_insync) //TODO: test with atomic m_insync
+  if (m_insync)
     return;
 
   this->m_vao.bind();
@@ -147,8 +154,9 @@ void GLMeshRS<REAL, SIZE>::update_glbuf()
   m_insync = true;
 }
 
-template<typename REAL, typename SIZE>
-void GLMeshRS<REAL, SIZE>::update_shader(ShaderManager::ShaderType type)
+
+void
+GLMesh::update_shader(ShaderManager::ShaderType type)
 {
   if (this->m_prog)
   {
@@ -178,6 +186,3 @@ void GLMeshRS<REAL, SIZE>::update_shader(ShaderManager::ShaderType type)
 
   this->m_ubo.bindToProg(this->m_prog->programId(), "Globals");
 }
-
-// defaults
-template class GLMeshRS<double, unsigned int>;

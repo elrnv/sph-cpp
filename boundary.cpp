@@ -9,7 +9,9 @@
 #include "gltext.h"
 #include "settings.h"
 
-// Fluid stuff
+// Boundary stuff
+// Def'n: a boundary is a static cloud of points, which passively interacts with
+//        other objects.
 
 Fluid::Fluid(PointCloud &pc, FluidParamsPtr params)
   : m_pc(pc)

@@ -3,10 +3,11 @@
 
 #include <vector>
 #include "types.h"
-//#include "quantityprocessor.h"
 #include "dynparams.h"
 
-// Fluid Stuff
+// Boundary Stuff
+// Def'n: a boundary is a static cloud of points, which passively interacts with
+//        other objects.
 
 // Forward declaration
 class GLPointCloud;

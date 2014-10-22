@@ -4,13 +4,15 @@
 #include "scene.h"
 #include "util.h"
 #include "mesh.h"
+#include "dynamics.h"
 #include "simwindow.h"
 #include "fluid.h"
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
 
-void SimWindow::toggle_shortcuts()
+void 
+SimWindow::toggle_shortcuts()
 {
   m_show_shortcuts = !m_show_shortcuts;
   glclear_bl();
@@ -59,12 +61,14 @@ SimWindow::~SimWindow()
 {
 }
 
-void SimWindow::onClose()
+void 
+SimWindow::onClose()
 {
   clear_dynamics();
 }
 
-void SimWindow::clear_dynamics()
+void 
+SimWindow::clear_dynamics()
 {
   m_dynamics = false;
   set_animating(false);
@@ -78,13 +82,14 @@ void SimWindow::clear_dynamics()
   delete m_grid; m_grid = 0;
 }
 
-void SimWindow::init()
+void 
+SimWindow::init()
 {
   OpenGLWindow::init();
   m_shaderman.init();
 
 	m_ubo.create();
-	m_ubo.setUsagePattern( UniformBuffer::StreamDraw );
+	m_ubo.setUsagePattern( UniformBuffer::DynamicDraw );
 	m_ubo.bind();
   m_ubo.allocate( sizeof(m_udata) );
   m_ubo.bindToIndex();
@@ -95,10 +100,13 @@ void SimWindow::init()
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
-void SimWindow::load_model(int i)
+void 
+SimWindow::load_model(int i)
 {
   clear_dynamics();
-  SceneNode *scene = Util::loadScene(std::string(STRINGIZE_VALUE_OF(CONFIGDIR)) + "/scene" + std::to_string(i) + ".cfg");
+  SceneNode *scene =
+    Util::loadScene( std::string(STRINGIZE_VALUE_OF(CONFIGDIR)) 
+                     + "/scene" + std::to_string(i) + ".cfg");
 
   if (!scene)
     return;
@@ -130,14 +138,16 @@ void SimWindow::load_model(int i)
   change_viewmode(m_viewmode);
 }
 
-void SimWindow::change_viewmode(ViewMode vm)
+void 
+SimWindow::change_viewmode(ViewMode vm)
 {
   m_viewmode = vm;
   m_change_prog = true;
   reset_viewmode();
 }
 
-void SimWindow::reset_viewmode()
+void 
+SimWindow::reset_viewmode()
 {
   glEnable(GL_BLEND);
 
@@ -168,12 +178,14 @@ void SimWindow::reset_viewmode()
   }
 }
 
-void SimWindow::toggle_bbox()
+void 
+SimWindow::toggle_bbox()
 {
   m_show_bbox = !m_show_bbox;
   renderLater();
 }
-void SimWindow::toggle_halos()
+void 
+SimWindow::toggle_halos()
 {
   for ( auto &glprim : m_glprims )
   {
@@ -185,7 +197,8 @@ void SimWindow::toggle_halos()
   }
 }
 
-void SimWindow::clear_cache()
+void 
+SimWindow::clear_cache()
 {
   for ( auto &glprim : m_glprims )
   {
@@ -199,7 +212,8 @@ void SimWindow::clear_cache()
   glprintf_trc(CYAN, "Cache cleared\n");
 }
 
-void SimWindow::toggle_dynamics()
+void 
+SimWindow::toggle_dynamics()
 {
   bool temp = m_dynamics;
 
@@ -233,7 +247,14 @@ void SimWindow::toggle_dynamics()
   set_animating(m_dynamics);
 }
 
-void SimWindow::render()
+void 
+SimWindow::toggle_simulation()
+{ 
+  if (m_grid) { m_grid->toggle_pause(); } 
+}
+
+void 
+SimWindow::render()
 {
   glDepthMask(GL_TRUE); // depthmask needs to be true before clearing the depth bit
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -255,7 +276,7 @@ void SimWindow::render()
   glFinish(); // Finish writing uniform buffer before drawing
 
   if (m_show_bbox)
-    draw_bbox();
+    draw_wire_bbox();
 
   glFinish();
   reset_viewmode();
@@ -330,7 +351,8 @@ void SimWindow::render()
   m_change_prog = false;
 }
 
-void SimWindow::keyPressEvent(QKeyEvent *event)
+void 
+SimWindow::keyPressEvent(QKeyEvent *event)
 {
   int key = event->key();
   //m_context->makeCurrent(this);
@@ -384,7 +406,8 @@ void SimWindow::keyPressEvent(QKeyEvent *event)
   renderLater(); // queue rendering
 }
 
-void SimWindow::init_bbox()
+void 
+SimWindow::init_bbox()
 {
   GLfloat vertices[24] = {
     -1, -1, -1,   1, -1, -1,
@@ -423,7 +446,8 @@ void SimWindow::init_bbox()
   m_ubo.bindToProg(m_bbox_prog->programId(), "Globals");
 }
 
-void SimWindow::draw_bbox()
+void 
+SimWindow::draw_wire_bbox()
 {
   glEnable(GL_BLEND);
   glEnable(GL_DEPTH_TEST);

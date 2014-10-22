@@ -6,44 +6,46 @@
 #include "dynamics.h"
 #include "glpointcloud.h"
 #include "gltext.h"
+//#include "quantityprocessor.h"
 #include "fluid.h"
 #include "settings.h"
-#include "quantityprocessor.h"
 #define BOOST_CHRONO_HEADER_ONLY
 #include <boost/chrono.hpp>
 
 //#define REPORT_DENSITY_VARIATION
 
 typedef boost::chrono::process_real_cpu_clock real_clock;
+typedef boost::chrono::nanoseconds ns_t;
 typedef real_clock::time_point real_t;
 
 // From [Solenthaler and Pajarola 2008], an alternative density
 // (number_density * mass) is used
-template<typename REAL, typename SIZE>
-class CBVolumeRS : public CBQ<REAL, SIZE, CBVolumeRS<REAL,SIZE> >
+/*
+class CBVolume : public CBQ<CBVolume>
 {
 public:
   inline void init_kernel(float h) { m_kern.init(h); }
-  inline void init_particle(ParticleR<REAL> &p) 
+  inline void init_particle(Particle &p) 
   { p.dinv = 0.0f; }
-  inline void fluid(ParticleR<REAL> &p, FluidParticleR<REAL> &near_p)
+  inline void fluid(Particle &p, FluidParticle &near_p)
   { }
-  inline void bound(ParticleR<REAL> &p, ParticleR<REAL> &near_p)
+  inline void bound(Particle &p, Particle &near_p)
   {
     p.dinv += this->m_kern[ p.pos - near_p.pos ];
   }
-  inline void finish_particle(ParticleR<REAL> &p)
+  inline void finish_particle(Particle &p)
   {
     p.dinv = 1.0f/(p.dinv * this->m_kern.coef);
   }
 private:
   CubicSplineKernel m_kern;
 };
+*/
 
 // UniformGrid stuff
 
-template<typename REAL, typename SIZE>
-UniformGridRS<REAL,SIZE>::UniformGridRS(
+
+UniformGrid::UniformGrid(
     const Vector3f &bmin,
     const Vector3f &bmax ) 
   : m_num_fluids(0)
@@ -55,16 +57,28 @@ UniformGridRS<REAL,SIZE>::UniformGridRS(
   , m_pause(false)
 { }
 
-template<typename REAL, typename SIZE>
-UniformGridRS<REAL,SIZE>::~UniformGridRS() { }
-  
-template<typename REAL, typename SIZE>
-void UniformGridRS<REAL,SIZE>::init()
+
+UniformGrid::~UniformGrid() { }
+
+void 
+UniformGrid::add_fluid(GLPointCloud &glpc) 
+{ 
+  if (glpc.is_dynamic())
+  {
+    // TODO: fix this:
+    FluidPtr fl = boost::static_pointer_cast<Fluid>(glpc.m_pc);
+    m_fluids[fl->get_type()].push_back(fl);
+    m_num_fluids += 1;
+  }
+}
+
+void
+UniformGrid::init()
 {
   if (m_num_fluids < 1)
     return;
 
-  FTiter<REAL,SIZE,DEFAULT>::init_fluid_processors(*this);
+  FTiter<DEFAULT>::init_fluid_processors(*this);
 
   // set cell size to be the maximum of the kernel support over all fluids;
   for (int j = 0; j < NUMTYPES; ++j)
@@ -114,56 +128,59 @@ void UniformGridRS<REAL,SIZE>::init()
       glprintf_trcv(fl->get_color(), "sound speed: %.2e  \n", std::sqrt(fl->get_sound_speed2()));
     }
   }
-  CBVolumeRS<REAL,SIZE> proc;
-  proc.init_kernel(m_h);
-  m_bound_volume_proc = &proc;
-  compute_bound_quantity< CBVolumeRS<REAL,SIZE> >();
-  m_bound_volume_proc = NULL;
+  //CBVolume proc;
+  //proc.init_kernel(m_h);
+  //m_bound_volume_proc = &proc;
+  //compute_bound_quantity< CBVolume >();
+  //m_bound_volume_proc = NULL;
 }
 
-template<typename REAL, typename SIZE>
-inline void UniformGridRS<REAL,SIZE>::update_grid()
+
+inline void UniformGrid::update_grid()
 {
   clear_fluid_data();
   populate_fluid_data(); // populate grid with particles
 }
 
-template<typename REAL, typename SIZE>
-inline void UniformGridRS<REAL,SIZE>::clear_fluid_data()
+
+inline void UniformGrid::clear_fluid_data()
 {
-  for (SIZE i = 0; i < m_gridsize[0]; ++i)
-    for (SIZE j = 0; j < m_gridsize[1]; ++j)
-      for (SIZE k = 0; k < m_gridsize[2]; ++k)
+  for (Size i = 0; i < m_gridsize[0]; ++i)
+    for (Size j = 0; j < m_gridsize[1]; ++j)
+      for (Size k = 0; k < m_gridsize[2]; ++k)
         m_grid[i][j][k].fluidvec.clear();
 }
 
-template<typename REAL, typename SIZE, int FT>
-inline void FTiter<REAL,SIZE,FT>::init_fluid_processors(UniformGridRS<REAL,SIZE> &g)
+template<int FT>
+inline void FTiter<FT>::init_fluid_processors(UniformGrid &g)
 { 
+  /*
   if (g.m_fluids[FT].size())
     for (auto &fl : g.m_fluids[FT])
       fl->template cast<FT>()->init_processors();
+      */
 
-  FTiter<REAL,SIZE,FT+1>::init_fluid_processors(g);
+  FTiter<FT+1>::init_fluid_processors(g);
 }
 
-template<typename REAL, typename SIZE>
-inline void UniformGridRS<REAL,SIZE>::populate_fluid_data()
+
+inline void 
+UniformGrid::populate_fluid_data()
 { 
-  REAL color = 1.0f;
+  Real color = 1.0f;
   for (int ft = DEFAULT; ft < NUMTYPES; ++ft)
   {
     unsigned short id = 0; // generate ids
     for (auto &fl : m_fluids[ft])
     {
-      SIZE num_vtx = fl->get_num_vertices();
-      for ( SIZE i = 0; i < num_vtx; ++i )
+      Size num_vtx = fl->get_num_vertices();
+      for ( Size i = 0; i < num_vtx; ++i )
       {
-        Vector3R<REAL> pos(fl->get_pos().col(i));
-        Vector3R<REAL> vel(fl->get_vel().col(i));
-        typename UniformGridRS<REAL,SIZE>::Array3Index idx = get_voxel_index(pos);
+        Vector3R<Real> pos(fl->get_pos().col(i));
+        Vector3R<Real> vel(fl->get_vel().col(i));
+        typename UniformGrid::Array3Index idx = get_voxel_index(pos);
         m_grid(idx).fluidvec.push_back(
-            FluidParticleR<REAL>( pos, vel, 
+            FluidParticle( pos, vel, 
               fl->accel_at(i), 
               fl->extern_accel_at(i), 
               fl->dinv_at(i), 
@@ -175,29 +192,29 @@ inline void UniformGridRS<REAL,SIZE>::populate_fluid_data()
   }
 }
 
-template<typename REAL, typename SIZE>
-void UniformGridRS<REAL,SIZE>::populate_bound_data()
+
+void UniformGrid::populate_bound_data()
 {
   unsigned char particles_per_cell_length = 4;
 
   // place boundary particles slightly away from the actual boundary
   float pad = 0.5*m_h;
 
-  SIZE nx = particles_per_cell_length*(m_gridsize[0]+2);
-  SIZE ny = particles_per_cell_length*(m_gridsize[1]+2);
-  SIZE nz = particles_per_cell_length*(m_gridsize[2]+2);
+  Size nx = particles_per_cell_length*(m_gridsize[0]+2);
+  Size ny = particles_per_cell_length*(m_gridsize[1]+2);
+  Size nz = particles_per_cell_length*(m_gridsize[2]+2);
   float incx = (m_bmax[0] - m_bmin[0] + 2*pad)/nx;
   float incy = (m_bmax[1] - m_bmin[1] + 2*pad)/ny;
   float incz = (m_bmax[2] - m_bmin[2] + 2*pad)/nz;
 
-  SIZE i,j,k; // indices
+  Size i,j,k; // indices
   
-  auto f = [&](SIZE i, SIZE j, SIZE k)
+  auto f = [&](Size i, Size j, Size k)
   {
-    Vector3R<REAL> pos( m_bmin[0] - pad + i*incx, 
+    Vector3R<Real> pos( m_bmin[0] - pad + i*incx, 
                         m_bmin[1] - pad + j*incy,
                         m_bmin[2] - pad + k*incz );
-    m_grid( get_voxel_index(pos) ).boundvec.push_back(ParticleR<REAL>(pos));
+    m_grid( get_voxel_index(pos) ).boundvec.push_back(Particle(pos));
     //fprintf(stderr, "v %f %f %f\n", pos[0], pos[1], pos[2]);
   };
 
@@ -233,39 +250,49 @@ void UniformGridRS<REAL,SIZE>::populate_bound_data()
   f(nx, 0, 0);
 }
 
-template<typename REAL, typename SIZE> template<int FT>
-inline void UniformGridRS<REAL,SIZE>::compute_accelT()
-{ compute_fluid_quantity< CFAccelRST<REAL, SIZE, FT>, FT >(); }
+template<int FT>
+inline void UniformGrid::compute_accelT()
+{ 
+//  compute_fluid_quantity< CFAccelT<FT>, FT >(); 
+}
 
-template<typename REAL, typename SIZE> template<int FT>
-inline void UniformGridRS<REAL,SIZE>::compute_surface_normalT()
-{ compute_fluid_quantity< CFSurfaceNormalRST<REAL, SIZE, FT>, FT >(); }
+template<int FT>
+inline void UniformGrid::compute_surface_normalT()
+{ 
+//  compute_fluid_quantity< CFSurfaceNormalT<FT>, FT >(); 
+}
 
-template<typename REAL, typename SIZE> template<int FT>
-inline void UniformGridRS<REAL,SIZE>::compute_surface_tensionT()
-{ compute_fluid_quantity< CFSurfaceTensionRST<REAL, SIZE, FT>, FT >(); }
+template<int FT>
+inline void UniformGrid::compute_surface_tensionT()
+{ 
+//  compute_fluid_quantity< CFSurfaceTensionT<FT>, FT >(); 
+}
 
-template<typename REAL, typename SIZE> template<int FT>
-inline void UniformGridRS<REAL,SIZE>::compute_densityT()
-{ compute_fluid_quantity< CFDensityRST<REAL,SIZE,FT>, FT >(); }
+template<int FT>
+inline void UniformGrid::compute_densityT()
+{ 
+ // compute_fluid_quantity< CFDensityT<FT>, FT >(); 
+}
 
-template<typename REAL, typename SIZE> template<int FT>
-inline void UniformGridRS<REAL,SIZE>::compute_density_updateT()
-{ compute_fluid_quantity< CFDensityUpdateRST<REAL,SIZE,FT>, FT >(); }
+template<int FT>
+inline void UniformGrid::compute_density_updateT()
+{
+//  compute_fluid_quantity< CFDensityUpdateT<FT>, FT >(); 
+}
 
-template<typename REAL, typename SIZE>
+
 template<typename ProcessPairFunc, typename ParticleType>
-inline void UniformGridRS<REAL,SIZE>::compute_quantity()
+inline void UniformGrid::compute_quantity()
 {
 //  clock_t s = clock();
-  SIZE nx = m_gridsize[0];
-  SIZE ny = m_gridsize[1];
-  SIZE nz = m_gridsize[2];
-  for (SIZE i = 0; i < nx; ++i)
+  Size nx = m_gridsize[0];
+  Size ny = m_gridsize[1];
+  Size nz = m_gridsize[2];
+  for (Size i = 0; i < nx; ++i)
   {
-    for (SIZE j = 0; j < ny; ++j)
+    for (Size j = 0; j < ny; ++j)
     {
-      for (SIZE k = 0; k < nz; ++k)
+      for (Size k = 0; k < nz; ++k)
       {
         auto &pvec = 
           m_grid[i][j][k].template get_vec<ParticleType>();
@@ -283,14 +310,14 @@ inline void UniformGridRS<REAL,SIZE>::compute_quantity()
           process.init_particle(p);
         }
 
-        SIZE xrange_size = xrange.finish() - xrange.start();
-        SIZE yrange_size = yrange.finish() - yrange.start();
-        SIZE zrange_size = zrange.finish() - zrange.start();
-        for (SIZE near_i = 0; near_i < xrange_size; ++near_i)
+        Size xrange_size = xrange.finish() - xrange.start();
+        Size yrange_size = yrange.finish() - yrange.start();
+        Size zrange_size = zrange.finish() - zrange.start();
+        for (Size near_i = 0; near_i < xrange_size; ++near_i)
         {
-          for (SIZE near_j = 0; near_j < yrange_size; ++near_j)
+          for (Size near_j = 0; near_j < yrange_size; ++near_j)
           {
-            for (SIZE near_k = 0; near_k < zrange_size; ++near_k)
+            for (Size near_k = 0; near_k < zrange_size; ++near_k)
             {
               Cell &cell = neigh_view[near_i][near_j][near_k];
               DynamicParticles &neigh_fluidvec = cell.fluidvec;
@@ -298,11 +325,11 @@ inline void UniformGridRS<REAL,SIZE>::compute_quantity()
               for ( auto &p : pvec )
               {
                 ProcessPairFunc &process = determine_proc< ProcessPairFunc, ParticleType>(p);
-                for ( FluidParticleR<REAL> &near_p : neigh_fluidvec )
+                for ( FluidParticle &near_p : neigh_fluidvec )
                 {
                   process.fluid(p, near_p); // process neighbouring fluid data
                 }
-                for ( ParticleR<REAL> &near_p : neigh_boundvec )
+                for ( Particle &near_p : neigh_boundvec )
                 {
                   process.bound(p, near_p); // process neighbouring boundary data
                 }
@@ -323,8 +350,8 @@ inline void UniformGridRS<REAL,SIZE>::compute_quantity()
   //qDebug() << "average time" << (float(clock() - s) / CLOCKS_PER_SEC);
 }
 
-template<typename REAL, typename SIZE, int FT>
-inline void FTiter<REAL,SIZE,FT>::update_density(UniformGridRS<REAL,SIZE> &g,float timestep)
+template<int FT>
+inline void FTiter<FT>::update_density(UniformGrid &g,float timestep)
 {
   if (g.m_fluids[FT].size())
   {
@@ -333,17 +360,17 @@ inline void FTiter<REAL,SIZE,FT>::update_density(UniformGridRS<REAL,SIZE> &g,flo
 
     g.template compute_density_updateT<FT>();
   }
-  FTiter<REAL,SIZE,FT+1>::update_density(g,timestep); // recurse
+  FTiter<FT+1>::update_density(g,timestep); // recurse
 }
 
-template<typename REAL, typename SIZE, int FT>
-inline void FTiter<REAL,SIZE,FT>::compute_density(UniformGridRS<REAL,SIZE> &g)
+template<int FT>
+inline void FTiter<FT>::compute_density(UniformGrid &g)
 {
   if (g.m_fluids[FT].size())
   {
 
-    REAL max_var[g.m_fluids[FT].size()];
-    REAL avg_var[g.m_fluids[FT].size()];
+    Real max_var[g.m_fluids[FT].size()];
+    Real avg_var[g.m_fluids[FT].size()];
     
     int i = 0;
     for (auto &fl : g.m_fluids[FT] )
@@ -367,11 +394,11 @@ inline void FTiter<REAL,SIZE,FT>::compute_density(UniformGridRS<REAL,SIZE> &g)
     }
 #endif
   }
-  FTiter<REAL,SIZE,FT+1>::compute_density(g); // recurse
+  FTiter<FT+1>::compute_density(g); // recurse
 }
 
-template<typename REAL, typename SIZE, int FT>
-inline void FTiter<REAL,SIZE,FT>::compute_accel(UniformGridRS<REAL,SIZE> &g)
+template<int FT>
+inline void FTiter<FT>::compute_accel(UniformGrid &g)
 {
   if (g.m_fluids[FT].size())
   {
@@ -381,31 +408,31 @@ inline void FTiter<REAL,SIZE,FT>::compute_accel(UniformGridRS<REAL,SIZE> &g)
     g.template compute_accelT<FT>();
   }
 
-  FTiter<REAL,SIZE,FT+1>::compute_accel(g); // recurse
+  FTiter<FT+1>::compute_accel(g); // recurse
 }
 
-template<typename REAL, typename SIZE>
-inline void UniformGridRS<REAL,SIZE>::jacobi_pressure_solve(float dt, float factor)
+
+inline void UniformGrid::jacobi_pressure_solve(float dt, float factor)
 {
   if (!m_fluids[ICS13].size())
     return;
   
   for (auto &fl : m_fluids[ICS13])
   {
-    fl->template cast<ICS13>()->m_fluid_prepare_jacobi_proc.init( dt );
-    fl->template cast<ICS13>()->m_fluid_jacobi_solve1_proc.init( dt );
-    fl->template cast<ICS13>()->m_fluid_jacobi_solve2_proc.init( dt, fl->get_avg_density(), fl->get_avg_pressure() );
-    fl->template cast<ICS13>()->reset_extern_accel();     // now may assume all accelerations are zero
+    //fl->template cast<ICS13>()->m_fluid_prepare_jacobi_proc.init( dt );
+    //fl->template cast<ICS13>()->m_fluid_jacobi_solve1_proc.init( dt );
+    //fl->template cast<ICS13>()->m_fluid_jacobi_solve2_proc.init( dt, fl->get_avg_density(), fl->get_avg_pressure() );
+    //fl->template cast<ICS13>()->reset_extern_accel();     // now may assume all accelerations are zero
   }
 
-  compute_fluid_quantity< CFPrepareJacobiRST<REAL, SIZE, ICS13>, ICS13 >();
+  //compute_fluid_quantity< CFPrepareJacobiT<ICS13>, ICS13 >();
 
   bool proceed = false;
   int iter = 0;
   do
   {
-    compute_fluid_quantity< CFJacobiSolveFirstRST<REAL, SIZE, ICS13>, ICS13 >();
-    compute_fluid_quantity< CFJacobiSolveSecondRST<REAL, SIZE, ICS13>, ICS13 >();
+    //compute_fluid_quantity< CFJacobiSolveFirstT<ICS13>, ICS13 >();
+    //compute_fluid_quantity< CFJacobiSolveSecondT<ICS13>, ICS13 >();
     proceed = false;
     for (auto &fl : m_fluids[ICS13])
     {
@@ -418,14 +445,14 @@ inline void UniformGridRS<REAL,SIZE>::jacobi_pressure_solve(float dt, float fact
     }
   } while(proceed);
 
-  compute_fluid_quantity< CFPressureAccelRST<REAL, SIZE, ICS13>, ICS13 >();
+  //compute_fluid_quantity< CFPressureAccelT<ICS13>, ICS13 >();
 
   for (auto &fl : m_fluids[ICS13])
     fl->get_vel() = fl->get_vel() + factor*dt*fl->get_extern_accel();
 }
 
-template<typename REAL, typename SIZE>
-void UniformGridRS<REAL,SIZE>::run()
+
+void UniformGrid::run()
 {
   if (m_num_fluids < 1)
     return;
@@ -497,10 +524,11 @@ void UniformGridRS<REAL,SIZE>::run()
       file_reads += 1;
       file_read_t += float(clock() - s) / CLOCKS_PER_SEC;
 
-      boost::chrono::nanoseconds elapsed = (real_clock::now() - start_time);
-      boost::chrono::nanoseconds perframe(boost::int_least64_t(1.0e9/global::dynset.fps));
+      ns_t elapsed = (real_clock::now() - start_time);
+      ns_t perframe(boost::int_least64_t(1.0e9/global::dynset.fps));
       if (elapsed < perframe)
-        std::this_thread::sleep_for(std::chrono::nanoseconds((perframe - elapsed).count()));
+        std::this_thread::sleep_for(
+            std::chrono::nanoseconds((perframe - elapsed).count()));
     }
     else // if not all cached, compute substeps
     {
@@ -516,7 +544,7 @@ void UniformGridRS<REAL,SIZE>::run()
         for (auto &fl : m_fluids[j])
           fl->cache(frame); // cache frame
 
-    } // if not cached
+    } // else if not all cached
 
     frame_t += float(clock() - s) / CLOCKS_PER_SEC;
 
@@ -535,7 +563,7 @@ void UniformGridRS<REAL,SIZE>::run()
     if (m_stop_requested) break;
 
     if (frame >= global::dynset.frames)
-    {
+    { // restart simulation
       // for timing
       file_reads = 0;
       frame_count = 0;
@@ -549,8 +577,8 @@ void UniformGridRS<REAL,SIZE>::run()
 
 }
 
-template<typename REAL, typename SIZE>
-inline bool UniformGridRS<REAL,SIZE>::step(float dt, bool first_step, float *substep_t)
+
+inline bool UniformGrid::step(float dt, bool first_step, float *substep_t)
 {
 #if 0
   ///////// testing adaptive time step
@@ -559,11 +587,11 @@ inline bool UniformGridRS<REAL,SIZE>::step(float dt, bool first_step, float *sub
   for (int j = 0; j < NUMTYPES; ++j)
     for (auto &fl : m_fluids[j])
     {
-      for (SIZE i = 0; i < fl->get_num_vertices(); ++i)
+      for (Size i = 0; i < fl->get_num_vertices(); ++i)
       {
         fdt = std::min(fdt,
             float(fl->get_radius() /
-              (fl->get_mass()*Vector3R<REAL>(fl->get_extern_accel().col(i)).norm())));
+              (fl->get_mass()*Vector3R<Real>(fl->get_extern_accel().col(i)).norm())));
         // check for nan and infs
         //if (!std::isfinite(fl->vel_at(i)[0]) ||
         //    !std::isfinite(fl->vel_at(i)[1]) || 
@@ -589,11 +617,11 @@ inline bool UniformGridRS<REAL,SIZE>::step(float dt, bool first_step, float *sub
   clock_t prev_t = clock();
 
   //if (iter)
-  // FTiter<REAL,SIZE,DEFAULT>::update_density(*this, dt);
+  // FTiter<DEFAULT>::update_density(*this, dt);
   //else
-  FTiter<REAL,SIZE,DEFAULT>::compute_density(*this);
+  //FTiter<DEFAULT>::compute_density(*this);
 
-  FTiter<REAL,SIZE,DEFAULT>::compute_accel(*this); // update m_accel
+  //FTiter<DEFAULT>::compute_accel(*this); // update m_accel
 
   if (m_fluids[MCG03].size()) // extra steps to compute surface tension for MCG03
   {
@@ -629,6 +657,7 @@ inline bool UniformGridRS<REAL,SIZE>::step(float dt, bool first_step, float *sub
 
   if (m_stop_requested) return false;
 
+  // TODO: put this step after each frame instead of after each substep
   for (int j = 0; j < NUMTYPES; ++j)
     for (auto &fl : m_fluids[j])
       fl->update_data(); // notify gl we have new positions
@@ -637,8 +666,8 @@ inline bool UniformGridRS<REAL,SIZE>::step(float dt, bool first_step, float *sub
 }
 
 
-template<typename REAL, typename SIZE>
-inline bool UniformGridRS<REAL,SIZE>::check_and_write_hash() 
+
+inline bool UniformGrid::check_and_write_hash() 
 {
   if (global::dynset.savedir.empty())
     return false;
@@ -670,5 +699,3 @@ inline bool UniformGridRS<REAL,SIZE>::check_and_write_hash()
 
   return false;
 }
-
-template class UniformGridRS<double, unsigned int>;

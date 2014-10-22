@@ -10,9 +10,6 @@
 // Plugin implementing custom tranformations
 #define EIGEN_TRANSFORM_PLUGIN "EigenTransformPlugin.h"
 
-// One radian measured in degrees (conversion constant)
-#define RADIAN 0.017453292519943
-
 // #define EIGEN_USE_MKL_ALL
 
 #include <Eigen/Geometry>

@@ -79,16 +79,10 @@ public:
       const Vector3f &ext_trc);
 
 protected:
-  // Useful for picking
-  std::string m_name;
-
-  // Transformations
-  AffineCompact3f m_trans;
-
-  // Hierarchy
-  NodeList m_children;
-
-  AlignedBox3f m_bbox;
+  std::string m_name;      // human readable name
+  AffineCompact3f m_trans; // transformations
+  NodeList m_children;     // hierarchy
+  AlignedBox3f m_bbox;     // bounding box
 };
 
 
@@ -100,10 +94,7 @@ public:
   GeometryNode(const std::string& name, PrimitivePtr primitive);
 
   // Construct a geometry node and mesh from given assimp mesh
-  GeometryNode(
-      const aiMesh *mesh,
-      const aiMaterial *mat,
-      DynParamsPtr dyn_params);
+  GeometryNode( const aiMesh *mesh, const aiMaterial *mat );
 
   // copy constructor
   GeometryNode(const GeometryNode &orig);
@@ -114,9 +105,10 @@ public:
   virtual ~GeometryNode();
 
   virtual bool is_geometry() const { return true; }
+  virtual bool is_dynamic()  const { return false; }
 
-  PrimitivePtr     get_primitive() const { return m_primitive; }
-  MaterialConstPtr get_material()  const { return m_material; }
+  virtual PrimitivePtr     get_primitive() const { return m_primitive; }
+          MaterialConstPtr get_material()  const { return m_material; }
 
   // compute the transformations into the primitives
   // this operation invalidates the bounding box
@@ -128,9 +120,54 @@ public:
   void cube_bbox();
 
 protected:
-  PrimitivePtr m_primitive;
+  PrimitivePtr      m_primitive;
   MaterialConstPtr  m_material;
-
 };
+
+
+class FluidNode : public GeometryNode 
+{
+public:
+  // Construct a geometry node and mesh from given assimp mesh
+  FluidNode(
+      const aiMesh *mesh,
+      const aiMaterial *mat,
+      DynParamsPtr dyn_params);
+
+  FluidNode(const FluidNode &orig); // copy constructor
+  virtual FluidNode *clone() const { return new FluidNode(*this); }
+  virtual ~FluidNode();
+
+  virtual bool is_dynamic() const { return true; }
+
+  // using covariant return type since primitive is encapsulated by m_fluid
+  virtual FluidPtr get_primitive() const { return m_fluid; }
+
+protected:
+  FluidPtr m_fluid;
+}; // class FluidNode
+
+#if 0
+class RigidNode : public GeometryNode 
+{
+public:
+  // Construct a geometry node and mesh from given assimp mesh
+  RigidNode(
+      const aiMesh *mesh,
+      const aiMaterial *mat,
+      DynParamsPtr dyn_params);
+
+  RigidNode(const RigidNode &orig); // copy constructor
+  virtual RigidNode *clone() const { return new RigidNode(*this); }
+  virtual ~RigidNode();
+
+  virtual bool is_dynamic() const { return true; }
+
+  virtual RigidPtr get_primitive() const { return m_rigid; }
+
+protected:
+  RigidPtr m_rigid;
+}; // class RigidNode
+#endif
 
 #endif // SCENE_H

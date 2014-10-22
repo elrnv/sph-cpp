@@ -22,8 +22,9 @@
 namespace Util
 {
 
+// converts an assimp scene to an internal scene
 SceneNode *
-processScene( const aiScene *scene, const aiNode *node, DynParamsPtr dyn_params )
+convertScene( const aiScene *scene, const aiNode *node, DynParamsPtr dyn_params )
 {
   SceneNode *scene_node = new SceneNode(node);
 
@@ -35,13 +36,22 @@ processScene( const aiScene *scene, const aiNode *node, DynParamsPtr dyn_params 
   {
     aiMesh *aimesh = scene->mMeshes[meshidx[i]];
     aiMaterial *aimat = scene->mMaterials[aimesh->mMaterialIndex];
-    scene_node->add_child(new GeometryNode(aimesh, aimat, dyn_params));
+    if (dyn_params)
+    {
+      if (dyn_params->type == DynParams::FLUID)
+        scene_node->add_child(new FluidNode(aimesh, aimat, 
+              boost::static_pointer_cast<FluidParams>(dyn_params)));
+      //else if (dyn_params->type == DynParams::RIGID)
+      //  scene_node->add_child(new RigidNode(aimesh, aimat, dyn_params));
+    }
+    else
+      scene_node->add_child(new GeometryNode(aimesh, aimat));
   }
 
   // Continue for all child nodes
   unsigned int num_children = node->mNumChildren;
   for (unsigned int i = 0; i < num_children; ++i)
-    scene_node->add_child(processScene(scene, node->mChildren[i], dyn_params));
+    scene_node->add_child(convertScene(scene, node->mChildren[i], dyn_params));
 
   return scene_node;
 }
@@ -55,7 +65,7 @@ loadDynamics( const std::string &filename )
   if (!file.is_open())
   {
     qWarning() << "Could not open dynamics file:" << filename.c_str();
-    return DynParamsPtr(NULL);
+    return DynParamsPtr(nullptr);
   }
 
   DynParamsPtr params_ptr;
@@ -163,10 +173,10 @@ loadObject( const std::string &filename, DynParamsPtr params_ptr )
   if (!scene)
   {
     qWarning() << importer.GetErrorString();
-    return NULL;
+    return nullptr;
   }
 
-  return processScene(scene, scene->mRootNode, params_ptr);
+  return convertScene(scene, scene->mRootNode, params_ptr);
 }
 
 // helper function to find the root filename from the path
@@ -184,7 +194,7 @@ extractRoot( const std::string &path )
 SceneNode *
 loadScene( const std::string &filename )
 {
-  SceneNode *root = NULL;
+  SceneNode *root = nullptr;
   libconfig::Config cfg;
   try
   {
@@ -257,7 +267,7 @@ loadScene( const std::string &filename )
       try
       {
         std::string objfile = objset[i]["objfile"];
-        DynParamsPtr params_ptr(NULL);
+        DynParamsPtr params_ptr(nullptr);
         try
         {
           std::string dynfile = objset[i]["dynfile"];
@@ -321,19 +331,38 @@ void loadGLData(
   if (node->is_geometry())
   {
     const GeometryNode *geonode = static_cast<const GeometryNode*>(node);
-    PrimitivePtr prim = geonode->get_primitive();
-    if (prim)
+    if (geonode->is_dynamic())
     {
-      if (prim->is_mesh())
+      FluidPtr prim = geonode->get_primitive();
+      if (prim)
       {
-        gl_prims.push_back(new GLMesh(boost::static_pointer_cast<Mesh>(prim),
-                                  geonode->get_material(), ubo, shaderman));
+        if (prim->is_mesh())
+        {
+          gl_prims.push_back(new GLMesh(boost::static_pointer_cast<Mesh>(prim),
+                                    geonode->get_material(), ubo, shaderman));
+        }
+        else if (prim->is_pointcloud())
+        {
+          gl_prims.push_back(new GLPointCloud(boost::static_pointer_cast<PointCloud>(prim),
+                /*is dynamic*/true, geonode->get_material(), ubo, shaderman));
+        }
       }
-      else if (prim->is_pointcloud())
+    }
+    else
+    {
+      PrimitivePtr prim = geonode->get_primitive();
+      if (prim)
       {
-        gl_prims.push_back(new GLPointCloud(boost::static_pointer_cast<PointCloud>(prim),
-                                        geonode->get_material(), ubo, shaderman));
-      
+        if (prim->is_mesh())
+        {
+          gl_prims.push_back(new GLMesh(boost::static_pointer_cast<Mesh>(prim),
+                                    geonode->get_material(), ubo, shaderman));
+        }
+        else if (prim->is_pointcloud())
+        {
+          gl_prims.push_back(new GLPointCloud(boost::static_pointer_cast<PointCloud>(prim),
+                /*is dynamic*/false, geonode->get_material(), ubo, shaderman));
+        }
       }
     }
   }

@@ -55,6 +55,6 @@ QMatrix3x3 toQMatrix3x3(void) const
   check_template_params();
   EIGEN_STATIC_ASSERT(Dim==3, YOU_MADE_A_PROGRAMMING_MISTAKE)
   EIGEN_STATIC_ASSERT(!(Options & RowMajor), YOU_MADE_A_PROGRAMMING_MISTAKE)
-    return QMatrix3x3(linear().data()).transposed();
+  return QMatrix3x3(linear().data()).transposed();
 }
  

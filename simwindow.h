@@ -3,13 +3,16 @@
 
 #include <vector>
 #include <boost/shared_ptr.hpp>
+#include <thread>
 #include "openglwindow.h"
 #include "uniformbuffer.h"
 #include "shadermanager.h"
-#include "glprimitive.h"
-#include "dynamics.h"
 
-typedef std::vector< GLPrimitive * > GLPrimVec;
+// forward declarations
+class UniformGrid;
+class GLPrimitive; 
+
+typedef std::vector< GLPrimitive * > GLPrimPtrVec;
 
 class SimWindow : public OpenGLWindow
 {
@@ -22,13 +25,13 @@ public:
 
   void load_model(int i);
   void init_bbox();
-  void draw_bbox();
+  void draw_wire_bbox();
 
   typedef ShaderManager::ShaderType ViewMode;
   void change_viewmode(ViewMode vm);
   void reset_viewmode();
   void toggle_dynamics();
-  void toggle_simulation() { if (m_grid) { m_grid->toggle_pause(); } }
+  void toggle_simulation();
   void toggle_halos();
   void toggle_bbox();
   void clear_cache();
@@ -62,7 +65,7 @@ private:
 
   UniformGrid *m_grid; // simulation grid
 
-  GLPrimVec m_glprims;
+  GLPrimPtrVec m_glprims;
 
   ViewMode m_viewmode;
   bool m_change_prog; // flag true if m_viewmode is recently changed

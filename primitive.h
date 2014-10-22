@@ -11,13 +11,15 @@ public:
     : m_bbox(Vector3f(-1.0f,-1.0f,-1.0f), Vector3f(1.0f,1.0f,1.0f))
   { }
   virtual ~Primitive() { }
-  virtual inline bool is_mesh()       const { return false; }
-  virtual inline bool is_pointcloud() const { return false; }
-  virtual inline bool is_dynamic()    const { return false; }
+  virtual bool is_mesh()       const = 0;
+  virtual bool is_pointcloud() const = 0;
   virtual inline void transform_in_place(const AffineCompact3f &trans) = 0;
   AlignedBox3f &get_bbox() { return m_bbox; }
   virtual inline AlignedBox3f &compute_bbox() = 0;
-  inline void cube_bbox() { m_bbox = AlignedBox3f(Vector3f(-1.f,-1.f,-1.f), Vector3f(1.f,1.f,1.f)); }
+  inline void cube_bbox() 
+  { 
+    m_bbox = AlignedBox3f(Vector3f(-1.f,-1.f,-1.f), Vector3f(1.f,1.f,1.f)); 
+  }
 protected:
   AlignedBox3f m_bbox;
 };

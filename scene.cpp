@@ -4,7 +4,7 @@
 #include "scene.h"
 #include "mesh.h"
 #include "pointcloud.h"
-#include "fluid.h"
+#include "fluidmanager.h"
 
 SceneNode::SceneNode(const std::string& name)
   : m_name(name)
@@ -156,31 +156,9 @@ GeometryNode::GeometryNode(
   , m_primitive(NULL)
 {
   if ( mesh->mPrimitiveTypes & aiPrimitiveType_POINT )
-  {
-    if ( dyn_params && dyn_params->type == DynParams::FLUID )
-    {
-      // interpret as fluid
-      FluidParamsPtr fparams = boost::static_pointer_cast<FluidParams>(dyn_params);
-      switch(fparams->fluid_type)
-      {
-        case MCG03: 
-          m_primitive = PrimitivePtr(new FluidT<int(MCG03)>(mesh, fparams)); break;
-        case BT07: 
-          m_primitive = PrimitivePtr(new FluidT<int(BT07)>(mesh, fparams)); break;
-        case ICS13:
-          m_primitive = PrimitivePtr(new FluidT<int(ICS13)>(mesh, fparams)); break;
-        default: 
-          m_primitive = PrimitivePtr(new FluidT<int(DEFAULT)>(mesh, fparams)); break;
-      }
-      //m_primitive = FLUID_TYPED_CALL(new FluidT, fparams->fluid_type, mesh, fparams);
-    }
-    else
-      m_primitive = PrimitivePtr(new PointCloud(mesh)); // interpret as point cloud
-  }
+    m_primitive = PrimitivePtr(new PointCloud(mesh));
   else if ( mesh->mPrimitiveTypes & aiPrimitiveType_TRIANGLE)
-  {
     m_primitive = PrimitivePtr(new Mesh(mesh)); // interpret as triangular mesh
-  }
   // otherwise m_primitive remains NULL
 
   if (!mat)
@@ -239,3 +217,79 @@ void GeometryNode::cube_bbox()
   if (m_primitive)
     m_primitive->cube_bbox();
 }
+
+// FluidNode 
+
+// helper for the constructor for fluids
+inline FluidPtr
+FluidNode::newFluid(FluidParamsPtr fparams, PointCloudPtr pc)
+{
+#define NEW_OBJ(FT) \
+  case FT: return new FluidT<int(FT)>(*pc, fparams);
+
+  switch( fparams->fluid_type )
+  {
+    FOREACH_FT_EVAL_MACRO(NEW_OBJ)
+    default: return NULL;
+  }
+}
+
+FluidNode::FluidNode(
+    const aiMesh *mesh, 
+    const aiMaterial *mat,
+    FluidParamsPtr fparams)
+  : GeometryNode(mesh, mat)
+  , m_fluid(NULL)
+{
+  if ( !m_primitive->is_pointcloud() )
+    return;
+  std::assert( fparams );
+  PointCloudPtr pc = boost::static_pointer_cast<PointCloud>(m_primitive);
+  m_fluid = newFluid(fparams, pc);
+}
+
+FluidNode::FluidNode(const FluidNode &orig)
+  : GeometryNode(orig)
+  , m_fluid(orig.m_fluid)
+{ }
+
+FluidNode::~FluidNode() { }
+
+
+// RigidNode
+#if 0
+
+RigidNode::RigidNode(
+    const aiMesh *mesh, 
+    const aiMaterial *mat,
+    DynParamsPtr dyn_params)
+  : GeometryNode(mesh, mat)
+  , m_rigid(NULL)
+{
+  if ( m_primitive->is_pointcloud() )
+  {
+    PointCloudPtr pc = 
+      boost::static_pointer_cast<PointCloud>(m_primitive);
+    if ( dyn_params && dyn_params->type == DynParams::RIGID )
+    {
+      // interpret as fluid with physical properties
+      RigidParamsPtr fparams =
+        boost::static_pointer_cast<RigidParams>(dyn_params);
+
+      m_rigid = new Rigid(fparams, pc);
+    }
+  }
+  else if ( m_primitive->is_mesh() ) 
+  { 
+    // implementation for rigid meshes
+  }
+  // otherwise m_rigid remains NULL
+}
+
+RigidNode::RigidNode(const RigidNode &orig)
+  : GeometryNode(orig)
+  , m_rigid(orig.m_rigid)
+{ }
+
+RigidNode::~RigidNode() { }
+#endif

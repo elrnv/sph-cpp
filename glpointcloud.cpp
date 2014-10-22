@@ -8,20 +8,21 @@
 #include "fluid.h"
 
 // GLPointCloud stuff
-template<typename REAL, typename SIZE>
-GLPointCloudRS<REAL,SIZE>::GLPointCloudRS(
-    PointCloudPtrRS<REAL,SIZE> pc,
+
+GLPointCloud::GLPointCloud(
+    PointCloudPtr pc,
+    bool dynamic,
     MaterialConstPtr mat,
     UniformBuffer &ubo,
     ShaderManager &shaderman)
-  : GLPrimitiveS<SIZE>(mat, ubo, shaderman)
+  : GLPrimitive(mat, ubo, shaderman)
   , m_pc(pc)
   , m_vertices(3, get_num_vertices())
   , m_radius(pc->get_radius())
   , m_halo_radius(pc->get_halo_radius())
   , m_insync(true)
   , m_halos(false)
-  , m_isdynamic(pc->is_dynamic())
+  , m_isdynamic(dynamic)
 {
   m_vertices = m_pc->get_pos().template cast<float>(); // copy position data
 
@@ -38,19 +39,19 @@ GLPointCloudRS<REAL,SIZE>::GLPointCloudRS(
 
   if (is_dynamic())
   {
-    FluidRS<REAL,SIZE> &fl = static_cast<FluidRS<REAL,SIZE> &>(*pc);
+    Fluid &fl = static_cast<Fluid &>(*pc);
     fl.init(this);
   }
 
   update_shader(ShaderManager::ADDITIVE_PARTICLE);
 }
 
-template<typename REAL, typename SIZE>
-GLPointCloudRS<REAL,SIZE>::~GLPointCloudRS()
+
+GLPointCloud::~GLPointCloud()
 { }
 
-template<typename REAL, typename SIZE>
-void GLPointCloudRS<REAL,SIZE>::update_data()
+
+void GLPointCloud::update_data()
 {
   std::lock_guard<std::mutex> guard(this->m_lock);
 
@@ -62,43 +63,43 @@ void GLPointCloudRS<REAL,SIZE>::update_data()
   m_insync = false;
 }
 
-template<typename REAL, typename SIZE>
-inline void GLPointCloudRS<REAL,SIZE>::clear_cache()
+
+void GLPointCloud::clear_cache()
 {
   std::lock_guard<std::mutex> guard(this->m_lock);
   if (is_dynamic())
   {
-    FluidRS<REAL,SIZE> &fl = static_cast<FluidRS<REAL,SIZE> &>(*m_pc);
+    Fluid &fl = static_cast<Fluid &>(*m_pc);
     fl.clear_cache();
   }
 }
 
-template<typename REAL, typename SIZE>
-Vector3f GLPointCloudRS<REAL,SIZE>::get_closest_pt() const
+
+Vector3f GLPointCloud::get_closest_pt() const
 {
   return Vector3f(m_vertices.col(get_num_vertices()-1));
 }
 
-template<typename REAL, typename SIZE>
-void GLPointCloudRS<REAL,SIZE>::sort_by_depth(const AffineCompact3f &mvtrans)
+
+void GLPointCloud::sort_by_depth(const AffineCompact3f &mvtrans)
 {
   std::lock_guard<std::mutex> guard(this->m_lock); // prevent others from reading buffers
 
   // Sort all vertices by the z value
   clock_t s = clock();
   Matrix3XR<GLfloat> mvpos = mvtrans * m_vertices; // TODO: mem alloc expensive?
-  SIZE num_verts = get_num_vertices();
-  VectorXT<SIZE> perm_vec(num_verts);
-  for (SIZE i = 0; i < num_verts; ++i)
+  Size num_verts = get_num_vertices();
+  VectorXT<Size> perm_vec(num_verts);
+  for (Size i = 0; i < num_verts; ++i)
     perm_vec[i] = i;
 
-  SIZE *perm_data = perm_vec.data();
+  Size *perm_data = perm_vec.data();
 
   std::sort(perm_data, perm_data + num_verts,
-      [mvpos](SIZE i, SIZE j) { return mvpos.col(i)[2] < mvpos.col(j)[2]; });
+      [mvpos](Size i, Size j) { return mvpos.col(i)[2] < mvpos.col(j)[2]; });
   clock_t sort_t = clock();
 
-  m_vertices = m_vertices * PermutationMatrix<Dynamic, Dynamic, SIZE>(perm_vec);
+  m_vertices = m_vertices * PermutationMatrix<Dynamic, Dynamic, Size>(perm_vec);
 
   clock_t mult_t = clock();
   fprintf(stderr, "\rsort: %05.2e  mult: %05.2e", float(sort_t - s), float(mult_t - sort_t));
@@ -106,8 +107,8 @@ void GLPointCloudRS<REAL,SIZE>::sort_by_depth(const AffineCompact3f &mvtrans)
   m_insync = false;
 }
 
-template<typename REAL, typename SIZE>
-void GLPointCloudRS<REAL,SIZE>::update_glbuf()
+
+void GLPointCloud::update_glbuf()
 {
   // even though this routine doesn't access m_pc, another thread may be
   // writing to m_vertices so we still need to lock it
@@ -125,8 +126,8 @@ void GLPointCloudRS<REAL,SIZE>::update_glbuf()
 }
 
 
-template<typename REAL, typename SIZE>
-void GLPointCloudRS<REAL,SIZE>::update_shader(ShaderManager::ShaderType type)
+
+void GLPointCloud::update_shader(ShaderManager::ShaderType type)
 {
   if (this->m_prog)
   {
@@ -148,5 +149,3 @@ void GLPointCloudRS<REAL,SIZE>::update_shader(ShaderManager::ShaderType type)
 
   this->m_ubo.bindToProg(this->m_prog->programId(), "Globals");
 }
-
-template class GLPointCloudRS<double, unsigned int>;

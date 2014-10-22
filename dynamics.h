@@ -4,77 +4,76 @@
 #include <vector>
 #include <deque>
 #include <boost/multi_array.hpp>
+#include "types.h"
 #include "kernel.h"
 #include "pointcloud.h"
+#include "fluid.h"
+#include "fluidmanager.h"
+#include "glpointcloud.h"
 #include "particle.h"
 
 #define M_G 9.81f
 
 // Compute routine used to compute SPH quantities
 
-template<typename REAL, typename SIZE>
-class CBVolumeRS;
+//class CBVolume;
 
 // forward declarations
-template<typename REAL, typename SIZE>
-class FluidRS;
 
-template<typename REAL, typename SIZE>
-using FluidPtrRS = boost::shared_ptr< FluidRS<REAL,SIZE> >;
-
-template<typename REAL, typename SIZE, int FT>
-class FluidRST;
-template<typename REAL, typename SIZE>
-class GLPointCloudRS;
-
-template <typename REAL, typename SIZE>
-class UniformGridRS;
+class UniformGrid;
 
 // template recursion mechanism to iterate through each fluid type
-template<typename REAL, typename SIZE, int FT>
+template<int FT>
 struct FTiter
 {
   // high level processing (ones that should be called by the integrator)
-  static void init_fluid_processors(UniformGridRS<REAL,SIZE> &);
-  static void update_density(UniformGridRS<REAL,SIZE> &, float);
-  static void compute_density(UniformGridRS<REAL,SIZE> &);
-  static void compute_accel(UniformGridRS<REAL,SIZE> &);
-  static void compute_pressure(UniformGridRS<REAL,SIZE> &);
+  static void init_fluid_processors(UniformGrid &);
+  static void update_density(UniformGrid &, float);
+  static void compute_density(UniformGrid &);
+  static void compute_accel(UniformGrid &);
+  static void compute_pressure(UniformGrid &);
 };
 
-template<typename REAL, typename SIZE> // base case
-struct FTiter<REAL, SIZE, NUMTYPES>
+ // base case
+template <>
+struct FTiter<NUMTYPES>
 {
-  inline static void init_fluid_processors(UniformGridRS<REAL,SIZE> &) { }
-  inline static void update_density(UniformGridRS<REAL,SIZE> &,float) { }
-  inline static void compute_density(UniformGridRS<REAL,SIZE> &) { }
-  inline static void compute_accel(UniformGridRS<REAL,SIZE> &) { }
-  inline static void compute_pressure(UniformGridRS<REAL,SIZE> &) { }
+  inline static void init_fluid_processors(UniformGrid &) { }
+  inline static void update_density(UniformGrid &,float) { }
+  inline static void compute_density(UniformGrid &) { }
+  inline static void compute_accel(UniformGrid &) { }
+  inline static void compute_pressure(UniformGrid &) { }
 };
 
 // Grid structure used to optimize computing particle properties using kernels
-template <typename REAL, typename SIZE>
-class UniformGridRS
+
+class UniformGrid
 {
 public:
 
   // grid-cell data definitions
-  typedef std::vector< FluidParticleR<REAL> > DynamicParticles;
-  typedef std::vector< ParticleR<REAL> > StaticParticles;
+  typedef std::vector< FluidParticle > DynamicParticles;
+  typedef std::vector< Particle > StaticParticles;
 
   struct Cell
   {
-    DynamicParticles fluidvec; // dynamic fluid particles
-    StaticParticles boundvec; // static boundary particles
-    //DynamicParticles rigidvec; // dynamic rigid body object data
+    Index fluididx; // dynamic fluid particles
+    Index boundidx; // static boundary particles
+    //Index rigididx; // dynamic rigid body particles
+
+    Index get_idx()
+    {
+      return ParticleType
+
+    }
 
     template <typename ParticleType>
-    typename std::enable_if<std::is_same< ParticleType, ParticleR<REAL> >::value,
+    typename std::enable_if<std::is_same< ParticleType, Particle >::value,
              std::vector< ParticleType > >::type &get_vec() { return boundvec; }
 
     template <typename ParticleType>
-    typename std::enable_if<std::is_base_of< FluidParticleR<REAL>, ParticleType >::value,
-             std::vector< FluidParticleR<REAL> > >::type &get_vec() { return fluidvec; }
+    typename std::enable_if<std::is_base_of< FluidParticle, ParticleType >::value,
+             std::vector< FluidParticle > >::type &get_vec() { return fluidvec; }
   };
 
   typedef boost::multi_array< Cell, 3 > Array3;
@@ -85,28 +84,19 @@ public:
   typedef typename Array3::template array_view<3>::type GridView;
 
   // Define a set of different types of fluids
-  typedef std::deque< FluidPtrRS<REAL,SIZE> > FluidVec;
+  typedef std::deque< FluidPtr > FluidVec;
 
   // Constructors/Destructor
-  UniformGridRS(const Vector3f &bmin, const Vector3f &bmax);
-  ~UniformGridRS();
+  UniformGrid(const Vector3f &bmin, const Vector3f &bmax);
+  ~UniformGrid();
   
-  inline void add_fluid(GLPointCloudRS<REAL,SIZE> &glpc) 
-  { 
-    if (glpc.is_dynamic())
-    {
-      FluidPtrRS<REAL,SIZE> fl = boost::static_pointer_cast<FluidRS<REAL,SIZE>>(glpc.m_pc);
-      m_fluids[fl->get_type()].push_back(fl);
-      m_num_fluids += 1;
-    }
-  }
+  void add_fluid(GLPointCloud &glpc);
 
-  template<typename ParticleType>
-  inline FluidRST<REAL,SIZE, extract_fluid_type<ParticleType>::type> *
+  template<int FT>
+  inline FluidT<FT> *
   get_fluid(unsigned int id) 
   { 
-    return m_fluids[extract_fluid_type<ParticleType>::type][id]
-              ->template cast< extract_fluid_type<ParticleType>::type>();
+    return m_fluids[FT][id]->template cast<FT>();
   }
 
   void init();
@@ -120,7 +110,7 @@ public:
     return std::max(std::min(d, max), min);
   }
 
-  inline Array3Index get_voxel_index(const Vector3R<REAL> &pos)
+  inline Array3Index get_voxel_index(const Vector3R<Real> &pos)
   {
     return {{ 
       clamp(static_cast<Index>(m_hinv*(pos[0]-m_bmin[0])), 0, m_gridsize[0]-1),
@@ -128,25 +118,28 @@ public:
       clamp(static_cast<Index>(m_hinv*(pos[2]-m_bmin[2])), 0, m_gridsize[2]-1) }};
   }
 
+  /*
   template <typename ProcessPairFunc>
-  typename std::enable_if< std::is_same< ProcessPairFunc, CBVolumeRS<REAL,SIZE> >::value,
-           CBVolumeRS<REAL,SIZE> >::type &get_proc()
+  typename std::enable_if< std::is_same< ProcessPairFunc, CBVolume >::value,
+           CBVolume >::type &get_proc()
            {
              return *m_bound_volume_proc;
            }
 
   template <typename ProcessPairFunc, typename ParticleType>
-  typename std::enable_if< std::is_same< ParticleType, ParticleR<REAL> >::value,
+  typename std::enable_if< std::is_same< ParticleType, Particle >::value,
            ProcessPairFunc & >::type determine_proc(const ParticleType &p)
            {
              Q_UNUSED(p); return get_proc<ProcessPairFunc>();
            }
+*/
 
   template <typename ProcessPairFunc, typename ParticleType>
-  typename std::enable_if< std::is_base_of< FluidParticleR<REAL>, ParticleType >::value,
-           ProcessPairFunc & >::type determine_proc(const FluidParticleR<REAL> &p)
+  typename std::enable_if< std::is_base_of< FluidParticle, ParticleType >::value,
+           ProcessPairFunc & >::type determine_proc(const FluidParticle &p)
            {
-             return get_fluid<ParticleType>(p.id)->template get_proc<ProcessPairFunc>();
+             return get_fluid<extract_fluid_type<ParticleType>::type>(p.id)
+               ->template get_proc<ProcessPairFunc>();
            }
 
   // Low level quantity processing functions
@@ -155,11 +148,11 @@ public:
 
   template<typename Func>
   inline void compute_bound_quantity()
-  { compute_quantity<Func, ParticleR<REAL> >(); }
+  { compute_quantity<Func, Particle >(); }
 
   template<typename Func, int FT>
   inline void compute_fluid_quantity()
-  { compute_quantity<Func, FluidParticleRT<REAL, FT> >(); }
+  { compute_quantity<Func, FluidParticleT<FT> >(); }
 
   template<int FT> void compute_accelT();
   template<int FT> void compute_surface_normalT();
@@ -198,7 +191,7 @@ public:
 
   bool check_and_write_hash();
 
-  friend std::size_t hash_value( const UniformGridRS<REAL,SIZE> &ug )
+  friend std::size_t hash_value( const UniformGrid &ug )
   {
     std::size_t seed = 0;
     for (int j = 0; j < NUMTYPES; ++j)
@@ -207,28 +200,28 @@ public:
     return seed;
   }
 
-  //friend FTiter<REAL,SIZE,NOTFLUID>;
-  //friend FTiter<REAL,SIZE,DEFAULT>;
-  //friend FTiter<REAL,SIZE,MCG03>;
-  //friend FTiter<REAL,SIZE,BT07>;
-  //friend FTiter<REAL,SIZE,ICS13>;
-  template <typename R, typename S, int FT>
+  template <int FT>
   friend struct FTiter;
 
 private: // member functions
 
   // utility function used in the constructor to get a range of two elements
   // centered at x (or 2 if x is on the boundary)
-  inline IndexRange range3(SIZE x, SIZE hi)
+  inline IndexRange range3(Size x, Size hi)
   {
     return IndexRange(x == 0 ? 0 : x-1, x == hi-1 ? hi : x+2 );
   }
 
+  // wrapper for fluid getter using the fluid manager
+
+  template< int FT >
+  inline get_fluids<FT> { return m_fluidman.get_fluids<FT>(); }
+
 private: // member variables
   // array of simulated interacting fluids
-  FluidVec m_fluids[NUMTYPES];
+  FluidManager m_fluidman;
 
-  unsigned int m_num_fluids;
+  Size m_num_fluids;
 
   // array of cells containing xyzp (position and density) for each vertex
   Array3      m_grid;
@@ -241,7 +234,7 @@ private: // member variables
   Vector3f m_bmin; // min boundary corner
   Vector3f m_bmax; // max boundary corner
 
-  CBVolumeRS<REAL,SIZE> *m_bound_volume_proc;
+  //CBVolume *m_bound_volume_proc;
 
   std::atomic<bool> m_stop_requested;
 
@@ -250,7 +243,5 @@ private: // member variables
   std::atomic<bool> m_pause;
 
 }; // class UniformGridRS
-
-typedef UniformGridRS<double, unsigned int> UniformGrid;
 
 #endif // DYNAMICS_H

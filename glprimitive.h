@@ -8,14 +8,14 @@
 #include "uniformbuffer.h"
 #include "shadermanager.h"
 #include "material.h"
+#include "types.h"
 #include "eigen.h"
 
 // A primitive representation for OpenGL applications (abstract)
-template<typename SIZE>
-class GLPrimitiveS : public QObject
+class GLPrimitive : public QObject
 {
 public:
-  explicit GLPrimitiveS(
+  explicit GLPrimitive(
       MaterialConstPtr mat,
       UniformBuffer &ubo,
       ShaderManager &shaderman)
@@ -37,7 +37,7 @@ public:
     m_diffuse_color = QVector3D(kd[0], kd[1], kd[2]);
     m_specular_color = QVector3D(ks[0], ks[1], ks[2]);
   }
-  virtual ~GLPrimitiveS() 
+  virtual ~GLPrimitive() 
   { }
 
   QOpenGLVertexArrayObject &get_vao()     { return m_vao; }
@@ -53,12 +53,11 @@ public:
   float get_opacity()  const { return m_opacity; }
   float get_reflectivity() const { return m_reflectivity; }
 
-  virtual bool is_pointcloud() const { return false; }
-  virtual bool is_mesh()       const { return false; }
-  virtual bool is_dynamic()    const { return false; }
+  virtual bool is_pointcloud() const = 0;
+  virtual bool is_mesh()       const = 0;
 
-  virtual inline SIZE get_num_indices()  const = 0;
-  virtual inline SIZE get_num_vertices() const = 0;
+  virtual inline Size get_num_indices()  const = 0;
+  virtual inline Size get_num_vertices() const = 0;
 
   // return the coordinates of the point closest to the camera (needed for sorting)
   virtual Vector3f get_closest_pt() const = 0;
@@ -66,6 +65,9 @@ public:
   virtual void sort_by_depth(const AffineCompact3f &mvtrans) = 0;
   virtual void update_glbuf() = 0;
   virtual void update_shader(ShaderManager::ShaderType type) = 0;
+
+  // a callback used by a class supplying the data to this gl object
+  virtual void update_data() = 0;
 
   virtual void print() const = 0;
 
@@ -91,10 +93,6 @@ protected:
   std::mutex m_lock; // lock used for transferring dynamic data to GL
 };
 
-template<typename SIZE>
-using GLPrimitivePtrS = boost::shared_ptr< GLPrimitiveS<SIZE> >;
-
-typedef GLPrimitiveS<unsigned int> GLPrimitive;
-typedef GLPrimitivePtrS<unsigned int> GLPrimitivePtr;
+typedef boost::shared_ptr< GLPrimitive > GLPrimitivePtr;
 
 #endif // GLPRIMITIVE_H

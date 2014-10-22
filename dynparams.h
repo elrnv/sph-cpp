@@ -5,6 +5,7 @@
 #include <boost/functional/hash.hpp>
 #include <string>
 #include "eigen.h"
+#include "fluidmanager.h"
 
 // General object specific parameters
 
@@ -17,7 +18,6 @@ struct DynParams
     NONE,
     FLUID,
     RIGID,
-    STATIC
   } type;
 
   Vector3f velocity;
@@ -47,20 +47,7 @@ struct DynParams
 
 
 // Fluid specific parameters
-
-// When adding fluid types, make sure you add them here, in the macros below and:
-// fluid.cpp:
-//   add a relevant fluid template instantiation
-enum __attribute__ ((__packed__)) FluidType
-{
-  NOTFLUID = -1,
-  DEFAULT = 0,
-  MCG03 = 1,
-  BT07 = 2,
-  ICS13 = 3,
-  NUMTYPES = 4
-};
-
+// These specify the fluid interface of the user prescribed config parameters
 
 struct FluidParams : public DynParams
 {
@@ -107,8 +94,42 @@ struct FluidParams : public DynParams
   }
 };
 
+// Rigid body parameters
+struct RigidParams : public DynParams
+{
+  bool is_dynamic;
+  float density;
+  float friction;
+  float kernel_inflation;
+  float recoil_velocity_damping;
+
+  RigidParams() // Default values:
+   : is_dynamic(false)
+   , density(1000.0f)
+   , friction(0.5f)
+   , kernel_inflation(3.0f)
+   , recoil_velocity_damping(0.4f)
+  {
+    this->type = RIGID;
+  }
+
+  ~RigidParams() { }
+
+  friend std::size_t hash_value( const RigidParams &rp )
+  {
+    std::size_t seed = 0;
+    boost::hash_combine(seed, rp.is_dynamic);
+    boost::hash_combine(seed, rp.density);
+    boost::hash_combine(seed, rp.kernel_inflation);
+    boost::hash_combine(seed, rp.recoil_velocity_damping);
+    boost::hash_combine(seed, hash_value(static_cast<const DynParams &>(rp)));
+    return seed;
+  }
+};
+
 // DynParams should not need to be owned by anybody
 typedef boost::shared_ptr<DynParams>   DynParamsPtr;
 typedef boost::shared_ptr<FluidParams> FluidParamsPtr;
+typedef boost::shared_ptr<RigidParams> RigidParamsPtr;
 
 #endif // DYNPARAMS_H

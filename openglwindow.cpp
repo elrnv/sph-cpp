@@ -2,6 +2,7 @@
 #include <QtCore/QCoreApplication>
 #include <QtGui/QOpenGLContext>
 #include <QtGui/QMouseEvent>
+#include "types.h"
 #include "eigen.h"
 #include "openglwindow.h"
 

@@ -6,26 +6,26 @@
 #include "mesh.h"
 
 // Mesh stuff
-template<typename REAL, typename SIZE>
-MeshRS<REAL,SIZE>::MeshRS(const aiMesh *mesh)
+
+Mesh::Mesh(const aiMesh *mesh)
 {
   // First copy all the vertices
   if (!mesh->HasPositions())
     return;
 
   aiVector3D *verts = mesh->mVertices;
-  SIZE num_verts = mesh->mNumVertices;
+  Size num_verts = mesh->mNumVertices;
   m_verts.resize(num_verts);
 
-  typename VertexVecR<REAL>::iterator v_it = m_verts.begin(); // member face iterator
-  for (SIZE i = 0; i < num_verts; ++i, ++v_it)
+  typename VertexVec::iterator v_it = m_verts.begin(); // member face iterator
+  for (Size i = 0; i < num_verts; ++i, ++v_it)
     v_it->pos << verts[i].x, verts[i].y, verts[i].z;
 
   if (mesh->HasNormals())
   {
     aiVector3D *normals = mesh->mNormals;
     v_it = m_verts.begin();
-    for (SIZE i = 0; i < num_verts; ++i, ++v_it)
+    for (Size i = 0; i < num_verts; ++i, ++v_it)
       v_it->nml << normals[i].x, normals[i].y, normals[i].z;
   }
 
@@ -33,16 +33,16 @@ MeshRS<REAL,SIZE>::MeshRS(const aiMesh *mesh)
     return;
 
   aiFace *faces = mesh->mFaces;
-  SIZE num_faces = mesh->mNumFaces;
+  Size num_faces = mesh->mNumFaces;
   m_faces.reserve(num_faces);
   
   // Assume all faces are already triangles as returned by assimp
-  for (SIZE i = 0; i < num_faces; ++i)
+  for (Size i = 0; i < num_faces; ++i)
   {
     if (faces[i].mNumIndices < 3)
       continue; // ignore line and point primitives
     m_faces.push_back(
-        FaceRS<REAL, SIZE>(
+        Face(
           faces[i].mIndices[0],
           faces[i].mIndices[1],
           faces[i].mIndices[2]));
@@ -66,13 +66,13 @@ MeshRS<REAL,SIZE>::MeshRS(const aiMesh *mesh)
     v.nml.normalize();                  // take the average
 }
 
-template<typename REAL, typename SIZE>
-MeshRS<REAL,SIZE>::~MeshRS()
+
+Mesh::~Mesh()
 {
 }
 
-template<typename REAL, typename SIZE>
-void MeshRS<REAL,SIZE>::compute_face_normals()
+
+void Mesh::compute_face_normals()
 {
   for ( auto &f : m_faces )
   {
@@ -82,8 +82,8 @@ void MeshRS<REAL,SIZE>::compute_face_normals()
   }
 }
 
-template<typename REAL, typename SIZE>
-AlignedBox3f &MeshRS<REAL,SIZE>::compute_bbox()
+
+AlignedBox3f &Mesh::compute_bbox()
 {
   m_bbox.setEmpty();
   for ( auto &v : m_verts )
@@ -91,29 +91,29 @@ AlignedBox3f &MeshRS<REAL,SIZE>::compute_bbox()
   return m_bbox;
 }
 
-template<typename REAL, typename SIZE>
-void MeshRS<REAL,SIZE>::transform_in_place(const AffineCompact3f &trans)
+
+void Mesh::transform_in_place(const AffineCompact3f &trans)
 {
   // convert positions to canonical homogenized coordinates
   for ( auto &v : m_verts )
   {
-    Vector3R<REAL> vec( trans.linear().template cast<REAL>() * v.pos );
+    Vector3R<Real> vec( trans.linear().template cast<Real>() * v.pos );
     Translation3f T( trans.translation() );
-    v.pos = vec + Vector3R<REAL>(T.x(), T.y(), T.z());
-    v.nml = trans.inverse().linear().transpose().template cast<REAL>() * v.nml;
+    v.pos = vec + Vector3R<Real>(T.x(), T.y(), T.z());
+    v.nml = trans.inverse().linear().transpose().template cast<Real>() * v.nml;
   }
   for ( auto &f : m_faces )
   {
-    f.nml = trans.inverse().linear().transpose().template cast<REAL>() * f.nml;
+    f.nml = trans.inverse().linear().transpose().template cast<Real>() * f.nml;
   }
 }
 
 
-template<typename REAL, typename SIZE>
-std::ostream& operator<<(std::ostream& out, const MeshRS<REAL,SIZE>& mesh)
+
+std::ostream& operator<<(std::ostream& out, const Mesh& mesh)
 {
   out << "mesh({ ";
-  typename VertexVecR<REAL>::const_iterator v_it;
+  typename VertexVec::const_iterator v_it;
   for (v_it = mesh.m_verts.begin(); v_it != mesh.m_verts.end(); ++v_it)
   {
     if (v_it != mesh.m_verts.begin()) out << ",\n       ";
@@ -121,7 +121,7 @@ std::ostream& operator<<(std::ostream& out, const MeshRS<REAL,SIZE>& mesh)
   }
   out << "},\n\n     { ";
 
-  typename FaceVecRS<REAL,SIZE>::const_iterator f_it;
+  typename FaceVec::const_iterator f_it;
   for (f_it = mesh.m_faces.begin(); f_it != mesh.m_faces.end(); ++f_it)
   {
     if (f_it != mesh.m_faces.begin()) out << ",\n       ";
@@ -130,8 +130,3 @@ std::ostream& operator<<(std::ostream& out, const MeshRS<REAL,SIZE>& mesh)
   out << "});\n";
   return out;
 }
-
-// defaults
-template class MeshRS<double, unsigned int>;
-
-template std::ostream& operator<<(std::ostream& out, const Mesh& mesh);

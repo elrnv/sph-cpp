@@ -5,76 +5,62 @@
 #include <iostream>
 #include <assimp/mesh.h>
 #include <boost/shared_ptr.hpp>
+#include "types.h"
 #include "primitive.h"
 
-template<typename REAL, typename SIZE>
-class MeshRS;
 
-template<typename REAL, typename SIZE>
-std::ostream& operator<<(std::ostream& out, const MeshRS<REAL,SIZE>& mesh);
+class Mesh;
 
-template<typename REAL, typename SIZE>
-class FaceRS {
+std::ostream& operator<<(std::ostream& out, const Mesh& mesh);
+
+class Face {
 public:
-  explicit FaceRS() { }
-  explicit FaceRS(SIZE v0, SIZE v1, SIZE v2) { v[0] = v0; v[1] = v1; v[2] = v2; }
-  SIZE  &operator[](SIZE i) { return v[i]; }
-  SIZE   operator[](SIZE i) const { return v[i]; }
+  explicit Face() { }
+  explicit Face(Size v0, Size v1, Size v2) { v[0] = v0; v[1] = v1; v[2] = v2; }
+  Size  &operator[](Size i) { return v[i]; }
+  Size   operator[](Size i) const { return v[i]; }
 
-  Vector3R<REAL> nml; // face normal
+  Vector3R<Real> nml; // face normal
 private:
-  SIZE v[3];
+  Size v[3];
 };
 
-template<typename REAL>
-class VertexR
+
+class Vertex
 {
 public:
-  explicit VertexR() : pos(0.0f,0.0f,0.0f), nml(0.0f,0.0f,0.0f) { }
-  Vector3R<REAL> pos; // vertex position
-  Vector3R<REAL> nml; // vertex normal
+  explicit Vertex() : pos(0.0f,0.0f,0.0f), nml(0.0f,0.0f,0.0f) { }
+  Vector3R<Real> pos; // vertex position
+  Vector3R<Real> nml; // vertex normal
 };
 
-template<typename REAL>
-using VertexVecR = std::vector< VertexR<REAL> >;
-
-template<typename REAL, typename SIZE>
-using FaceVecRS = std::vector< FaceRS<REAL, SIZE> >;
-
-// defaults
-typedef VertexVecR<double> VertexVec;
-typedef FaceVecRS<double, unsigned int> FaceVec;
+typedef std::vector<Vertex> VertexVec;
+typedef std::vector<Face> FaceVec;
 
 // A triangular mesh.
-template<typename REAL, typename SIZE>
-class MeshRS : public Primitive 
+
+class Mesh : public Primitive 
 {
 public:
-  explicit MeshRS(const aiMesh *mesh);
-  ~MeshRS();
+  explicit Mesh(const aiMesh *mesh);
+  ~Mesh();
 
-  inline AlignedBox3f &compute_bbox();
+  AlignedBox3f &compute_bbox();
   void compute_face_normals();
 
-  const VertexVecR<REAL>      &get_verts() const { return m_verts; }
-  const FaceVecRS<REAL, SIZE> &get_faces() const { return m_faces; }
+  void transform_in_place(const AffineCompact3f &trans);
 
-  bool is_mesh() const { return true; }
+  inline const VertexVec &get_verts() const { return m_verts; }
+  inline const FaceVec   &get_faces() const { return m_faces; }
+  inline bool is_mesh() const { return true; }
 
-  inline void transform_in_place(const AffineCompact3f &trans);
-
-  friend std::ostream& operator<< <>(std::ostream& out, const MeshRS<REAL,SIZE>& mesh);
+  friend std::ostream& operator<<(std::ostream& out, const Mesh& mesh);
 
 protected:
-  VertexVecR<REAL>      m_verts;
-  FaceVecRS<REAL, SIZE> m_faces;
+  VertexVec m_verts;
+  FaceVec   m_faces;
 };
 
-template<typename REAL, typename SIZE>
-using MeshPtrRS = boost::shared_ptr< MeshRS<REAL, SIZE> >;
-
-// defaults
-typedef MeshRS<double, unsigned int> Mesh;
-typedef MeshPtrRS<double, unsigned int> MeshPtr;
+typedef boost::shared_ptr< Mesh > MeshPtr;
 
 #endif // MESH_H
