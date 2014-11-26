@@ -16,12 +16,16 @@
 #include "scene.h"
 #include "glmesh.h"
 #include "glpointcloud.h"
+#include "materialmanager.h"
+#include "geometrymanager.h"
+#include "dynamicsmanager.h"
 #include "dynparams.h"
 #include "settings.h"
 
 namespace Util
 {
 
+/* NOT USED ANYMORE
 // converts an assimp scene to an internal scene
 SceneNode *
 convertScene( const aiScene *scene, const aiNode *node, DynParamsPtr dyn_params )
@@ -54,6 +58,37 @@ convertScene( const aiScene *scene, const aiNode *node, DynParamsPtr dyn_params 
     scene_node->add_child(convertScene(scene, node->mChildren[i], dyn_params));
 
   return scene_node;
+} */
+
+// converts an assimp scene to an internal representation
+void
+convertScene(const aiScene *scene, const aiNode *node, DynParamsPtr dyn_params,
+             MaterialManager &matman,
+             GeometryManager &geoman,
+             DynamicsManager &dynman)
+{
+  unsigned int num_meshes = node->mNumMeshes;
+
+  // copy the meshes if any
+  unsigned int *meshidx = node->mMeshes;
+  assert(meshidx || !num_meshes);
+  for (unsigned int i = 0; i < num_meshes; ++i)
+  {
+    aiMesh *aimesh = scene->mMeshes[meshidx[i]];
+    aiMaterial *aimat = scene->mMaterials[aimesh->mMaterialIndex];
+
+    Index matidx = matman.add_material(aimat);
+
+    if (dyn_params)
+      dynman.add_dynamic_object(aimesh, matidx, dynparams);
+    else
+      geoman.add_geometry_object(aimesh, matidx);
+  }
+
+  // Continue for all child nodes
+  unsigned int num_children = node->mNumChildren;
+  for (unsigned int i = 0; i < num_children; ++i)
+    convertScene(scene, node->mChildren[i], dyn_params, matman, geoman, dynman);
 }
 
 DynParamsPtr
@@ -151,8 +186,12 @@ loadDynamics( const std::string &filename )
   return params_ptr;
 }
 
-SceneNode *
-loadObject( const std::string &filename, DynParamsPtr params_ptr )
+// return true on success, and false otherwise
+bool
+loadObjects( const std::string &filename, DynParamsPtr params_ptr,
+             MaterialManager &matman,
+             GeometryManager &geoman,
+             DynamicsManager &dynman)
 {
   Assimp::Importer importer;
 
@@ -173,10 +212,11 @@ loadObject( const std::string &filename, DynParamsPtr params_ptr )
   if (!scene)
   {
     qWarning() << importer.GetErrorString();
-    return nullptr;
+    return false;
   }
 
-  return convertScene(scene, scene->mRootNode, params_ptr);
+  convertScene(scene, scene->mRootNode, params_ptr,
+               matman, geoman, dynman);
 }
 
 // helper function to find the root filename from the path
@@ -191,10 +231,13 @@ extractRoot( const std::string &path )
   return path.substr(start+1, end - start - 1);
 }
 
-SceneNode *
-loadScene( const std::string &filename )
+// return false if nothing loaded, true otherwise
+bool
+loadScene( const std::string &filename,
+           MaterialManager &matman,
+           GeometryManager &geoman,
+           DynamicsManager &dynman )
 {
-  SceneNode *root = nullptr;
   libconfig::Config cfg;
   try
   {
@@ -222,7 +265,10 @@ loadScene( const std::string &filename )
     {
       qWarning() << "Setting " << te.getPath() << "has the wrong type!";
     }
-    catch (libconfig::SettingNotFoundException &nfe) { }
+    catch (libconfig::SettingNotFoundException &nfe) 
+    {
+      qWarning() << "Setting " << nfe.getPath() << "not found!";
+    }
 
     global::dynset.hashfile = "";
     if (!global::dynset.savedir.empty()) 
@@ -244,7 +290,10 @@ loadScene( const std::string &filename )
     {
       qWarning() << "Setting " << te.getPath() << "has the wrong type!";
     }
-    catch (libconfig::SettingNotFoundException &nfe) { }
+    catch (libconfig::SettingNotFoundException &nfe) 
+    { 
+      qWarning() << "Setting " << nfe.getPath() << "not found!";
+    }
     
     global::sceneset.rotx = 0.0f;
     global::sceneset.roty = 0.0f;
@@ -254,31 +303,32 @@ loadScene( const std::string &filename )
     global::sceneset.normalize = true;
     cfg.lookupValue("scene.normalize", global::sceneset.normalize);
 
-    std::string objdir = cfg.lookup("scene.objdir");
+    std::string geodir = cfg.lookup("scene.geodir");
     libconfig::Setting& objset = cfg.lookup("scene.objects");
 
     int num = objset.getLength();
     if (!num)
-      return root;
+      return false;
 
     // get scene objects
+    bool something_loaded = false;
     for (int i = 0; i < num; ++i)
     {
       try
       {
-        std::string objfile = objset[i]["objfile"];
+        std::string geofile = objset[i]["geofile"];
         DynParamsPtr params_ptr(nullptr);
         try
         {
           std::string dynfile = objset[i]["dynfile"];
 
-          params_ptr = DynParamsPtr(loadDynamics( objdir + "/" + dynfile ));
+          params_ptr = DynParamsPtr(loadDynamics( geodir + "/" + dynfile ));
           if (params_ptr)
           {
             params_ptr->saveprefix = 
               extractRoot(filename) +
               extractRoot(dynfile) +
-              extractRoot(objfile);
+              extractRoot(geofile);
           }
         }
         catch (libconfig::SettingTypeException &te)
@@ -290,14 +340,8 @@ loadScene( const std::string &filename )
           qWarning() << "Setting " << nfe.getPath() << "not found!";
         }
 
-        SceneNode *obj = loadObject( objdir + "/" + objfile, params_ptr );
-        if(obj)
-        {
-          if (!root)
-            root = new SceneNode("root");
-
-          root->add_child(obj);
-        }
+        something_loaded |=
+          loadObjects(geodir+"/"+geofile, params_ptr, matman, geoman, dynman);
       }
       catch (libconfig::SettingTypeException &te)
       {
@@ -318,9 +362,10 @@ loadScene( const std::string &filename )
   {
     qWarning() << "Configuration file:" << filename.c_str() << ", could not be opened!";
   }
-  return root;
+  return something_loaded;
 }
 
+/*  NOT USED ANYMORE
 // PRE: we must have the current GL context
 void loadGLData(
     const SceneNode *node,
@@ -328,6 +373,62 @@ void loadGLData(
     UniformBuffer &ubo,
     ShaderManager &shaderman)
 {
+  if (node->is_geometry())
+  {
+    const GeometryNode *geonode = static_cast<const GeometryNode*>(node);
+    if (geonode->is_dynamic())
+    {
+      FluidPtr prim = geonode->get_primitive();
+      if (prim)
+      {
+        if (prim->is_mesh())
+        {
+          gl_prims.push_back(new GLMesh(boost::static_pointer_cast<Mesh>(prim),
+                                    geonode->get_material(), ubo, shaderman));
+        }
+        else if (prim->is_pointcloud())
+        {
+          gl_prims.push_back(new GLPointCloud(boost::static_pointer_cast<PointCloud>(prim),
+                true, geonode->get_material(), ubo, shaderman));
+        }
+      }
+    }
+    else
+    {
+      PrimitivePtr prim = geonode->get_primitive();
+      if (prim)
+      {
+        if (prim->is_mesh())
+        {
+          gl_prims.push_back(new GLMesh(boost::static_pointer_cast<Mesh>(prim),
+                                    geonode->get_material(), ubo, shaderman));
+        }
+        else if (prim->is_pointcloud())
+        {
+          gl_prims.push_back(new GLPointCloud(boost::static_pointer_cast<PointCloud>(prim),
+                false, geonode->get_material(), ubo, shaderman));
+        }
+      }
+    }
+  }
+
+  for ( const SceneNode *child : node->get_children())
+    loadGLData(child, gl_prims, ubo, shaderman);
+} */
+
+// PRE: we must have the current GL context
+void loadGLData(
+    std::vector< GLPrimitive * > &gl_prims,
+    UniformBuffer &ubo,
+    ShaderManager &shaderman,
+    MaterialManager &matman,
+    GeometryManager &geoman,
+    DynamicsManager &dynman )
+{
+  PointCloudVec &pcvec = geoman.get_pointclouds();
+  for ( auto &pc : pcvec )
+    gl_prims.push_back(GLPointCloud(pc, /*is dynamic*/false, )
+
   if (node->is_geometry())
   {
     const GeometryNode *geonode = static_cast<const GeometryNode*>(node);

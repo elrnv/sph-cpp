@@ -27,7 +27,7 @@ public:
     max_var = &mv; avg_var = &av;
   }
   inline void init_particle(FluidParticle &p)
-  { 
+  {
     p.dinv = 0.0f;
   }
   inline void fluid(FluidParticle &p, FluidParticle &near_p)

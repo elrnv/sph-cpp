@@ -16,23 +16,21 @@ class GLPrimitive : public QObject
 {
 public:
   explicit GLPrimitive(
-      MaterialConstPtr mat,
-      UniformBuffer &ubo,
-      ShaderManager &shaderman)
+      Material &mat,
+      UniformBuffer &ubo)
     : m_ubo(ubo)
     , m_vao(this)
     , m_prog(NULL)
-    , m_shaderman(shaderman)
     , m_pos(QOpenGLBuffer::VertexBuffer)
     , m_nml(QOpenGLBuffer::VertexBuffer)
     , m_idx(QOpenGLBuffer::IndexBuffer)
-    , m_specular_power(mat->get_shininess())
-    , m_opacity(mat->get_opacity())
-    , m_reflectivity(mat->get_reflectivity())
+    , m_specular_power(mat.get_shininess())
+    , m_opacity(mat.get_opacity())
+    , m_reflectivity(mat.get_reflectivity())
   { 
-    const Vector3f &ka = mat->ka();
-    const Vector3f &kd = mat->kd();
-    const Vector3f &ks = mat->ks();
+    const Vector3f &ka = mat.ka();
+    const Vector3f &kd = mat.kd();
+    const Vector3f &ks = mat.ks();
     m_ambient_color = QVector3D(ka[0], ka[1], ka[2]);
     m_diffuse_color = QVector3D(kd[0], kd[1], kd[2]);
     m_specular_color = QVector3D(ks[0], ks[1], ks[2]);
@@ -59,15 +57,13 @@ public:
   virtual inline Size get_num_indices()  const = 0;
   virtual inline Size get_num_vertices() const = 0;
 
-  // return the coordinates of the point closest to the camera (needed for sorting)
+  // get the coordinates of the point closest to the camera (needed for sorting)
   virtual Vector3f get_closest_pt() const = 0;
 
-  virtual void sort_by_depth(const AffineCompact3f &mvtrans) = 0;
-  virtual void update_glbuf() = 0;
+  virtual void update_glbuf_withsort(const AffineCompact3f &trans,
+                                     const AffineCompact3f &nmltrans) = 0;
+  virtual void update_glbuf_nosort() = 0;
   virtual void update_shader(ShaderManager::ShaderType type) = 0;
-
-  // a callback used by a class supplying the data to this gl object
-  virtual void update_data() = 0;
 
   virtual void print() const = 0;
 
@@ -77,7 +73,6 @@ protected:
   UniformBuffer &m_ubo;
   QOpenGLVertexArrayObject m_vao; // vertex array object for this mesh
   QOpenGLShaderProgram *m_prog;  // glsl programs used for rendering
-  ShaderManager &m_shaderman;
 
   QOpenGLBuffer m_pos; // position buffer
   QOpenGLBuffer m_nml; // normal buffer

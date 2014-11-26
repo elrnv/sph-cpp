@@ -71,8 +71,6 @@ GLMesh::GLMesh(
 
   this->m_vao.release();
 
-  //update_data(); // TODO: uncomment when sort_by_depth is done
-
   update_shader(ShaderManager::PHONG);
 }
 
@@ -104,54 +102,39 @@ GLMesh::update_data()
   m_insync = false;
 }
 
-
 void
-GLMesh::sort_by_depth(const AffineCompact3f &mvtrans)
+GLMesh::update_glbuf(const Matrix3XR<GLfloat &vispos, const Matrix3XR<GLfloat> &visnml)
 {
-  return;
-  // TODO: implement this
-  std::lock_guard<std::mutex> guard(this->m_lock);
-
-  // Sort all vertices by the z value
-  Matrix3XR<GLfloat> mvpos = (mvtrans * m_vertices).eval(); // TODO: mem alloc expensive?
-  Size num_verts = get_num_vertices();
-  VectorXT<Size> perm_vec(num_verts);
-  for (Size i = 0; i < num_verts; ++i)
-    perm_vec[i] = i;
-
-  Size *perm_data = perm_vec.data();
-
-  std::sort(perm_data, perm_data + num_verts,
-      [mvpos](Size i, Size j) { return mvpos.col(i)[2] < mvpos.col(j)[2]; });
-
-  PermutationMatrix<Dynamic, Dynamic, Size> perm_mat(perm_vec);
-  m_vertices = m_vertices * perm_mat;
-  m_normals  = m_normals * perm_mat;
-
-  for (Size i = 0; i < num_verts; ++i)
-    std::cerr << m_vertices.col(i)[0] << " " << m_vertices.col(i)[1] << " " << m_vertices.col(i)[2] << std::endl;
-
-  m_insync = false;
-}
-
-
-void
-GLMesh::update_glbuf()
-{
-  std::lock_guard<std::mutex> guard(this->m_lock);
-  
-  if (m_insync)
-    return;
-
   this->m_vao.bind();
   this->m_pos.bind();
-  this->m_pos.write( 0, m_vertices.data(), sizeof( m_vertices ) );
+  this->m_pos.write( 0, vispos.data(), sizeof( vispos ) );
 
   this->m_nml.bind();
-  this->m_nml.write( 0, m_normals.data(), sizeof( m_normals ) );
+  this->m_nml.write( 0, visnml.data(), sizeof( visnml) );
   this->m_vao.release();
+}
 
-  m_insync = true;
+void 
+GLMesh::update_glbuf_withsort(const AffineCompact3f &mvtrans,
+                              const AffineCompact3f &nmlmvtrans)
+{ // no actual sort needed here
+  if (!m_mesh->is_staleposnml())
+  {
+    update_glbuf(mvtrans * m_mesh->template get_vispos<GLfloat>());
+    update_glbuf(nmlmvtrans * m_mesh->template get_visnml<GLfloat>());
+    m_mesh->set_staleposnml(true);
+  }
+}
+
+void
+GLMesh::update_glbuf_nosort()
+{
+  if (!m_mesh->is_staleposnml())
+  {
+    update_glbuf(m_mesh->template get_vispos<GLfloat>());
+    update_glbuf(m_mesh->template get_visnml<GLfloat>());
+    m_mesh->set_staleposnml(true);
+  }
 }
 
 

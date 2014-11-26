@@ -15,10 +15,10 @@ void OpenGLWindow::toggle_text()
 
 OpenGLWindow::OpenGLWindow(QWindow *parent)
 	: QWindow(parent)
-  , m_show_text(false) // immediately toggled
   , m_near(0.1), m_far(100.0), m_fov(40.0)
   , m_frame(0)
 	, m_context(0)
+  , m_show_text(false) // immediately toggled
 	, m_update_pending(false)
 	, m_animating(false)
 	, m_rotation_control(false)

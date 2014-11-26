@@ -9,7 +9,7 @@
 #include "shadermanager.h"
 
 // forward declarations
-class UniformGrid;
+class SPHGrid;
 class GLPrimitive; 
 
 typedef std::vector< GLPrimitive * > GLPrimPtrVec;
@@ -63,18 +63,21 @@ private:
     Vector4f eyepos;
   } m_udata;
 
-  UniformGrid *m_grid; // simulation grid
+  SPHGrid *m_grid;      // simulation grid
 
   GLPrimPtrVec m_glprims;
 
   ViewMode m_viewmode;
-  bool m_change_prog; // flag true if m_viewmode is recently changed
+  bool m_change_prog;   // flag true if m_viewmode is recently changed
 
   ShaderManager m_shaderman;
+  ShaderManager m_dynman;
+  ShaderManager m_geoman;
+  ShaderManager m_matman;
 
   // bounding box
   QOpenGLVertexArrayObject m_bbox_vao;
-  QOpenGLShaderProgram *m_bbox_prog;
+  QOpenGLShaderProgram    *m_bbox_prog;
 
   std::thread m_sim_thread;
 };

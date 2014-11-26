@@ -2,6 +2,7 @@
 
 // Material
 
+// define the default material
 Material::Material()
  : m_ka(0.0f,0.0f,0.0f)
  , m_kd(0.6f,0.6f,0.6f)
@@ -11,6 +12,7 @@ Material::Material()
  , m_opacity(0.3f)
 {}
 
+// material imported from assimp
 Material::Material(const aiMaterial &mat)
 {
   aiColor3D ka, kd, ks;
@@ -32,6 +34,7 @@ Material::Material(const aiMaterial &mat)
   m_reflectivity = 0.0f;
 }
 
+// custom material
 Material::Material(const Vector3f& ka, const Vector3f& kd, const Vector3f& ks,
     float shininess, float reflectivity, float opacity)
   : m_ka(ka), m_kd(kd), m_ks(ks)

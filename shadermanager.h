@@ -19,11 +19,12 @@ public:
     ADDITIVE_PARTICLE
   };
 
-  QOpenGLShaderProgram *get_normals_shader() { return &m_normals_shader; }
-  QOpenGLShaderProgram *get_flat_shader() { return &m_flat_shader; }
+  QOpenGLShaderProgram *get_normals_shader()   { return &m_normals_shader; }
+  QOpenGLShaderProgram *get_flat_shader()      { return &m_flat_shader; }
   QOpenGLShaderProgram *get_phong_shader()     { return &m_phong_shader; }
   QOpenGLShaderProgram *get_particle_shader()  { return &m_particle_shader; }
-  QOpenGLShaderProgram *get_additive_particle_shader()  { return &m_add_particle_shader; }
+  QOpenGLShaderProgram *get_additive_particle_shader() 
+  { return &m_add_particle_shader; }
 
   void init();
 

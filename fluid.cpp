@@ -11,13 +11,15 @@
 
 // Fluid stuff
 
-Fluid::Fluid(PointCloud &pc, FluidParamsPtr params)
+Fluid::Fluid(const aiMesh *pc, Index matidx, FluidParamsPtr params)
   : m_pc(pc)
   , m_params(params)
   , m_avg_density(0.0f)
   , m_avg_pressure(0.0f)
   , m_cache(global::dynset.frames+1)
-{ }
+{
+  init();
+}
 
 Fluid::~Fluid()
 { }
@@ -25,7 +27,7 @@ Fluid::~Fluid()
 // the fluid must be initialized before being simulated
 
 void 
-Fluid::init(GLPointCloud *glpc)
+Fluid::init()
 {
   m_bmin = m_pc.get_bbox().corner(Eigen::AlignedBox3f::BottomLeftFloor);
   m_bmax = m_pc.get_bbox().corner(Eigen::AlignedBox3f::TopRightCeil);
@@ -49,14 +51,12 @@ Fluid::init(GLPointCloud *glpc)
     m_c2 = max_velocity2 / m_params->compressibility;
   }
 
-  m_glpc = glpc;
-
   Matrix3XR<Real> &pos = m_pc.get_pos();
   m_accel.resizeLike(pos);
   m_dinv.resize(pos.cols());
   m_extern_accel.resizeLike(pos);
   m_vel.resizeLike(pos);
-  for (Size i = 0; i < this->get_num_vertices(); ++i)
+  for (Size i = 0; i < get_num_vertices(); ++i)
     m_vel.col(i) = m_params->velocity.template cast<Real>();
   m_dinv.setConstant(m_rest_density);
   reset_accel();
@@ -71,19 +71,6 @@ Fluid::init(GLPointCloud *glpc)
 
   // construct output filename (this can be done whenever)
   m_savefmt = global::dynset.savedir + "/" + m_params->saveprefix + "%03d.sim";
-}
-
-
-Vector3f 
-Fluid::get_color() const 
-{ 
-  Vector3f color(1.0f, 1.0f, 1.0f);
-  if (m_glpc)
-  {
-    const QVector3D diffuse = m_glpc->get_diffuse();
-    color = Vector3f(diffuse[0], diffuse[1], diffuse[2]);
-  }
-  return color;
 }
 
 // clamp value d to min and max boundaries + epsilon,
@@ -108,7 +95,7 @@ Fluid::clamp(Real &d, Real min, Real max, Real tol)
 void 
 Fluid::resolve_collisions()
 {
-  for (Size i = 0; i < this->get_num_vertices(); ++i)
+  for (Size i = 0; i < get_num_vertices(); ++i)
   {
     for (unsigned char j = 0; j < 3; ++j)
     {
@@ -124,7 +111,7 @@ Fluid::resolve_collisions()
 void
 Fluid::clamp(float adjust, float push)
 {
-  for (Size i = 0; i < this->get_num_vertices(); ++i)
+  for (Size i = 0; i < get_num_vertices(); ++i)
   {
     for (unsigned char j = 0; j < 3; ++j)
     {
@@ -153,17 +140,7 @@ Fluid::clamp(float adjust, float push)
   }
 }
 
-
-void
-Fluid::update_data()
-{
-  if (m_glpc)
-    m_glpc->update_data();
-}
-
-
 // File stuff
-
 
 void
 Fluid::save(unsigned int frame) 
@@ -183,7 +160,7 @@ Fluid::save(unsigned int frame)
     return;
   }
 
-  Size num = this->get_num_vertices();
+  Size num = get_num_vertices();
   outfile.write(reinterpret_cast<const char *>(&num), sizeof num);
   float radius = m_pc.get_radius();
   float lev = 0.0f;

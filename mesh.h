@@ -42,7 +42,7 @@ typedef std::vector<Face> FaceVec;
 class Mesh : public Primitive 
 {
 public:
-  explicit Mesh(const aiMesh *mesh);
+  explicit Mesh(const aiMesh *mesh, Index matidx);
   ~Mesh();
 
   AlignedBox3f &compute_bbox();
@@ -54,11 +54,26 @@ public:
   inline const FaceVec   &get_faces() const { return m_faces; }
   inline bool is_mesh() const { return true; }
 
+  // manage position and normal visualization data
+  inline void prepare_visposnml();
+  template <typename T>
+  inline Matrix3XR<T> &get_vispos() { return m_vispos.template cast<T>(); }
+  template <typename T>
+  inline Matrix3XR<T> &get_visnml() { return m_visnml.template cast<T>(); }
+  inline bool is_staleposnml() { return m_staleposnml; }
+  inline void set_staleposnml(bool sp) { m_staleposnml = sp; }
+
   friend std::ostream& operator<<(std::ostream& out, const Mesh& mesh);
 
 protected:
   VertexVec m_verts;
   FaceVec   m_faces;
+
+  // The following data structures provide a mechanism for syncronizing computed
+  // mesh data with its visual representative (like glmesh)
+  Matrix3XR<Real> m_vispos;
+  Matrix3XR<Real> m_visnml;
+  std::atomic<bool> m_staleposnml;
 };
 
 typedef boost::shared_ptr< Mesh > MeshPtr;

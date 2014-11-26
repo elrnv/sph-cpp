@@ -1,7 +1,6 @@
 #include <QtGui/QScreen>
 #include <QtGui/QKeyEvent>
 #include <string>
-#include "scene.h"
 #include "util.h"
 #include "mesh.h"
 #include "dynamics.h"
@@ -11,45 +10,12 @@
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
 
-void 
-SimWindow::toggle_shortcuts()
-{
-  m_show_shortcuts = !m_show_shortcuts;
-  glclear_bl();
-
-  if (!m_show_shortcuts)
-  {
-    glprintf_blc(BLUE, "T - show/hide shortcuts\n");
-    return;
-  }
-  glprintf_bl("Shortcuts:\n");
-  glprintf_blc(BLUE, "  Y - enable/disable text\n");
-  glprintf_blc(BLUE, "  T - show/hide shortcuts\n");
-  glprintf_blc(BLUE, "  R - reset view\n");
-  glprintf_bl("  View Modes: \n");
-  glprintf_blc(GREEN, "    W - wireframe\n");
-  glprintf_blc(RED,   "    S - phong\n");
-  glprintf_blc(BLUE,  "    Q - particles\n");
-  glprintf_blc(BLUE,  "    A - additive particles\n");
-  glprintf_bl("  Scenes: \n");
-  glprintf_blc(BLUE,  "    5 - MCG03 Surface Tension test\n");
-  glprintf_blc(BLUE,  "    6 - MCG03 No Surface Tension test\n");
-  glprintf_blc(BLUE,  "    7 - BT07 Surface Tension test\n");
-  glprintf_blc(BLUE,  "    8 - BT07 No Surface Tension test\n");
-  glprintf_bl("  Dynamics: \n");
-  glprintf_blc(RED,  "    D - start/stop\n");
-  glprintf_blc(RED,  "    G - pause/resume\n");
-  glprintf_blc(RED,  "    C - clear cache\n");
-  glprintf_blc(CYAN, "    H - show/hide halos\n");
-  glprintf_blc(CYAN, "    B - show/hide bounding box\n");
-}
-
 SimWindow::SimWindow()
   : m_show_shortcuts(true) // immediately toggled below
   , m_dynamics(false)
   , m_show_bbox(true)
   , m_grid(NULL)
-  , m_viewmode(ShaderManager::ADDITIVE_PARTICLE)
+  , m_viewmode(ViewMode::ADDITIVE_PARTICLE)
   , m_change_prog(true)
   , m_shaderman(this)
   , m_bbox_vao(this)
@@ -127,13 +93,14 @@ SimWindow::load_model(int i)
 
   scene->cube_bbox();
   m_udata.modelmtx.setIdentity();
+  m_udata.normalmtx.block(0,0,3,3) = m_udata.modelmtx.block(0,0,3,3).inverse().transpose();
 
   for ( auto &glprim : m_glprims )
     delete glprim;
 
   m_glprims.clear();
   m_glprims.reserve( scene->num_primitives() );
-  Util::loadGLData( scene, m_glprims, m_ubo, m_shaderman );
+  Util::loadGLData( m_glprims, m_ubo, m_shaderman, m_matman, m_geoman, m_dynman );
   delete scene; scene = 0;
   change_viewmode(m_viewmode);
 }
@@ -163,7 +130,7 @@ SimWindow::reset_viewmode()
   else if (m_viewmode == ViewMode::PARTICLE) 
   {
     glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_FALSE);
+    glDepthMask(GL_TRUE);
 	  glDisable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_PROGRAM_POINT_SIZE);
@@ -184,6 +151,7 @@ SimWindow::toggle_bbox()
   m_show_bbox = !m_show_bbox;
   renderLater();
 }
+
 void 
 SimWindow::toggle_halos()
 {
@@ -200,15 +168,7 @@ SimWindow::toggle_halos()
 void 
 SimWindow::clear_cache()
 {
-  for ( auto &glprim : m_glprims )
-  {
-    if (!glprim->is_pointcloud())
-      continue;
-
-    GLPointCloud *glpc = static_cast<GLPointCloud*>(glprim);
-    if (glpc->is_dynamic())
-      glpc->clear_cache();
-  }
+  m_dynman.clear_cache();
   glprintf_trc(CYAN, "Cache cleared\n");
 }
 
@@ -226,7 +186,7 @@ SimWindow::toggle_dynamics()
     glclear_tr(); // clear dynamics text buffer
 
     // Create simulation grid
-    m_grid = new UniformGrid(Vector3f(-1,-1,-1), Vector3f(1,1,1));
+    m_grid = new SPHGrid(Vector3f(-1,-1,-1), Vector3f(1,1,1));
 
     for ( auto &glprim : m_glprims )
     {
@@ -241,7 +201,7 @@ SimWindow::toggle_dynamics()
     m_grid->init();
 
     // run simulation
-    m_sim_thread = std::thread(&UniformGrid::run, m_grid);
+    m_sim_thread = std::thread(&SPHGrid::run, m_grid);
 
   }
   set_animating(m_dynamics);
@@ -259,15 +219,42 @@ SimWindow::render()
   glDepthMask(GL_TRUE); // depthmask needs to be true before clearing the depth bit
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-  int i = 0;
+  if (m_show_bbox)
+    draw_wire_bbox();
+
+  glFinish();
+
+  reset_viewmode();
 
   Affine3f vtrans(get_view_trans()); // view transformation
+
+  AffineCompact3f &mvtrans = get_view_trans();
+  if (m_viewmode == ViewMode::PARTICLE)
+  { // explicitly transform and sort by depth
+    for ( auto &glprim : m_glprims )
+      glprim->update_glbuf_withsort(mvtrans, mvtrans);
+    vtrans.setIdentity(); // reset the view matrix
+  }
+  else
+  {
+    for ( auto &glprim : m_glprims )
+      glprim->update_glbuf_nosort();
+  }
+
+  // sort primitives (why?)
+  /*
+  if (m_viewmode != ViewMode::ADDITIVE_PARTICLE)
+  {
+    std::sort(m_glprims.begin(), m_glprims.end(),
+        [mvtrans](const GLPrimitive *p1, const GLPrimitive *p2)
+        { return (mvtrans * p1->get_closest_pt())[2] < (mvtrans * p2->get_closest_pt())[2]; });
+  }*/
+
+  // write uniform buffer
   m_udata.vpmtx = (get_proj_trans() * vtrans).matrix();
-  m_udata.mvpmtx = m_udata.vpmtx * m_udata.modelmtx;
+  m_udata.mvpmtx = m_udata.vpmtx; // ignoring unused model transformations
   m_udata.vinvmtx = vtrans.inverse().matrix();
   m_udata.eyepos = m_udata.vinvmtx * Vector4f(0.0f, 0.0f, 0.0f, 1.0f);
-
-  m_udata.normalmtx.block(0,0,3,3) = m_udata.modelmtx.block(0,0,3,3).inverse().transpose();
 
   m_ubo.bind();
   m_ubo.write(0, &m_udata, sizeof( m_udata )); // write uniform buffer object
@@ -275,32 +262,8 @@ SimWindow::render()
 
   glFinish(); // Finish writing uniform buffer before drawing
 
-  if (m_show_bbox)
-    draw_wire_bbox();
-
-  glFinish();
-  reset_viewmode();
-
-  if (m_viewmode != ViewMode::ADDITIVE_PARTICLE)
-  {
-    AffineCompact3f mvtrans = AffineCompact3f(vtrans.matrix() * m_udata.modelmtx);
-
-    for ( auto &glprim : m_glprims )
-    {
-      if (m_viewmode == ShaderManager::PARTICLE)
-        glprim->sort_by_depth(mvtrans);
-      ++i;
-    }
-
-    std::sort(m_glprims.begin(), m_glprims.end(),
-        [mvtrans](const GLPrimitive *p1, const GLPrimitive *p2)
-        { return (mvtrans * p1->get_closest_pt())[2] < (mvtrans * p2->get_closest_pt())[2]; });
-  }
-
   for ( auto &glprim : m_glprims )
   {
-    glprim->update_glbuf(); // in case data has changed
-
     if (m_change_prog)
       glprim->update_shader(m_viewmode);
 
@@ -319,8 +282,8 @@ SimWindow::render()
     glprim->get_program()->setUniformValue("lights[1].col", QVector4D(0.0, 0.0, 0.0, 0.0));
 
     glprim->get_vao().bind();
-    if (m_viewmode == ShaderManager::PARTICLE ||
-        m_viewmode == ShaderManager::ADDITIVE_PARTICLE)
+    if (m_viewmode == ViewMode::PARTICLE ||
+        m_viewmode == ViewMode::ADDITIVE_PARTICLE)
     {
       glprim->get_program()->setUniformValue("pt_scale", float(14.5*window_dim()[1]*m_near));
       if (glprim->is_pointcloud())
@@ -349,6 +312,40 @@ SimWindow::render()
   }
 
   m_change_prog = false;
+}
+
+
+void 
+SimWindow::toggle_shortcuts()
+{
+  m_show_shortcuts = !m_show_shortcuts;
+  glclear_bl();
+
+  if (!m_show_shortcuts)
+  {
+    glprintf_blc(BLUE, "T - show/hide shortcuts\n");
+    return;
+  }
+  glprintf_bl("Shortcuts:\n");
+  glprintf_blc(BLUE, "  Y - enable/disable text\n");
+  glprintf_blc(BLUE, "  T - show/hide shortcuts\n");
+  glprintf_blc(BLUE, "  R - reset view\n");
+  glprintf_bl("  View Modes: \n");
+  glprintf_blc(GREEN, "    W - wireframe\n");
+  glprintf_blc(RED,   "    S - phong\n");
+  glprintf_blc(BLUE,  "    Q - particles\n");
+  glprintf_blc(BLUE,  "    A - additive particles\n");
+  glprintf_bl("  Scenes: \n");
+  glprintf_blc(BLUE,  "    5 - MCG03 Surface Tension test\n");
+  glprintf_blc(BLUE,  "    6 - MCG03 No Surface Tension test\n");
+  glprintf_blc(BLUE,  "    7 - BT07 Surface Tension test\n");
+  glprintf_blc(BLUE,  "    8 - BT07 No Surface Tension test\n");
+  glprintf_bl("  Dynamics: \n");
+  glprintf_blc(RED,  "    D - start/stop\n");
+  glprintf_blc(RED,  "    G - pause/resume\n");
+  glprintf_blc(RED,  "    C - clear cache\n");
+  glprintf_blc(CYAN, "    H - show/hide halos\n");
+  glprintf_blc(CYAN, "    B - show/hide bounding box\n");
 }
 
 void 

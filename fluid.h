@@ -9,9 +9,9 @@
 // Fluid Stuff
 
 // Forward declaration
-class GLPointCloud;
+class PointCloud;
 
-// A dynamic cloud of points, this is a purely abstract class
+// A dynamic cloud of points
 
 class Fluid
 {
@@ -31,9 +31,10 @@ public:
   typedef std::vector< CachedFrame > Cache;
 
   // dynamic point cloud from a regular updatable gl point cloud
-  explicit Fluid(PointCloud &pc, FluidParamsPtr params);
+  explicit Fluid(const aiMesh *pc, Index matidx, FluidParamsPtr params);
   ~Fluid();
-  void init(GLPointCloud *glpc); // register the graphical rep. and initialize
+
+  void init();
 
   // get pointers to be able to externally evolve data
   inline Real *vel_at(Size i)    { return m_vel.data() + i*3; }
@@ -44,6 +45,8 @@ public:
   inline Real &get_avg_density()  { return m_avg_density; }
   inline Real &get_avg_pressure()  { return m_avg_pressure; }
 
+  inline Matrix3XR<Real> &get_pos()          { return m_pc.get_pos(); }
+  inline const Matrix3XR<Real> &get_pos() const  { return m_pc.get_pos(); }
   inline Matrix3XR<Real> &get_vel()          { return m_vel; }
   inline Matrix3XR<Real> &get_accel()        { return m_accel; }
   inline Matrix3XR<Real> &get_extern_accel() { return m_extern_accel; }
@@ -58,6 +61,7 @@ public:
     return m_params->kernel_inflation * m_pc.get_radius();
   }
 
+  inline Size get_num_vertices() const { return m_pc.get_num_vertices(); }
   inline Real get_halo_radius()   { return get_kernel_radius(); }
 
   inline Real get_mass() const            { return m_mass; }
@@ -68,14 +72,12 @@ public:
   inline Real get_sound_speed2() const    { return m_c2; }
   inline Real get_compressibility() const { return m_params->compressibility; }
   inline Real get_friction() const        { return m_params->friction; }
-  inline FluidType get_type() const       { return m_params->fluid_type; }
+  inline ParticleType get_type() const    { return m_params->fluid_type; }
 
   friend std::size_t hash_value( const Fluid &fl ) 
   { 
     return hash_value(*(fl.m_params)); 
   }
-
-  Vector3f get_color() const;
 
   inline void reset_accel() { m_accel.setZero(); m_extern_accel.setZero(); }
   inline void reset_extern_accel() { m_extern_accel.setZero(); }
@@ -83,8 +85,6 @@ public:
   bool clamp(Real &d, Real min, Real max, Real tol);
   void clamp(float adjust, float push);
   void resolve_collisions();
-
-  void update_data(); // propagate changes to some viewer
 
   void clear_saved();
   void save(unsigned int frame);
@@ -118,8 +118,7 @@ protected:
   Matrix3XR<Real> m_extern_accel; // accelerations
   VectorXR<Real>  m_dinv;  // density inverses
 
-  PointCloud   &m_pc;   // The underlying dynamic cloud of points
-  GLPointCloud *m_glpc; // graphical rep. of this fluid (can be null)
+  PointCloud     &m_pc;    // The underlying dynamic cloud of points
 
   std::string m_savefmt;
 
@@ -128,5 +127,6 @@ protected:
 
 
 typedef boost::shared_ptr< Fluid > FluidPtr;
+typedef std::vector< Fluid > FluidVec;
 
 #endif // FLUID_H

@@ -5,7 +5,7 @@
 #include <boost/functional/hash.hpp>
 #include <string>
 #include "eigen.h"
-#include "fluidmanager.h"
+#include "types.h"
 
 // General object specific parameters
 
@@ -51,7 +51,7 @@ struct DynParams
 
 struct FluidParams : public DynParams
 {
-  FluidType fluid_type;
+  ParticleType fluid_type;
 
   float density;
   float viscosity;

@@ -7,7 +7,9 @@
 
 // Mesh stuff
 
-Mesh::Mesh(const aiMesh *mesh)
+Mesh::Mesh(const aiMesh *mesh, Index matidx)
+  : Primitive(matidx)
+  , m_staleposnml(true)
 {
   // First copy all the vertices
   if (!mesh->HasPositions())
@@ -16,6 +18,9 @@ Mesh::Mesh(const aiMesh *mesh)
   aiVector3D *verts = mesh->mVertices;
   Size num_verts = mesh->mNumVertices;
   m_verts.resize(num_verts);
+
+  m_vispos.resize(NoChange, num_verts);
+  m_visnml.resize(NoChange, num_verts);
 
   typename VertexVec::iterator v_it = m_verts.begin(); // member face iterator
   for (Size i = 0; i < num_verts; ++i, ++v_it)
@@ -64,6 +69,8 @@ Mesh::Mesh(const aiMesh *mesh)
 
   for ( auto &v : m_verts )
     v.nml.normalize();                  // take the average
+
+  prepare_visposnml();
 }
 
 
@@ -108,8 +115,27 @@ void Mesh::transform_in_place(const AffineCompact3f &trans)
   }
 }
 
+// Visualization stuff
+// Called from the dynamics thread
+// copies internal representation of vertices and faces to a visualizable
+// representation
+inline void prepare_visposnml()
+{
+  if (m_staleposnml)
+  {
+    Size num_verts = m_verts.size();
+    for ( Size i = 0; i < num_verts; ++i )
+    {
+      Vertex &v = m_verts[i];
+      m_vispos.col(i) << v.pos;
+      m_visnml.col(i) << v.nml;
+    }
 
+    m_staleposnml = false;
+  }
+}
 
+// String representation
 std::ostream& operator<<(std::ostream& out, const Mesh& mesh)
 {
   out << "mesh({ ";

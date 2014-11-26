@@ -9,84 +9,82 @@
 #include "material.h"
 #include "dynparams.h"
 
-class SceneNode;
-typedef std::vector<SceneNode*> NodeList;
-
-class SceneNode 
+class Scene
 {
-public:
-
-  SceneNode(const std::string& name);
-
-  // construct a scene node from an assimp node
-  SceneNode(const aiNode *node);
-
-  // copy constructor for deep copy
-  SceneNode(const SceneNode &orig);
-
-  // virtual allocation routine to avoid using dynamic_casts
-  virtual SceneNode *clone() const { return new SceneNode(*this); }
-
-  virtual ~SceneNode();
-
-  const std::string &get_name() const { return m_name; } // for debugging
-
-  const AffineCompact3f& get_trans() const { return m_trans; }
-
-  // ownership of child is implicitly passed to this node
-  void add_child(SceneNode* child)
+private:
+  class Node 
   {
-    m_children.push_back(child);
-  }
+  public:
+    Node(const std::string& name);
+    Node(const aiNode *node); // construct a scene node from an assimp node
+    ~Node();
 
-  // rotation in degrees
-  void rotate(float angle, const Vector3f &axis);
+    const std::string &get_name() const { return m_name; } // for debugging
+    const AffineCompact3f& get_trans() const { return m_trans; }
 
-  void scale(float amount); // uniform scale
-  void scale(const Vector3f& amount); // non-uniform scale
-  void translate(const Vector3f& amount);
+    // rotation in degrees
+    void rotate(float angle, const Vector3f &axis);
 
-  // compute the parent transformations into the children, reset m_trans
-  // this operation invalidates the bounding box
-  virtual void flatten();
+    void scale(float amount); // uniform scale
+    void scale(const Vector3f& amount); // non-uniform scale
+    void translate(const Vector3f& amount);
 
-  virtual void print(int depth = 0) const;
+    // compute the parent transformations into the children, reset m_trans
+    // this operation invalidates the bounding box
+    void flatten();
 
-  const NodeList &get_children() const { return m_children; }
+    void print(int depth = 0) const;
 
-  virtual bool is_geometry() const { return false; }
+    bool is_geometry() const { return false; }
 
-  unsigned int num_primitives() const;
+    unsigned int num_primitives() const;
 
-  virtual AlignedBox3f &compute_bbox();
-  AlignedBox3f &get_bbox() { return m_bbox; }
-  virtual void cube_bbox();
+    AlignedBox3f &compute_bbox();
+    AlignedBox3f &get_bbox() { return m_bbox; }
+    void cube_bbox();
 
-  // translate and scale model to fit in a 2x2x2 box centered at the origin
-  void normalize_model();
+    // translate and scale model to fit in a 2x2x2 box centered at the origin
+    void normalize_model();
 
-  // same as above but extend the bounding box according to given vectors
-  // in the form Vector2f( positive extension, negative extension )
-  void normalize_model(
-      const Vector2f &ext_x,
-      const Vector2f &ext_y,
-      const Vector2f &ext_z);
+    // same as above but extend the bounding box according to given vectors
+    // in the form Vector2f( positive extension, negative extension )
+    void normalize_model(
+        const Vector2f &ext_x,
+        const Vector2f &ext_y,
+        const Vector2f &ext_z);
 
-  // same as normalize_model(void) but extending the bottom left floor corner
-  // and top right ceil corner by the given vectors
-  void normalize_model(
-      const Vector3f &ext_blf,
-      const Vector3f &ext_trc);
+    // same as normalize_model(void) but extending the bottom left floor corner
+    // and top right ceil corner by the given vectors
+    void normalize_model(
+        const Vector3f &ext_blf,
+        const Vector3f &ext_trc);
 
-protected:
-  std::string m_name;      // human readable name
-  AffineCompact3f m_trans; // transformations
-  NodeList m_children;     // hierarchy
-  AlignedBox3f m_bbox;     // bounding box
+  protected:
+    std::string     m_name;      // human readable name
+    AffineCompact3f m_trans;     // transformations
+    AlignedBox3f    m_bbox;      // bounding box
+    Index           m_prim_idx;  // optional index to the represented primitive
+    NodeType        m_node_type; // what kind of node is this
+
+    // child data (indices into the main node list)
+    Index m_first_child;
+    Size  m_num_children;
+  };
+
+  typedef std::vector<Node> NodeVec;
+
+public:
+  Scene(const aiScene *scene); // construct a scene from an assimp scene
+  ~Scene();
+
+  void add_node(const aiNode *ainode);
+
+private:
+  NodeVec m_nodes;
 };
 
 
-class GeometryNode : public SceneNode 
+class GeometryNode : public Node 
 {
 public:
   // Create a geo node with existing primitive

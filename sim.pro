@@ -19,7 +19,7 @@ SOURCES += \
   fluid.cpp \
   fluidimpl.cpp \
   boundary.cpp \
-  dynamics.cpp \
+  sph.cpp \
   glmesh.cpp \
   glpointcloud.cpp
 
@@ -32,14 +32,16 @@ HEADERS += \
   scene.h \
   mesh.h \
   pointcloud.h \
+  geometrymanager.h \
   primitive.h \
   material.h \
+  materialmanager.h \
   uniformbuffer.h \
   shadermanager.h \
-  dynamicsmanager.h \
 #  quantityprocessor.h \
   fluid.h \
   fluidimpl.h \
+  sph.h \
   boundary.h \
   dynamics.h \
   glmesh.h \
@@ -57,7 +59,9 @@ CONFIG += c++11
 
 INCLUDEPATH += /opt/local/include/eigen3
 INCLUDEPATH += /opt/local/include
+INCLUDEPATH += /Users/egor/proj/assimp/include
 LIBS += -L/opt/local/lib 
+LIBS += -L/Users/egor/proj/assimp/lib
 LIBS += -lassimp
 LIBS += -lboost_system-mt
 

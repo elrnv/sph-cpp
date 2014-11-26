@@ -1,5 +1,5 @@
-#ifndef DYNAMICS_H
-#define DYNAMICS_H
+#ifndef SPHGRID_H
+#define SPHGRID_H
 
 #include <vector>
 #include <deque>
@@ -8,72 +8,72 @@
 #include "kernel.h"
 #include "pointcloud.h"
 #include "fluid.h"
-#include "fluidmanager.h"
+#include "dynamicsmanager.h"
 #include "glpointcloud.h"
 #include "particle.h"
 
 #define M_G 9.81f
 
-// Compute routine used to compute SPH quantities
-
 //class CBVolume;
 
-// forward declarations
-
-class UniformGrid;
-
-// template recursion mechanism to iterate through each fluid type
-template<int FT>
-struct FTiter
-{
-  // high level processing (ones that should be called by the integrator)
-  static void init_fluid_processors(UniformGrid &);
-  static void update_density(UniformGrid &, float);
-  static void compute_density(UniformGrid &);
-  static void compute_accel(UniformGrid &);
-  static void compute_pressure(UniformGrid &);
-};
-
- // base case
-template <>
-struct FTiter<NUMTYPES>
-{
-  inline static void init_fluid_processors(UniformGrid &) { }
-  inline static void update_density(UniformGrid &,float) { }
-  inline static void compute_density(UniformGrid &) { }
-  inline static void compute_accel(UniformGrid &) { }
-  inline static void compute_pressure(UniformGrid &) { }
-};
-
 // Grid structure used to optimize computing particle properties using kernels
-
-class UniformGrid
+class SPHGrid
 {
 public:
 
   // grid-cell data definitions
-  typedef std::vector< FluidParticle > DynamicParticles;
-  typedef std::vector< Particle > StaticParticles;
+  template<int PT>
+  using ParticleVecT = std::vector< ParticleT<PT> >;
 
   struct Cell
   {
-    Index fluididx; // dynamic fluid particles
-    Index boundidx; // static boundary particles
-    //Index rigididx; // dynamic rigid body particles
+    // The following macros define the data and their respective getters
+    // of particle vectors for each particle type (PT) defined in types.h
 
-    Index get_idx()
-    {
-      return ParticleType
-
+    template<int PT>
+    inline void push_particle(FluidDataT<PT> &fldata, float color, Size vtxidx)
+    { 
+      Vector3R<Real> pos(fldata.fl.get_pos().col(vtxidx));
+      Vector3R<Real> vel(fldata.fl.get_vel().col(vtxidx));
+      get_pvec<PT>().push_back(
+          FluidParticleT<PT>( pos, vel, 
+            fldata.fl.accel_at(vtxidx), 
+            fldata.fl.extern_accel_at(vtxidx), 
+            fldata.fl.dinv_at(vtxidx), 
+            color, fldata));
     }
 
-    template <typename ParticleType>
-    typename std::enable_if<std::is_same< ParticleType, Particle >::value,
-             std::vector< ParticleType > >::type &get_vec() { return boundvec; }
+    inline void push_particle(BoundaryPC &bnd, Size vtxidx)
+    {
+      Vector3R<Real> pos(bnd->get_pos().col(vtxidx));
+      get_pvec<STATIC>().push_back(ParticleT<STATIC>(pos, bnd));
+    }
 
-    template <typename ParticleType>
-    typename std::enable_if<std::is_base_of< FluidParticle, ParticleType >::value,
-             std::vector< FluidParticle > >::type &get_vec() { return fluidvec; }
+    inline void clear() 
+    {
+#define CLEAR_PVEC_TEMPLATE(z, PT, _) m_pvec_##PT.clear();
+      BOOST_PP_REPEAT(NUMTYPES, CLEAR_PVEC_TEMPLATE, _)
+    }
+    
+    // particle getters
+#define PARTICLE_VEC_GETTER(z, PT, _) \
+    inline DynamicParticleVecT<PT> & \
+    get_pvec<PT>() { return m_pvec_##PT; }
+#define PARTICLE_VEC_CONST_GETTER(z, PT, _) \
+    inline const DynamicParticleVecT<PT> & \
+    get_pvec<PT>() const { return m_pvec_##PT; }
+
+    BOOST_PP_REPEAT(NUMTYPES, PARTICLE_VEC_GETTER, _)
+    BOOST_PP_REPEAT(NUMTYPES, PARTICLE_VEC_CONST_GETTER, _)
+
+#undef PARTICLE_VEC_GETTER
+#undef PARTICLE_VEC_CONST_GETTER
+
+    // data members
+#define PARTICLE_VEC_MEMBER(z, PT, _) \
+    ParticleVecT<PT> m_pvec_##PT;
+
+    BOOST_PP_REPEAT(NUMTYPES, PARTICLE_VEC_MEMBER, _)
   };
 
   typedef boost::multi_array< Cell, 3 > Array3;
@@ -87,18 +87,9 @@ public:
   typedef std::deque< FluidPtr > FluidVec;
 
   // Constructors/Destructor
-  UniformGrid(const Vector3f &bmin, const Vector3f &bmax);
-  ~UniformGrid();
+  SPHGrid(const Vector3f &bmin, const Vector3f &bmax, DynamicsManager &dynman);
+  ~SPHGrid();
   
-  void add_fluid(GLPointCloud &glpc);
-
-  template<int FT>
-  inline FluidT<FT> *
-  get_fluid(unsigned int id) 
-  { 
-    return m_fluids[FT][id]->template cast<FT>();
-  }
-
   void init();
   void update_grid();
   void populate_fluid_data();
@@ -118,6 +109,8 @@ public:
       clamp(static_cast<Index>(m_hinv*(pos[2]-m_bmin[2])), 0, m_gridsize[2]-1) }};
   }
 
+  inline Cell &get_cell_at(const Array3Index &idx) { return m_grid(idx); }
+
   /*
   template <typename ProcessPairFunc>
   typename std::enable_if< std::is_same< ProcessPairFunc, CBVolume >::value,
@@ -133,6 +126,11 @@ public:
              Q_UNUSED(p); return get_proc<ProcessPairFunc>();
            }
 */
+
+  inline float get_cell_size() { return m_h; }
+  inline Array3Index get_grid_size() { return m_gridsize; }
+  inline const Vector3f &get_bmin() const { return m_bmin; }
+  inline const Vector3f &get_bmax() const { return m_bmax; }
 
   template <typename ProcessPairFunc, typename ParticleType>
   typename std::enable_if< std::is_base_of< FluidParticle, ParticleType >::value,
@@ -167,9 +165,6 @@ public:
   // run dynamic simulation
   void run();
 
-  // execute one substep
-  bool step(float dt, bool first_step, float *substep_t = NULL);
-
   // request stop which will be checked by the owner thread
   void request_stop() { m_stop_requested = true; }
   void toggle_pause() 
@@ -191,17 +186,14 @@ public:
 
   bool check_and_write_hash();
 
-  friend std::size_t hash_value( const UniformGrid &ug )
+  friend std::size_t hash_value( const SPHGrid &ug )
   {
     std::size_t seed = 0;
-    for (int j = 0; j < NUMTYPES; ++j)
+    for (int j = 0; j < NUMFLUIDTYPES; ++j)
       for (auto &fl : ug.m_fluids[j])
         boost::hash_combine(seed, hash_value(*fl));
     return seed;
   }
-
-  template <int FT>
-  friend struct FTiter;
 
 private: // member functions
 
@@ -212,14 +204,9 @@ private: // member functions
     return IndexRange(x == 0 ? 0 : x-1, x == hi-1 ? hi : x+2 );
   }
 
-  // wrapper for fluid getter using the fluid manager
-
-  template< int FT >
-  inline get_fluids<FT> { return m_fluidman.get_fluids<FT>(); }
-
 private: // member variables
   // array of simulated interacting fluids
-  FluidManager m_fluidman;
+  DynamicsManager &m_dynman;
 
   Size m_num_fluids;
 
@@ -242,6 +229,6 @@ private: // member variables
   std::condition_variable m_pause_cv;
   std::atomic<bool> m_pause;
 
-}; // class UniformGridRS
+}; // class SPHGridRS
 
-#endif // DYNAMICS_H
+#endif // SPHGRID_H

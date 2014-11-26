@@ -10,84 +10,49 @@
 // GLPointCloud stuff
 
 GLPointCloud::GLPointCloud(
-    PointCloudPtr pc,
+    PointCloud &pc,
     bool dynamic,
-    MaterialConstPtr mat,
     UniformBuffer &ubo,
-    ShaderManager &shaderman)
+    ShaderManager &shaderman,
+    Material &mat)
   : GLPrimitive(mat, ubo, shaderman)
   , m_pc(pc)
   , m_vertices(3, get_num_vertices())
   , m_radius(pc->get_radius())
   , m_halo_radius(pc->get_halo_radius())
-  , m_insync(true)
   , m_halos(false)
   , m_isdynamic(dynamic)
 {
-  m_vertices = m_pc->get_pos().template cast<float>(); // copy position data
-
   this->m_vao.create();
   this->m_vao.bind();
 
   this->m_pos.create();
   this->m_pos.setUsagePattern( 
       is_dynamic() ? QOpenGLBuffer::StreamDraw : QOpenGLBuffer::StaticDraw );
+
+  Matrix3XR<GLfloat> &vispos = m_pc->template get_vispos<GLfloat>();
   this->m_pos.bind();
-  this->m_pos.allocate( m_vertices.data(), sizeof( GLfloat ) * m_vertices.size() );
+  this->m_pos.allocate( vispos.data(), sizeof( GLfloat ) * vispos.size() );
 
   this->m_vao.release();
 
-  if (is_dynamic())
-  {
-    Fluid &fl = static_cast<Fluid &>(*pc);
-    fl.init(this);
-  }
-
-  update_shader(ShaderManager::ADDITIVE_PARTICLE);
+  update_shader(ShaderManager::ADDITIVE_PARTICLE, shaderman);
 }
-
 
 GLPointCloud::~GLPointCloud()
 { }
 
-
-void GLPointCloud::update_data()
-{
-  std::lock_guard<std::mutex> guard(this->m_lock);
-
-  if (!m_insync)
-    return;
-  
-  m_vertices = m_pc->get_pos().template cast<float>();
-
-  m_insync = false;
-}
-
-
-void GLPointCloud::clear_cache()
-{
-  std::lock_guard<std::mutex> guard(this->m_lock);
-  if (is_dynamic())
-  {
-    Fluid &fl = static_cast<Fluid &>(*m_pc);
-    fl.clear_cache();
-  }
-}
-
-
-Vector3f GLPointCloud::get_closest_pt() const
+inline Vector3f GLPointCloud::get_closest_pt() const
 {
   return Vector3f(m_vertices.col(get_num_vertices()-1));
 }
 
+typedef PermutationMatrix<Dynamic,Dynamic,Size> SortMatrix;
 
-void GLPointCloud::sort_by_depth(const AffineCompact3f &mvtrans)
+inline void GLPointCloud::sort_by_z(Matrix3XR<GLfloat> &pos)
 {
-  std::lock_guard<std::mutex> guard(this->m_lock); // prevent others from reading buffers
-
   // Sort all vertices by the z value
   clock_t s = clock();
-  Matrix3XR<GLfloat> mvpos = mvtrans * m_vertices; // TODO: mem alloc expensive?
   Size num_verts = get_num_vertices();
   VectorXT<Size> perm_vec(num_verts);
   for (Size i = 0; i < num_verts; ++i)
@@ -96,38 +61,52 @@ void GLPointCloud::sort_by_depth(const AffineCompact3f &mvtrans)
   Size *perm_data = perm_vec.data();
 
   std::sort(perm_data, perm_data + num_verts,
-      [mvpos](Size i, Size j) { return mvpos.col(i)[2] < mvpos.col(j)[2]; });
+      [pos](Size i, Size j) { return pos.col(i)[2] < pos.col(j)[2]; });
   clock_t sort_t = clock();
 
-  m_vertices = m_vertices * PermutationMatrix<Dynamic, Dynamic, Size>(perm_vec);
+  pos = pos * PermutationMatrix<Dynamic, Dynamic, Size>(perm_vec);
 
   clock_t mult_t = clock();
   fprintf(stderr, "\rsort: %05.2e  mult: %05.2e", float(sort_t - s), float(mult_t - sort_t));
-
-  m_insync = false;
 }
 
-
-void GLPointCloud::update_glbuf()
+// private helper for the function below
+inline void GLPointCloud::update_glbuf(const Matrix3XR<GLfloat> &vispos)
 {
-  // even though this routine doesn't access m_pc, another thread may be
-  // writing to m_vertices so we still need to lock it
-  std::lock_guard<std::mutex> guard(this->m_lock);
+  this->m_pos.bind();
+  this->m_pos.write( 0, vispos.data(), sizeof( GLfloat ) * vispos.size() );
+  this->m_pos.release();
+}
 
-  if (m_insync)
+// Note: this is sensitive concurrent code
+// currently it only works when one thread tries to read vispos and one thread
+// writes to vispos
+inline void 
+GLPointCloud::update_glbuf_withsort(const AffineCompact3f &mvtrans,
+                                    const AffineCompact3f &nmlmvtrans)
+{
+  if (m_pc->is_stalepos())
     return;
 
-  // write to gl buffer object
-  this->m_pos.bind();
-  this->m_pos.write( 0, m_vertices.data(), sizeof( GLfloat ) * m_vertices.size() );
-  this->m_pos.release();
+  Matrix3XR<GLfloat> vispos = mvtrans * m_pc->template get_vispos<GLfloat>();
+  sort_by_z(vispos);
+  update_glbuf(vispos); // write to gl buffer
 
-  m_insync = true;
+  m_pc->set_stalepos(true);
+}
+inline void 
+GLPointCloud::update_glbuf_nosort()
+{
+  if (m_pc->is_stalepos())
+    return;
+
+  update_glbuf(m_pc->template get_vispos<GLfloat>()); // write to gl buffer
+  m_pc->set_stalepos(true);
 }
 
-
-
-void GLPointCloud::update_shader(ShaderManager::ShaderType type)
+inline void 
+GLPointCloud::update_shader(ShaderManager::ShaderType type,
+                                 ShaderManager &shaderman)
 {
   if (this->m_prog)
   {
@@ -135,9 +114,9 @@ void GLPointCloud::update_shader(ShaderManager::ShaderType type)
   }
 
   if (type == ShaderManager::PARTICLE)
-    this->m_prog = this->m_shaderman.get_particle_shader();
+    this->m_prog = shaderman.get_particle_shader();
   else 
-    this->m_prog = this->m_shaderman.get_additive_particle_shader();
+    this->m_prog = shaderman.get_additive_particle_shader();
 
   this->m_vao.bind();
 

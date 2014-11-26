@@ -8,6 +8,8 @@
 
 SceneNode::SceneNode(const std::string& name)
   : m_name(name)
+  , m_first_child(INVALID_INDEX)
+  , m_num_children(0)
 {
   m_trans.setIdentity();
 }
@@ -26,21 +28,6 @@ SceneNode::SceneNode(const aiNode *node)
          trans.c1, trans.c2, trans.c3, trans.c4,
          trans.d1, trans.d2, trans.d3, trans.d4;
   m_trans = mat;
-}
-
-SceneNode::SceneNode(const SceneNode &orig)
-  : m_name(orig.m_name)
-  , m_trans(orig.m_trans)
-  , m_bbox(orig.m_bbox)
-{
-  m_children.resize(orig.m_children.size());
-
-  // deep copy of children
-  for( const SceneNode *node : orig.m_children )
-  {
-    SceneNode *new_node = node->clone(); // dynamic allocation with new
-    m_children.push_back(new_node);
-  }
 }
 
 SceneNode::~SceneNode()
@@ -139,6 +126,14 @@ void SceneNode::normalize_model(const Vector3f &ext_blf, const Vector3f &ext_trc
   m_trans.translate(-box_center);
 }
 
+
+
+void 
+Scene::add_node(const aiNode *ainode)
+{
+  m_nodes.push_back(Node(ainode));
+}
+
 // GeometryNode
 
 GeometryNode::GeometryNode(const std::string& name, PrimitivePtr primitive)
@@ -224,12 +219,12 @@ void GeometryNode::cube_bbox()
 inline FluidPtr
 FluidNode::newFluid(FluidParamsPtr fparams, PointCloudPtr pc)
 {
-#define NEW_OBJ(FT) \
-  case FT: return new FluidT<int(FT)>(*pc, fparams);
+#define NEW_OBJ(PT) \
+  case PT: return new FluidT<int(PT)>(*pc, fparams);
 
   switch( fparams->fluid_type )
   {
-    FOREACH_FT_EVAL_MACRO(NEW_OBJ)
+    FOREACH_PT_EVAL_MACRO(NEW_OBJ)
     default: return NULL;
   }
 }

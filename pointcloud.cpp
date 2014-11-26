@@ -9,8 +9,10 @@
 #include "dynamics.h"
 
 // PointCloud stuff
-PointCloud::PointCloud(const aiMesh *mesh)
-  : m_mindist(-1.f)
+PointCloud::PointCloud(const aiMesh *mesh, Index matidx)
+  : Primitive(matidx)
+  , m_mindist(-1.f)
+  , m_stalepos(true)
 {
   // First copy all the vertices
   if (!mesh->HasPositions())
@@ -22,6 +24,18 @@ PointCloud::PointCloud(const aiMesh *mesh)
 
   for (Size i = 0; i < num_verts; ++i)
     m_pos.col(i) << verts[i].x, verts[i].y, verts[i].z;
+
+  prepare_vispos(); // copy data for visualizer
+}
+
+// Default constructor used for ghost and boundary particles
+PointCloud::PointCloud(const Matrix3XR &pos)
+  : Primitive(0)
+  , m_mindist(-1.f)
+  , m_stalepos(true)
+  , m_pos(pos)
+{
+  prepare_vispos(); // copy data for visualizer
 }
 
 PointCloud::~PointCloud()
@@ -107,6 +121,19 @@ PointCloud::compute_mindist()
   return m_mindist = Real(std::sqrt(dist2));
 }
 
+
+// Visualization stuff
+// Called from the dynamics thread
+inline void prepare_vispos()
+{
+  if (m_stalepos)
+  {
+    m_vispos = m_pos;
+    m_stalepos = false;
+  }
+}
+
+// String representation
 std::ostream&
 operator<<(std::ostream& out, const PointCloud& pc)
 {

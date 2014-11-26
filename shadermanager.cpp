@@ -32,13 +32,13 @@ void ShaderManager::init()
   m_phong_shader.link();
   qDebug() << "Phong Shader LOG:" << m_phong_shader.log();
 
-  m_particle_shader.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/particle.vert");
+  m_particle_shader.addShaderFromSourceFile(QOpenGLShader::Vertex,   ":/particle.vert");
   m_particle_shader.addShaderFromSourceFile(QOpenGLShader::Geometry, ":/particle.geom");
   m_particle_shader.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/particle.frag");
   m_particle_shader.link();
   qDebug() << "Particle Shader LOG:" << m_particle_shader.log();
 
-  m_add_particle_shader.addShaderFromSourceFile(QOpenGLShader::Vertex, ":/particle.vert");
+  m_add_particle_shader.addShaderFromSourceFile(QOpenGLShader::Vertex,   ":/particle.vert");
   m_add_particle_shader.addShaderFromSourceFile(QOpenGLShader::Geometry, ":/addparticle.geom");
   m_add_particle_shader.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/particle.frag");
   m_add_particle_shader.link();

@@ -11,27 +11,25 @@ typedef double Real;
 typedef unsigned int Size;
 typedef Size Index;
 
-#if 0
-// Type ID factory
-// This is used to avoid virtual function calls and dynamic casts throughout the
-// code_base by keeping a type-unique id in the base class
-class TypeIdFactory
-{
-public:
-  template <class T>
-  static size_t GetTypeId(T const&) // argument deduction
-  {
-    static size_t const Id = GetTypeIdImpl();
-    return Id;
-  }
+#define INVALID_INDEX Index(-1)
 
-private:
-  static size_t GetTypeIdImpl()
-  {
-    static size_t Id = 0;
-    return ++Id;
-  }
-}; // class TypeIdFactory
-#endif
+#define ALL_PARTICLE_TYPES DEFAULT, MCG03, BT07, STATIC
+#define NUMTYPES 4
+#define ALL_FLUID_PARTICLE_TYPES DEFAULT, MCG03, BT07
+#define NUMFLUIDTYPES 3
+
+// SPH particle types
+enum ParticleType
+{
+  ALL_PARTICLE_TYPES
+};
+
+// SPH compute types
+enum ComputeType
+{
+  Density,
+  Accel,
+  Volume
+};
 
 #endif // TYPES_H

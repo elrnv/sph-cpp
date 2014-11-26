@@ -18,9 +18,10 @@ class GLPointCloud : public GLPrimitive
 public:
   explicit GLPointCloud(
       PointCloudPtr pc,
-      MaterialConstPtr mat,
+      bool dynamic,
       UniformBuffer &ubo,
-      ShaderManager &shaderman);
+      ShaderManager &shaderman,
+      Material &mat); // its ok to pass by ref since we just copy it anyways
   ~GLPointCloud();
 
   inline bool is_pointcloud() const { return true; }
@@ -32,11 +33,11 @@ public:
   inline Size get_num_vertices() const { return m_pc->get_num_vertices(); }
 
   Vector3f get_closest_pt() const;
-  void sort_by_depth(const AffineCompact3f &mvmtx);
-  void update_glbuf();
-  void update_shader(ShaderManager::ShaderType type);
-
-  void update_data();
+  void sort_by_z(Matrix3XR<Glfloat> &vispos);
+  void update_glbuf_withsort(const AffineCompact3f &trans,
+                             const AffineCompact3f &nmltrans);
+  void update_glbuf_nosort();
+  void update_shader(ShaderManager::ShaderType t, ShaderManager &sm);
 
   void clear_cache();
 
@@ -48,11 +49,11 @@ public:
 
   friend UniformGrid;
 
+private:  // helper functions
+  void update_glbuf(const Matrix3XR<GLfloat> &vispos);
+
 private:
   PointCloudPtr m_pc; // reference to the native point cloud object
-
-  // intermediate buffer between pc and glbuffer
-  Matrix3XR<GLfloat> m_vertices;
 
   Real m_radius;      // particle radius inherited from point cloud
   Real m_halo_radius; // particle influence radius inherited from point cloud
