@@ -2,6 +2,7 @@
 #define FLUIDDATA_H
 
 #include "fluid.h"
+#include "kernel.h"
 
 // These are intermediate structs used to improve cache locality when doing sph
 // computations. The values in these structs are used directly by the Particles
@@ -49,10 +50,54 @@ struct FluidData
 template<int PT>
 struct FluidDataT : public FluidData
 {
+  explicit FluidDataT(Fluid &fl) : FluidData(fl) { }
+
+  void init_kernel(float h)
+  {
+    m_kern.init(h);
+  }
+
+  Poly6Kernel m_kern;
+}; // FluidDataT
+
+template<>
+struct FluidDataT<MCG03> : public FluidData
+{
+  explicit FluidDataT(Fluid &fl) : FluidData(fl) { }
+
+  void init_kernel(float h)
+  {
+    m_kern.init(h);
+    m_spikygrad_kern.init(h);
+    m_visclap_kern.init(h);
+    m_color_kern.init(h);
+  }
+
+  Poly6Kernel       m_kern; // for density
+
+  SpikyGradKernel   m_spikygrad_kern; // for pressure
+  ViscLapKernel     m_visclap_kern;   // for viscosity
+  CubicSplineKernel m_color_kern;     // for surface tension
+}; // FluidDataT<MCG03>
+
+template<>
+struct FluidDataT<BT07> : public FluidData
+{
   explicit FluidDataT(Fluid &fl)
-    : fl(fl)
+    : FluidData(fl)
   { }
 
-}; // FluidDataT
+  void init_kernel(float h)
+  {
+    m_kern.init(h);
+    m_grad_kern.init(h);
+    m_bound_kern.init(h);
+  }
+
+  CubicSplineKernel m_kern;
+
+  CubicSplineGradKernel m_grad_kern;
+  MKI04Kernel           m_bound_kern;
+}; // FluidDataT<BT07>
 
 #endif // FLUIDDATA_H

@@ -9,6 +9,8 @@
 #include "gltext.h"
 #include "settings.h"
 
+#define M_G 9.81f
+
 // Fluid stuff
 
 Fluid::Fluid(const aiMesh *pc, Index matidx, FluidParamsPtr params)
@@ -17,20 +19,19 @@ Fluid::Fluid(const aiMesh *pc, Index matidx, FluidParamsPtr params)
   , m_avg_density(0.0f)
   , m_avg_pressure(0.0f)
   , m_cache(global::dynset.frames+1)
-{
-  init();
-}
+{ }
 
 Fluid::~Fluid()
 { }
 
 // the fluid must be initialized before being simulated
 
-void 
-Fluid::init()
+inline void 
+Fluid::init(const SPHGrid &grid)
 {
-  m_bmin = m_pc.get_bbox().corner(Eigen::AlignedBox3f::BottomLeftFloor);
-  m_bmax = m_pc.get_bbox().corner(Eigen::AlignedBox3f::TopRightCeil);
+
+  m_bmin = grid.get_bmin();
+  m_bmax = grid.get_bmax();
 
   m_kernel_radius = get_kernel_radius();
   m_rest_density = m_params->density;

@@ -8,18 +8,14 @@ SOURCES += \
   settings.cpp \
   openglwindow.cpp \
   simwindow.cpp \
-  scene.cpp \
   mesh.cpp \
   pointcloud.cpp \
-  primitive.cpp \
   material.cpp \
   uniformbuffer.cpp \
   shadermanager.cpp \
-#  quantityprocessor.cpp \
   fluid.cpp \
-  fluidimpl.cpp \
   boundary.cpp \
-  sph.cpp \
+  sphgrid.cpp \
   glmesh.cpp \
   glpointcloud.cpp
 
@@ -29,7 +25,6 @@ HEADERS += \
   dynparams.h \
   openglwindow.h \
   simwindow.h \
-  scene.h \
   mesh.h \
   pointcloud.h \
   geometrymanager.h \
@@ -38,17 +33,17 @@ HEADERS += \
   materialmanager.h \
   uniformbuffer.h \
   shadermanager.h \
-#  quantityprocessor.h \
   fluid.h \
-  fluidimpl.h \
-  sph.h \
+  fluiddata.h \
+  sphgrid.h \
   boundary.h \
-  dynamics.h \
+  dynamicsmanager.h \
   glmesh.h \
   glpointcloud.h \
   glprimitive.h \
   particle.h \
   eigen.h \
+  extramath.h \
   util.h \
   kernel.h
 
@@ -57,10 +52,17 @@ DESTDIR = ../bin
 # compile with latest c++ specs
 CONFIG += c++11
 
+macx {
+  QMAKE_MAC_SDK = macosx10.10
+}
+QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
+
 INCLUDEPATH += /opt/local/include/eigen3
-INCLUDEPATH += /opt/local/include
+INCLUDEPATH += /Users/egor/proj/boost_include
+INCLUDEPATH += /Users/egor/Qt5.2.0/5.2.0/clang_64/include
+#INCLUDEPATH += /opt/local/include
 INCLUDEPATH += /Users/egor/proj/assimp/include
-LIBS += -L/opt/local/lib 
+#LIBS += -L/opt/local/lib 
 LIBS += -L/Users/egor/proj/assimp/lib
 LIBS += -lassimp
 LIBS += -lboost_system-mt
@@ -82,7 +84,7 @@ LIBS += -lconfig++
 QMAKE_CXXFLAGS += -DBOOST_DISABLE_ASSERTS
 
 # show warnings if a function is not inlined
-QMAKE_CXXFLAGS += -stdlib=libc++ -Winline -Wno-unused-parameter
+QMAKE_CXXFLAGS += -stdlib=libc++ -Winline -Wno-unused-parameter -U__STRICT_ANSI__
 
 # directory containing scene configurations
 QMAKE_CXXFLAGS += -DCONFIGDIR=/Users/egor/proj/sph/data

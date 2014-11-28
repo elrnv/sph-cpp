@@ -226,6 +226,7 @@ public:
     m_color_kern.init(h);
     m_colorgrad_kern.init(h);
   }
+
   inline void init_particle(FluidParticle &p)
   { 
     p.c = p.vol * Real(p.color) * m_color_kern(Vector3R<Real>(0.0f,0.0f,0.0f));

@@ -14,10 +14,6 @@
 
 //#define REPORT_DENSITY_VARIATION
 
-typedef boost::chrono::process_real_cpu_clock real_clock;
-typedef boost::chrono::nanoseconds ns_t;
-typedef real_clock::time_point real_t;
-
 // From [Solenthaler and Pajarola 2008], an alternative density
 // (number_density * mass) is used
 /*
@@ -46,25 +42,22 @@ private:
 
 
 SPHGrid::SPHGrid(
-    const Vector3f &bmin,
-    const Vector3f &bmax,
+    AlignedBox3f &box,
     DynamicsManager &dynman ) 
   : m_dynman(dynman)
   , m_h(2e-3f) // minimum possible cell size
   , m_hinv(500.0f)
-  , m_bmin(bmin) // smallest boundary corner
-  , m_bmax(bmax) // largest boundary corner
-  , m_stop_requested(false)
-  , m_pause(false)
+  , m_bmin(box.corner(AlignedBox3f::BottomLeftFloor))// smallest boundary corner
+  , m_bmax(box.corner(AlignedBox3f::TopRightCeil))   // largest boundary corner
 { }
 
 
 SPHGrid::~SPHGrid() { }
 
 void
-SPHGrid::init(MaterialManager &matman)
+SPHGrid::init()
 {
-  if (m_dynman.get_numfluids() < 1)
+  if (m_dynman.get_num_fluids() < 1)
     return;
 
   // set cell size to be the maximum of the kernel support over all fluids;
@@ -94,15 +87,16 @@ SPHGrid::init(MaterialManager &matman)
   //m_bound_volume_proc = NULL;
 }
 
-
-inline void SPHGrid::update_grid()
+inline void
+SPHGrid::update_grid()
 {
   clear_fluid_data();
-  populate_fluid_data(); // populate grid with particles
+  // populate grid with fluid particles
+  m_dynman.populate_sph_grid_with_fluids(*this);
 }
 
-
-inline void SPHGrid::clear_fluid_data()
+inline void
+SPHGrid::clear_fluid_data()
 {
   for (Size i = 0; i < m_gridsize[0]; ++i)
     for (Size j = 0; j < m_gridsize[1]; ++j)
@@ -110,106 +104,16 @@ inline void SPHGrid::clear_fluid_data()
         m_grid[i][j][k].clear();
 }
 
-#if 0
-void SPHGrid::populate_bound_data()
-{
-  unsigned char particles_per_cell_length = 4;
-
-  // place boundary particles slightly away from the actual boundary
-  float pad = 0.5*m_h;
-
-  Size nx = particles_per_cell_length*(m_gridsize[0]+2);
-  Size ny = particles_per_cell_length*(m_gridsize[1]+2);
-  Size nz = particles_per_cell_length*(m_gridsize[2]+2);
-  float incx = (m_bmax[0] - m_bmin[0] + 2*pad)/nx;
-  float incy = (m_bmax[1] - m_bmin[1] + 2*pad)/ny;
-  float incz = (m_bmax[2] - m_bmin[2] + 2*pad)/nz;
-
-  Size i,j,k; // indices
-  
-  auto f = [&](Size i, Size j, Size k)
-  {
-    Vector3R<Real> pos( m_bmin[0] - pad + i*incx, 
-                        m_bmin[1] - pad + j*incy,
-                        m_bmin[2] - pad + k*incz );
-    m_grid( get_voxel_index(pos)
-        ).get_pvec<STATIC>().push_back(ParticleT<STATIC>(pos));
-    //fprintf(stderr, "v %f %f %f\n", pos[0], pos[1], pos[2]);
-  };
-
-  k = 0;
-  for (i = 0; i < nx; ++i)
-    for (j = 0; j < ny; ++j)
-      f(i,j,k);
-  k = nz;
-  for (i = nx; i > 0; --i)
-    for (j = ny; j > 0; --j)
-      f(i,j,k);
-
-  j = 0;
-  for (i = nx; i > 0; --i)
-    for (k = nz; k > 0; --k)
-      f(i,j,k);
-  j = ny;
-  for (i = 0; i < nx; ++i)
-    for (k = 0; k < nz; ++k)
-      f(i,j,k);
-
-  i = 0;
-  for (j = 0; j < ny; ++j)
-    for (k = nz; k > 0; --k)
-      f(i,j,k);
-  i = nx;
-  for (j = ny; j > 0; --j)
-    for (k = 0; k < nz; ++k)
-      f(i,j,k);
-
-  // two points not filled
-  f(0, ny, nz);
-  f(nx, 0, 0);
-}
-#endif
-
-template<int FT>
-inline void SPHGrid::compute_accelT()
-{ 
-//  compute_fluid_quantity< CFAccelT<FT>, FT >(); 
-}
-
-template<int FT>
-inline void SPHGrid::compute_surface_normalT()
-{ 
-//  compute_fluid_quantity< CFSurfaceNormalT<FT>, FT >(); 
-}
-
-template<int FT>
-inline void SPHGrid::compute_surface_tensionT()
-{ 
-//  compute_fluid_quantity< CFSurfaceTensionT<FT>, FT >(); 
-}
-
-template<int FT>
-inline void SPHGrid::compute_densityT()
-{ 
- // compute_fluid_quantity< CFDensityT<FT>, FT >(); 
-}
-
-template<int FT>
-inline void SPHGrid::compute_density_updateT()
-{
-//  compute_fluid_quantity< CFDensityUpdateT<FT>, FT >(); 
-}
-
 // variadic base case
 template<int F, typename ParticleType>
-inline void SPHGrid::interact_with_neigh_cell(
-    ParticleType &p, Cell &cell)
+inline void
+SPHGrid::interact_with_neigh_cell( ParticleType &p, Cell &cell )
 { }
 
 // variadic induction
 template<int F, typename ParticleType, int NPT, int... NPTs>
-inline void SPHGrid::interact_with_neigh_cell(
-    ParticleType &p, Cell &cell)
+inline void
+SPHGrid::interact_with_neigh_cell( ParticleType &p, Cell &cell )
 {
   auto &neigh_pvec = cell.template get_pvec<NPT>();
   for ( auto &neigh_p : neigh_pvec )
@@ -220,16 +124,16 @@ inline void SPHGrid::interact_with_neigh_cell(
 
 // variadic base case
 template<int F>
-inline void SPHGrid::compute_quantity_in_cell(
-    Size i, Size j, Size k,
-    Size nx, Size ny, Size nz)
+inline void
+SPHGrid::compute_quantity_in_cell( Size i,  Size j,  Size k, 
+                                   Size nx, Size ny, Size nz )
 { }
 
 // variadic induction
 template<int F, int PT, int... PTs>
-inline void SPHGrid::compute_quantity_in_cell(
-    Size i, Size j, Size k,
-    Size nx, Size ny, Size nz)
+inline void
+SPHGrid::compute_quantity_in_cell( Size i, Size j, Size k,
+                                   Size nx, Size ny, Size nz )
 {
   auto &pvec = m_grid[i][j][k].template get_pvec<PT>();
   if (pvec.empty())
@@ -267,7 +171,8 @@ inline void SPHGrid::compute_quantity_in_cell(
 }
 
 template<typename F, int... PT>
-inline void SPHGrid::compute_quantity()
+inline void
+SPHGrid::compute_quantity()
 {
 //  clock_t s = clock();
   Size nx = m_gridsize[0];
@@ -303,7 +208,8 @@ inline void FTiter<FT>::update_density(SPHGrid &g,float timestep)
 #endif
 
 template<int PT>
-inline void SPHGrid::compute_density()
+inline void
+SPHGrid::compute_density()
 {
   FluidDataVecT<PT> &fldatavec = m_dynman.get_fluiddatas<PT>();
   if (!fldatavec.size())
@@ -339,24 +245,34 @@ inline void SPHGrid::compute_density()
 }
 
 template<int PT, int PT2, int... PTs>
-inline void SPHGrid::compute_density()
+inline void
+SPHGrid::compute_density()
 {
   compute_density<PT>();       // do one
   compute_density<PT2, PTs>(); // recurse on the rest
 }
 
-template<int FT>
-inline void FTiter<FT>::compute_accel(SPHGrid &g)
+template<int PT>
+inline void 
+SPHGrid::compute_accel()
 {
-  if (g.m_fluids[FT].size())
-  {
-    for (auto &fl : g.m_fluids[FT])
-      fl->template cast<FT>()->reset_accel();     // now may assume all accelerations are zero
+  FluidDataVecT<PT> &fldatavec = m_dynman.get_fluiddatas<PT>();
+  if (!fldatavec.size())
+    return;
 
-    g.template compute_accelT<FT>();
-  }
+  for ( auto &fldata : fldatavec )
+    fldata.fl.reset_accel();   
+  // now we may assume all accelerations are zero
 
-  FTiter<FT+1>::compute_accel(g); // recurse
+  compute_quantity<Accel,PT>();
+}
+
+template<int PT, int PT2, int... PTs>
+inline void 
+SPHGrid::compute_accel()
+{
+  compute_accel<PT>();
+  compute_accel<PT2, PTs>();
 }
 
 #if 0
@@ -400,147 +316,3 @@ inline void SPHGrid::jacobi_pressure_solve(float dt, float factor)
 }
 #endif
 
-
-void SPHGrid::run()
-{
-  if (m_dynman.get_numfluids() < 1)
-    return;
-
-  // timestep
-  float dt = 1.0f/(global::dynset.fps * global::dynset.substeps);
-
-  glprintf_tr("step: %.2es\n", dt);
-  float rdt = dt;
-
-  bool all_cached = check_and_write_hash();
-
-  if (all_cached) // try to load cached frames into the fluid objects
-    all_cached &= m_dynman.load_saved_cache();
-  
-  if (!all_cached)
-  {
-    // Initialize the fluid for init_steps steps before simulating
-    // temporarily disable gravity
-    Vector3f grav = global::dynset.gravity;
-    global::dynset.gravity = Vector3f(0.0,0.0,0.0);
-    for (unsigned int iter = 0; iter < global::dynset.init_steps; ++iter)
-    { // for each simulation substep
-      if (!m_dynman.step(dt, iter == 0))
-        break;
-    } // for each substep
-
-    global::dynset.gravity = grav; // restore gravity
-
-    if (m_stop_requested)
-      return;
-
-    m_dynman.cache(0);
-  }
-
-  real_t start_time;
-  float file_read_t = 0.0f;
-  float frame_t = 0.0f;
-  float substep_t = 0.0f;
-  unsigned int file_reads = 0;
-  unsigned int frame_count = 0;
-  unsigned int frame = 1;
-
-  for ( ; ; ++frame, ++frame_count ) // for each frame
-  {
-    start_time = real_clock::now();
-    clock_t s = clock();
-
-    // check if we have the next frame cached for ALL of the fluids
-    cached = m_dynman.is_cached(frame);
-
-    if (cached)
-    {
-      m_dynman.load_cached(frame); // load cached frame
-      m_dynman.prepare_vis_data(); // notify gl we have new positions
-
-      file_reads += 1;
-      file_read_t += float(clock() - s) / CLOCKS_PER_SEC;
-
-      ns_t elapsed = (real_clock::now() - start_time);
-      ns_t perframe(boost::int_least64_t(1.0e9/global::dynset.fps));
-      if (elapsed < perframe)
-        std::this_thread::sleep_for(
-            std::chrono::nanoseconds((perframe - elapsed).count()));
-    }
-    else // if not all cached, compute substeps
-    {
-      substep_t = 0.0f;
-      for (unsigned int iter = 0; iter < global::dynset.substeps; ++iter)
-      { // for each simulation substep
-        bool first_step = iter == 0 && frame == 1 && global::dynset.init_steps == 0;
-        if (!m_dynman.step(dt, first_step, &substep_t))
-          break;
-      } // for each substep
-
-      m_dynman.cache(frame);
-    }
-
-    frame_t += float(clock() - s) / CLOCKS_PER_SEC;
-
-    glprintf_tl("\ravg time per:  substep = %.2es,   frame = %.2es,   read = %.2es",
-        substep_t / float(global::dynset.substeps),
-        frame_t / float(frame_count),
-        file_read_t / float(file_reads));
-
-    {
-      std::unique_lock<std::mutex> locker(m_pause_lock);
-
-      while (m_pause) // avoid spurious wakeup
-        m_pause_cv.wait(locker);
-    }
-
-    if (m_stop_requested) break;
-
-    if (frame >= global::dynset.frames)
-    { // restart simulation
-      // for timing
-      file_reads = 0;
-      frame_count = 0;
-      frame_t = 0.0f;
-      file_read_t = 0.0f;
-
-      // actual frame
-      frame = 0;
-    }
-  }
-
-}
-
-
-inline bool SPHGrid::check_and_write_hash() 
-{
-  if (global::dynset.savedir.empty())
-    return false;
-
-  // open save hash file
-  std::fstream fs(global::dynset.hashfile, std::fstream::in );
-
-  std::size_t savedhash = 0;
-
-  if (fs.is_open())
-  {
-    fs >> std::hex >> savedhash;
-    fs.close();
-  }
-
-  fs.open(global::dynset.hashfile, std::fstream::out);
-
-  std::size_t curhash = 0;
-  boost::hash_combine(curhash, hash_value(global::dynset));
-  boost::hash_combine(curhash, hash_value(global::sceneset));
-  boost::hash_combine(curhash, hash_value(*this));
-
-  fs.seekp(0);
-  fs << std::setfill('0') << std::setw(sizeof(std::size_t) >> 1) << std::hex << curhash;
-  fs.close();
-
-  if (savedhash == curhash)
-    return true;
-
-  return false;
-}

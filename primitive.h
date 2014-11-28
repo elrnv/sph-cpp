@@ -23,12 +23,11 @@ public:
   virtual bool is_mesh()       const = 0;
   virtual bool is_pointcloud() const = 0;
   virtual inline void transform_in_place(const AffineCompact3f &trans) = 0;
-  AlignedBox3f &get_bbox() { return m_bbox; }
   virtual inline AlignedBox3f &compute_bbox() = 0;
-  inline void cube_bbox() 
-  { 
-    m_bbox = AlignedBox3f(Vector3f(-1.f,-1.f,-1.f), Vector3f(1.f,1.f,1.f)); 
-  }
+
+  inline AlignedBox3f &get_bbox() { return m_bbox; }
+  inline void set_bbox(const AlignedBox3f &bbox) { m_bbox = bbox; }
+
 protected:
   Index        m_material_idx; // index of the material being used
   AlignedBox3f m_bbox;

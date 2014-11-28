@@ -12,6 +12,16 @@ Material::Material()
  , m_opacity(0.3f)
 {}
 
+// define the copy constructor
+Material::Material(const Material &orig)
+ : m_ka(orig.m_ka)
+ , m_kd(orig.m_kd)
+ , m_ks(orig.m_ks)
+ , m_shininess(orig.m_shininess)
+ , m_reflectivity(orig.m_reflectivity)
+ , m_opacity(orig.m_opacity)
+{}
+
 // material imported from assimp
 Material::Material(const aiMaterial &mat)
 {

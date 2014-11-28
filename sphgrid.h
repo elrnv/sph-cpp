@@ -5,14 +5,10 @@
 #include <deque>
 #include <boost/multi_array.hpp>
 #include "types.h"
-#include "kernel.h"
 #include "pointcloud.h"
 #include "fluid.h"
 #include "dynamicsmanager.h"
-#include "glpointcloud.h"
 #include "particle.h"
-
-#define M_G 9.81f
 
 //class CBVolume;
 
@@ -46,7 +42,8 @@ public:
     inline void push_particle(BoundaryPC &bnd, Size vtxidx)
     {
       Vector3R<Real> pos(bnd->get_pos().col(vtxidx));
-      get_pvec<STATIC>().push_back(ParticleT<STATIC>(pos, bnd));
+      get_pvec<STATIC>().push_back(ParticleT<STATIC>(pos,
+            bnd.get_kernel_radius()));
     }
 
     inline void clear() 
@@ -83,17 +80,12 @@ public:
 
   typedef typename Array3::template array_view<3>::type GridView;
 
-  // Define a set of different types of fluids
-  typedef std::deque< FluidPtr > FluidVec;
-
   // Constructors/Destructor
   SPHGrid(const Vector3f &bmin, const Vector3f &bmax, DynamicsManager &dynman);
   ~SPHGrid();
   
   void init();
   void update_grid();
-  void populate_fluid_data();
-  void populate_bound_data();
   void clear_fluid_data();
 
   inline Index clamp(Index d, Index min, Index max)
@@ -132,70 +124,29 @@ public:
   inline const Vector3f &get_bmin() const { return m_bmin; }
   inline const Vector3f &get_bmax() const { return m_bmax; }
 
-  template <typename ProcessPairFunc, typename ParticleType>
-  typename std::enable_if< std::is_base_of< FluidParticle, ParticleType >::value,
-           ProcessPairFunc & >::type determine_proc(const FluidParticle &p)
-           {
-             return get_fluid<extract_fluid_type<ParticleType>::type>(p.id)
-               ->template get_proc<ProcessPairFunc>();
-           }
+//  template <typename ProcessPairFunc, typename ParticleType>
+//  typename std::enable_if< std::is_base_of< FluidParticle, ParticleType >::value,
+//           ProcessPairFunc & >::type determine_proc(const FluidParticle &p)
+//           {
+//             return get_fluid<extract_fluid_type<ParticleType>::type>(p.id)
+//               ->template get_proc<ProcessPairFunc>();
+//           }
 
   // Low level quantity processing functions
-  template<typename ProcessPairFunc, typename ParticleType>
+  template<int F, int... PTs>
   void compute_quantity();
 
-  template<typename Func>
-  inline void compute_bound_quantity()
-  { compute_quantity<Func, Particle >(); }
-
-  template<typename Func, int FT>
-  inline void compute_fluid_quantity()
-  { compute_quantity<Func, FluidParticleT<FT> >(); }
-
-  template<int FT> void compute_accelT();
-  template<int FT> void compute_surface_normalT();
-  template<int FT> void compute_surface_tensionT();
-
-  template<int FT> void compute_densityT();
-
-  template<int FT> void compute_density_updateT();
-
-  void jacobi_pressure_solve(float dt,float factor);
-
-  // run dynamic simulation
-  void run();
-
-  // request stop which will be checked by the owner thread
-  void request_stop() { m_stop_requested = true; }
-  void toggle_pause() 
-  { 
-    std::unique_lock<std::mutex> locker(m_pause_lock);
-    m_pause = !m_pause;
-    if (!m_pause)
-      m_pause_cv.notify_all();
-  }
-  void un_pause() 
-  { 
-    std::unique_lock<std::mutex> locker(m_pause_lock);
-    if (m_pause)
-    {
-      m_pause = false;
-      m_pause_cv.notify_all();
-    }
-  }
-
-  bool check_and_write_hash();
-
-  friend std::size_t hash_value( const SPHGrid &ug )
-  {
-    std::size_t seed = 0;
-    for (int j = 0; j < NUMFLUIDTYPES; ++j)
-      for (auto &fl : ug.m_fluids[j])
-        boost::hash_combine(seed, hash_value(*fl));
-    return seed;
-  }
+  //void jacobi_pressure_solve(float dt,float factor);
 
 private: // member functions
+
+  // two helper functions for compute_quantity
+  template<int F, int... PTs>
+  void compute_quantity_in_cell( Size i,  Size j,  Size k,
+                                 Size nx, Size ny, Size nz );
+
+  template<int F, typename ParticleType, int... NPTs>
+  void interact_with_neigh_cell( ParticleType &p, Cell &cell );
 
   // utility function used in the constructor to get a range of two elements
   // centered at x (or 2 if x is on the boundary)
@@ -207,8 +158,6 @@ private: // member functions
 private: // member variables
   // array of simulated interacting fluids
   DynamicsManager &m_dynman;
-
-  Size m_num_fluids;
 
   // array of cells containing xyzp (position and density) for each vertex
   Array3      m_grid;
@@ -222,12 +171,6 @@ private: // member variables
   Vector3f m_bmax; // max boundary corner
 
   //CBVolume *m_bound_volume_proc;
-
-  std::atomic<bool> m_stop_requested;
-
-  std::mutex m_pause_lock;
-  std::condition_variable m_pause_cv;
-  std::atomic<bool> m_pause;
 
 }; // class SPHGridRS
 

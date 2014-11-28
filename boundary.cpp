@@ -5,24 +5,19 @@
 #include <sstream>
 #include "fluid.h"
 #include "pointcloud.h"
-#include "glpointcloud.h"
-#include "gltext.h"
-#include "settings.h"
 
 BoundaryPC::BoundaryPC(const aiMesh *pc, Index matidx, DynParamsPtr params)
   : m_pc(pc)
   , m_params(params)
   , m_kernel_radius(get_kernel_radius())
-{
-}
+{ }
 
 // A default transparent boundary resembing a box covering the given sph grid
 BoundaryPC::BoundaryPC(SPHGrid &grid, int particles_per_cell_length = 4)
-  : m_pc(generate_grid_box_pc)
+  : m_pc(generate_grid_box_pc(grid, particles_per_cell_length))
   , m_params(NULL)
-{
-  m_kernel_radius = grid.get_cell_size();
-}
+  , m_kernel_radius(grid.get_cell_size())
+{ }
 
 // helper function to the constructor above
 inline Matrix3XR<Real> 

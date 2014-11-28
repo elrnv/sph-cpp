@@ -10,7 +10,7 @@ class MaterialManager
 {
 public:
   MaterialManager()
-    : m_materials(1, Material)
+    : m_materials(1, Material())
   { }
   ~MaterialManager() { }
 
@@ -20,7 +20,7 @@ public:
     if (!mat)
       return 0; // default material
 
-    m_materials.push_back( Material(mat) );
+    m_materials.push_back( Material(*mat) );
     return m_materials.size() - 1;
   }
 

@@ -3,10 +3,13 @@
 
 #include "types.h"
 #include "eigen.h"
+#include "math.h"
+#include "fluiddata.h"
+#include "settings.h"
 
 struct __attribute__ ((__packed__)) Particle
 {
-  Particle(Vector3R<Real> p) : pos(p){ }
+  Particle(const Vector3R<Real> &p) : pos(p){ }
   ~Particle() { }
 
   Vector3R<Real> pos;
@@ -20,7 +23,10 @@ struct __attribute__ ((__packed__)) Particle
   void init() { }
 
   template<int T>
-  void neigh(Particle &neigh) { }
+  void neigh(Particle &neigh) { (void) neigh; }
+
+  template<int T>
+  void neigh(FluidParticle &neigh) { (void) neigh; }
 
   template<int T>
   void finish() { }
@@ -50,7 +56,8 @@ struct __attribute__ ((__packed__)) FluidParticle : public Particle
 
 struct __attribute__ ((__packed__)) ImplicitFluidParticle : public FluidParticle
 {
-  explicit ImplicitFluidParticle(Vector3R<Real> p, Vector3R<Real> v,
+  explicit ImplicitFluidParticle(
+      const Vector3R<Real> &p, const Vector3R<Real> &v,
       Real *a, Real *ea, Real *dinv, Real c)
     : ImplicitFluidParticle(p,v,a,ea,dinv,c) { }
   ~ImplicitFluidParticle() { }
@@ -62,28 +69,39 @@ struct __attribute__ ((__packed__)) ImplicitFluidParticle : public FluidParticle
 template<int PT>
 struct ParticleT : public Particle
 { 
-  explicit ParticleT(Vector3R<Real> p)
-    : Particle(p) { }
+  // PRE: kernel should already be initialized
+  explicit ParticleT(const Vector3R<Real> &p, Real h)
+    : Particle(p), radius(h) { }
+
+  Real radius;
 
   template<int T>
-  void neigh(Particle &neigh) { }
+  void init() { }
   template<int T>
-  void neigh(FluidParticle &neigh) { }
+  void neigh(Particle &neigh) { (void) neigh; }
+  template<int T>
+  void neigh(FluidParticle &neigh) { (void) neigh; }
+  template<int T>
+  void finish() { }
 };
 
 template<int PT>
 struct FluidParticleT : public FluidParticle
 { 
   explicit FluidParticleT(Vector3R<Real> p, Vector3R<Real> v,
-      Real *a, Real *ea, Real *dinv, Real c, FluidT<PT> &fluid)
-    : FluidParticle(p, v, a, ea, dinv, i, c), fl(fluid) { }
+      Real *a, Real *ea, Real *dinv, Real c, FluidDataT<PT> &fldata)
+    : FluidParticle(p, v, a, ea, dinv, c), fl(fldata) { }
 
-  FluidT<PT> &fl;
+  FluidDataT<PT> &fl;
 
   template<int T>
-  void neigh(Particle &neigh) { }
+  void init() { }
   template<int T>
-  void neigh(FluidParticle &neigh) { }
+  void neigh(Particle &neigh) { (void) neigh; }
+  template<int T>
+  void neigh(FluidParticle &neigh) { (void) neigh; }
+  template<int T>
+  void finish() { }
 };
 
 // Particle Type specializations implementing the interface given above
@@ -91,25 +109,26 @@ struct FluidParticleT : public FluidParticle
 // DEFAULT
 // Density
 template<> template<> inline void 
-FluidParticle<DEFAULT>::init<Density>()
+FluidParticleT<DEFAULT>::init<Density>()
 { 
   d = 0.0f; vol = 0.0f;
 }
+
 template<> template<> inline void 
-FluidParticle<DEFAULT>::neigh<Density>(FluidParticle &neigh)
+FluidParticleT<DEFAULT>::neigh<Density>(FluidParticle &neigh)
 {
   d += fl.m_mass * fl.m_kern[ pos - neigh.pos ];
   vol += fl.m_kern[ pos - neigh.pos ];
 }
 //template<> template<> inline void 
-//FluidParticle<DEFAULT>::neigh(Particle &neigh)
+//FluidParticleT<DEFAULT>::neigh(Particle &neigh)
 //{
 //  // neigh.dinv is inverse number density (aka volume) of the boundary paticle
 //  //dinv += fl.m_rest_density * neigh.dinv * fl.m_kern[ pos - neigh.pos ];
 //  //vol += fl.m_kern[ pos - neigh.pos ];
 //}
 template<> template<> inline void 
-FluidParticle<DEFAULT>::finish<Density>()
+FluidParticleT<DEFAULT>::finish<Density>()
 {
   d = d * fl.m_kern.coef;
   *_dinv = dinv = 1.0f/d;
@@ -155,7 +174,7 @@ FluidParticleT<MCG03>::finish<Density>()
 
 // Accel
 template<> template<> inline void 
-FluidParticle<MCG03>::init<Accel>()
+FluidParticleT<MCG03>::init<Accel>()
 { 
   c = vol * Real(color) * fl.m_color_kern(Vector3R<Real>(0.0f,0.0f,0.0f));
   n[0] = n[1] = n[2] = 0.0f;
@@ -163,7 +182,7 @@ FluidParticle<MCG03>::init<Accel>()
 }
 
 template<> template<> inline void 
-FluidParticle<MCG03>::neigh<Accel>(FluidParticle &neigh)
+FluidParticleT<MCG03>::neigh<Accel>(FluidParticle &neigh)
 {
   if (this == &neigh)
     return;
@@ -193,9 +212,9 @@ FluidParticle<MCG03>::neigh<Accel>(FluidParticle &neigh)
 }
 
 //template<> template<> inline void 
-//FluidParticle<MCG03>::neigh<Accel>(Particle &neigh) { }
+//FluidParticleT<MCG03>::neigh<Accel>(Particle &neigh) { }
 template<> template<> inline void
-FluidParticle<MCG03>::finish<Accel>()
+FluidParticleT<MCG03>::finish<Accel>()
 {
   //qDebug() << "c = " << c;
   //c = c / m[0];
@@ -216,20 +235,20 @@ FluidParticle<MCG03>::finish<Accel>()
 #define BT07_BOUNDARY_PARTICLES
 // Density
 template<> template<> inline void
-FluidParticle<BT07>::init<Density>()
+FluidParticleT<BT07>::init<Density>()
 { 
   dinv = 0.0f;
   vol = 0.0f;
 }
 template<> template<> inline void
-FluidParticle<BT07>::neigh<Density>(FluidParticle &neigh)
+FluidParticleT<BT07>::neigh<Density>(FluidParticle &neigh)
 {
   dinv += fl.m_mass * fl.m_kern[ pos - neigh.pos ];
   vol += fl.m_kern[ pos - neigh.pos ];
 }
 
 template<> template<> inline void
-FluidParticle<BT07>::neigh<Density>(Particle &neigh) 
+FluidParticleT<BT07>::neigh<Density>(Particle &neigh) 
 {
   // neigh.dinv is inverse number density (aka volume) of the boundary paticle
 #ifdef BT07_BOUNDARY_PARTICLES
@@ -238,7 +257,7 @@ FluidParticle<BT07>::neigh<Density>(Particle &neigh)
 #endif
 }
 template<> template<> inline void
-FluidParticle<BT07>::finish<Density>()
+FluidParticleT<BT07>::finish<Density>()
 {
   *_dinv = dinv = 1.0f / (dinv * fl.m_kern.coef);
   vol = 1.0f / (vol * fl.m_kern.coef);
@@ -255,14 +274,14 @@ FluidParticle<BT07>::finish<Density>()
 
 // Accel
 template<> template<> inline void
-FluidParticle<BT07>::init<Accel>()
+FluidParticleT<BT07>::init<Accel>()
 {
   n[0] = n[1] = n[2] = 0.0f;
   m[0] = m[1] = m[2] = 0.0f;
 }
 
 template<> template<> inline void
-FluidParticle<BT07>::neigh<Accel>(FluidParticle &neigh)
+FluidParticleT<BT07>::neigh<Accel>(FluidParticle &neigh)
 {
   if (this == &neigh)
     return;
@@ -277,20 +296,20 @@ FluidParticle<BT07>::neigh<Accel>(FluidParticle &neigh)
   Real vx = x_ab.dot(vel - neigh.vel);
   if (vx < 0)
   {
-    Real nu = 2*fl.m_viscosity*fl.m_maingrad_kern.h*fl.m_cs *
+    Real nu = 2*fl.m_viscosity*fl.m_grad_kern.h*fl.m_cs *
             neigh.vol * dinv / (dinv + neigh.dinv);
-    res -= nu*vx / (x_ab.squaredNorm() + 0.01*fl.m_maingrad_kern.h2);
+    res -= nu*vx / (x_ab.squaredNorm() + 0.01*fl.m_grad_kern.h2);
   }
 
-  n = n - res * fl.m_maingrad_kern(x_ab);
+  n = n - res * fl.m_grad_kern(x_ab);
   
   // surface tension 
   // (apply surface tension only to particles from the same phase)
   if (color == neigh.color)
-    n = n - (neigh.vol/(neigh.dinv*fl.m_mass))*fl.m_st * fl.m_st_kern(x_ab) * x_ab;
+    n = n - (neigh.vol/(neigh.dinv*fl.m_mass))*fl.m_st * fl.m_kern(x_ab) * x_ab;
 }
 template<> template<> inline void
-FluidParticle<BT07>::neigh<Accel>(Particle &neigh)
+FluidParticleT<BT07>::neigh<Accel>(Particle &neigh)
 {
   // BT07 fluids dont interact with static boundary particles, instead they
   // mirror fluid particles on the boundary, and compute repulsion forces
@@ -308,15 +327,16 @@ FluidParticle<BT07>::neigh<Accel>(Particle &neigh)
   
   if (vx < 0)
   {
-    Real nu = 0.5*fl.m_friction*fl.m_maingrad_kern.h*fl.m_cs*dinv;
-    res -= nu*vx / (x_ab.squaredNorm() + 0.01*fl.m_maingrad_kern.h2);
+    Real nu = 0.5*fl.m_friction*fl.m_grad_kern.h*fl.m_cs*dinv;
+    res -= nu*vx / (x_ab.squaredNorm() + 0.01*fl.m_grad_kern.h2);
   }
 
-  m = m - massb * res * fl.m_maingrad_kern(x_ab);
+  m = m - massb * res * fl.m_grad_kern(x_ab);
 #endif
 }
+
 template<> template<> inline void
-FluidParticle<BT07>::finish()
+FluidParticleT<BT07>::finish<Accel>()
 {
   // if the particle is close to the boundary and add a repulsive force
   // (assume boundary particle is infinitely more massive than the fluid
@@ -364,19 +384,19 @@ FluidParticle<BT07>::finish()
 template<> template<> inline void
 ParticleT<STATIC>::init<Volume>() 
 { 
-  p.dinv = 0.0f; 
+  dinv = 0.0f; 
 }
 //template<> template<> inline void 
 //ParticleT<STATIC>::neigh<Volume>(FluidParticle &near_p) { }
 template<> template<> inline void
-ParticleT<STATIC>::neigh<Volume>(Particle &near_p)
+ParticleT<STATIC>::neigh<Volume>(Particle &neigh)
 {
-  p.dinv += this->m_kern[ p.pos - near_p.pos ];
+  dinv += CubicSplineKernel::compute( pos - neigh.pos, radius );
 }
 template<> template<> inline void
 ParticleT<STATIC>::finish<Volume>()
 {
-  p.dinv = 1.0f/(p.dinv * m_kern.coef);
+  dinv = 1.0f / dinv;
 }
 
 #endif // PARTICLE_H

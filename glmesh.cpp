@@ -3,16 +3,18 @@
 #include <QtGui/QOpenGLBuffer>
 #include <limits>
 #include <assimp/scene.h>
+#include "materialmanager.h"
 #include "glmesh.h"
 
 // GLMesh stuff
 
 GLMesh::GLMesh(
     MeshPtr mesh,
-    MaterialConstPtr mat,
+    bool dynamic,
+    MaterialManager &matman,
     UniformBuffer &ubo,
     ShaderManager &shaderman)
-  : GLPrimitive(mat, ubo, shaderman)
+  : GLPrimitive(matman.get_material(mesh.get_material_idx()), ubo, shaderman)
   , m_mesh(mesh)
   , m_vertices(3, get_num_vertices())
   , m_normals(3, get_num_vertices())

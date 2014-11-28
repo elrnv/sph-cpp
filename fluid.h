@@ -10,6 +10,7 @@
 
 // Forward declaration
 class PointCloud;
+class SPHGrid;
 
 // A dynamic cloud of points
 
@@ -34,7 +35,7 @@ public:
   explicit Fluid(const aiMesh *pc, Index matidx, FluidParamsPtr params);
   ~Fluid();
 
-  void init();
+  void init(const SPHGrid &grid);
 
   // get pointers to be able to externally evolve data
   inline Real *vel_at(Size i)    { return m_vel.data() + i*3; }

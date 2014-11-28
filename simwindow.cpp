@@ -3,12 +3,12 @@
 #include <string>
 #include "util.h"
 #include "mesh.h"
-#include "dynamics.h"
 #include "simwindow.h"
-#include "fluid.h"
 
-#define STRINGIZE(x) #x
-#define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
+#define STRINGIZE_VALUE(x) #x
+#define STRINGIZE(x) STRINGIZE_VALUE(x)
+
+extern AffineBox3f UnitBox;
 
 SimWindow::SimWindow()
   : m_show_shortcuts(true) // immediately toggled below
@@ -70,28 +70,40 @@ void
 SimWindow::load_model(int i)
 {
   clear_dynamics();
-  SceneNode *scene =
-    Util::loadScene( std::string(STRINGIZE_VALUE_OF(CONFIGDIR)) 
-                     + "/scene" + std::to_string(i) + ".cfg");
+  m_dynman.clear();
+  m_geoman.clear();
+  std::string cfg_filename = 
+    STRINGIZE(CONFIGDIR) + "/scene" + std::to_string(i) + ".cfg";
+  bool loaded = Util::loadScene(cfg_filename, m_matman, m_geoman, m_dynman);
 
-  if (!scene)
+  if (!loaded) // nothing loaded, nothing to do
     return;
 
   if (global::sceneset.normalize)
   {
-    scene->normalize_model();
-    scene->rotate(global::sceneset.rotx, Vector3f::UnitX());
-    scene->rotate(global::sceneset.roty, Vector3f::UnitY());
-    scene->flatten();
+    m_dynman.normalize_models();
+    m_dynman.transform_models(
+        AngleAxisf(global::sceneset.rotx, Vector3f::UnitX()));
+    m_dynman.transform_models(
+        AngleAxisf(global::sceneset.roty, Vector3f::UnitY()));
 
-    scene->normalize_model(
+    m_dynman.normalize_model(
         global::sceneset.padx,
         global::sceneset.pady,
         global::sceneset.padz);
-    scene->flatten();
+
+    m_geoman.normalize_models();
+    m_geoman.transform_models(
+        AngleAxisf(global::sceneset.rotx, Vector3f::UnitX()));
+    m_geoman.transform_models(
+        AngleAxisf(global::sceneset.roty, Vector3f::UnitY()));
+
+    m_geoman.normalize_model(
+        global::sceneset.padx,
+        global::sceneset.pady,
+        global::sceneset.padz);
   }
 
-  scene->cube_bbox();
   m_udata.modelmtx.setIdentity();
   m_udata.normalmtx.block(0,0,3,3) = m_udata.modelmtx.block(0,0,3,3).inverse().transpose();
 
@@ -99,9 +111,12 @@ SimWindow::load_model(int i)
     delete glprim;
 
   m_glprims.clear();
-  m_glprims.reserve( scene->num_primitives() );
+  Size num_prims = 
+      m_dynman.get_num_fluids() 
+    + m_geoman.get_num_meshes()
+    + m_geoman.get_num_pointclouds();
+  m_glprims.reserve( num_prims );
   Util::loadGLData( m_glprims, m_ubo, m_shaderman, m_matman, m_geoman, m_dynman );
-  delete scene; scene = 0;
   change_viewmode(m_viewmode);
 }
 
@@ -186,22 +201,14 @@ SimWindow::toggle_dynamics()
     glclear_tr(); // clear dynamics text buffer
 
     // Create simulation grid
-    m_grid = new SPHGrid(Vector3f(-1,-1,-1), Vector3f(1,1,1));
-
-    for ( auto &glprim : m_glprims )
-    {
-      if (!glprim->is_pointcloud())
-        continue;
-
-      GLPointCloud *glpc = static_cast<GLPointCloud*>(glprim);
-      if (glpc->is_dynamic())
-        m_grid->add_fluid(*glpc);
-    }
-
+    m_grid = new SPHGrid(UnitBox, m_dynman);
     m_grid->init();
+    m_dynman.glprint_fluids(m_matman);
+
+    m_dynman.init_fluids(m_grid);
 
     // run simulation
-    m_sim_thread = std::thread(&SPHGrid::run, m_grid);
+    m_sim_thread = std::thread(&run, m_dynman, m_grid);
 
   }
   set_animating(m_dynamics);

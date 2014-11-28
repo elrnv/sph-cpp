@@ -13,7 +13,6 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <libconfig.h++>
-#include "scene.h"
 #include "glmesh.h"
 #include "glpointcloud.h"
 #include "materialmanager.h"
@@ -427,49 +426,18 @@ void loadGLData(
 {
   PointCloudVec &pcvec = geoman.get_pointclouds();
   for ( auto &pc : pcvec )
-    gl_prims.push_back(GLPointCloud(pc, /*is dynamic*/false, )
+    gl_prims.push_back(GLPointCloud(pc, /*is dynamic*/false, 
+          matman, ubo, shaderman));
 
-  if (node->is_geometry())
-  {
-    const GeometryNode *geonode = static_cast<const GeometryNode*>(node);
-    if (geonode->is_dynamic())
-    {
-      FluidPtr prim = geonode->get_primitive();
-      if (prim)
-      {
-        if (prim->is_mesh())
-        {
-          gl_prims.push_back(new GLMesh(boost::static_pointer_cast<Mesh>(prim),
-                                    geonode->get_material(), ubo, shaderman));
-        }
-        else if (prim->is_pointcloud())
-        {
-          gl_prims.push_back(new GLPointCloud(boost::static_pointer_cast<PointCloud>(prim),
-                /*is dynamic*/true, geonode->get_material(), ubo, shaderman));
-        }
-      }
-    }
-    else
-    {
-      PrimitivePtr prim = geonode->get_primitive();
-      if (prim)
-      {
-        if (prim->is_mesh())
-        {
-          gl_prims.push_back(new GLMesh(boost::static_pointer_cast<Mesh>(prim),
-                                    geonode->get_material(), ubo, shaderman));
-        }
-        else if (prim->is_pointcloud())
-        {
-          gl_prims.push_back(new GLPointCloud(boost::static_pointer_cast<PointCloud>(prim),
-                /*is dynamic*/false, geonode->get_material(), ubo, shaderman));
-        }
-      }
-    }
-  }
+  MeshVec &meshvec = geoman.get_meshes();
+  for ( auto &mesh : meshvec)
+    gl_prims.push_back(GLMesh(mesh, /*is dynamic*/false,
+          matman, ubo, shaderman));
 
-  for ( const SceneNode *child : node->get_children())
-    loadGLData(child, gl_prims, ubo, shaderman);
+  FluidVec &flvec = dynman.get_fluids();
+  for ( auto &fl : flvec )
+    gl_prims.push_back(GLPointCloud(fl, /*is dynamic*/true,
+          matman, ubo, shaderman));
 }
 
 };

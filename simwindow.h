@@ -7,6 +7,9 @@
 #include "openglwindow.h"
 #include "uniformbuffer.h"
 #include "shadermanager.h"
+#include "dynamicsmanager.h"
+#include "geometrymanager.h"
+#include "materialmanager.h"
 
 // forward declarations
 class SPHGrid;
@@ -71,9 +74,9 @@ private:
   bool m_change_prog;   // flag true if m_viewmode is recently changed
 
   ShaderManager m_shaderman;
-  ShaderManager m_dynman;
-  ShaderManager m_geoman;
-  ShaderManager m_matman;
+  DynamicsManager m_dynman;
+  GeometryManager m_geoman;
+  MaterialManager m_matman;
 
   // bounding box
   QOpenGLVertexArrayObject m_bbox_vao;

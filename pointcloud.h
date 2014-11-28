@@ -19,6 +19,7 @@ class PointCloud : public Primitive
 {
 public:
   explicit PointCloud(const aiMesh *pc, Index matidx);
+  explicit PointCloud(const Matrix3XR<Real> &pos);
   ~PointCloud();
 
   inline Real get_radius() { return 0.5*compute_mindist(); }

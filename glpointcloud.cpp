@@ -3,8 +3,8 @@
 #include <QtGui/QOpenGLBuffer>
 #include <assimp/scene.h>
 #include <limits>
+#include "materialmanager.h"
 #include "glpointcloud.h"
-#include "dynamics.h"
 #include "fluid.h"
 
 // GLPointCloud stuff
@@ -12,10 +12,10 @@
 GLPointCloud::GLPointCloud(
     PointCloud &pc,
     bool dynamic,
+    MaterialManager &matman,
     UniformBuffer &ubo,
-    ShaderManager &shaderman,
-    Material &mat)
-  : GLPrimitive(mat, ubo, shaderman)
+    ShaderManager &shaderman)
+  : GLPrimitive(matman.get_material(mesh.get_material_idx()), ubo, shaderman)
   , m_pc(pc)
   , m_vertices(3, get_num_vertices())
   , m_radius(pc->get_radius())

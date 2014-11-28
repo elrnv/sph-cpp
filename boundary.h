@@ -2,8 +2,10 @@
 #define BOUNDARYPC_H
 
 #include <vector>
+#include <assimp/scene.h>
 #include "types.h"
 #include "dynparams.h"
+#include "sphgrid.h"
 
 // BoundaryPC (Boundary Point Cloud)
 // Def'n: this boundary is a static cloud of points, which passively interacts
@@ -19,12 +21,11 @@ class BoundaryPC
 public:
   // dynamic point cloud from a regular updatable gl point cloud
   explicit BoundaryPC(const aiMesh *pc, Index matidx, DynParamsPtr params);
+  explicit BoundaryPC(SPHGrid &grid, int particles_per_cell_length = 4);
   ~BoundaryPC();
 
   Matrix3XR<Real> generate_grid_box_pc(
       SPHGrid &grid, int particles_per_cell_length);
-
-  void init();
 
   inline Size get_num_vertices() const { return m_pc.get_num_vertices(); }
   inline Matrix3XR<Real> &get_pos()    { return m_pc.get_pos(); }
@@ -46,7 +47,7 @@ public:
 protected:
   DynParamsPtr m_params;
   Real         m_kernel_radius;
-  PointCloud  &m_pc;   // The underlying dynamic cloud of points
+  PointCloud   m_pc;   // The underlying dynamic cloud of points
 }; // class BoundaryPC
 
 typedef std::vector< BoundaryPC > BoundaryPCVec;

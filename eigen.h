@@ -28,13 +28,10 @@ using Eigen::Vector2f;
 template<typename T>
 using VectorXT = Matrix<T, Dynamic, 1>;
 
+template<typename T>
+using Vector3T = Matrix<T, 3, 1>;
 template<typename REAL>
-using VectorXR = VectorXT<REAL>;
-
-template<typename REAL>
-using Vector3R = Matrix<REAL, 3, 1>;
-template<typename REAL>
-using Vector4R = Matrix<REAL, 3, 1>;
+using Vector4T = Matrix<T, 3, 1>;
 
 using Eigen::Matrix3d;
 using Eigen::Matrix3f;
@@ -44,10 +41,10 @@ using Eigen::Matrix3Xi;
 using Eigen::Matrix4d;
 using Eigen::Matrix4f;
 
-template<typename REAL>
-using Matrix3XR = Matrix<REAL, 3, Dynamic>;
-template<typename REAL>
-using Matrix4XR = Matrix<REAL, 3, Dynamic>;
+template<typename T>
+using Matrix3XT = Matrix<T, 3, Dynamic>;
+template<typename T>
+using Matrix4XT = Matrix<T, 3, Dynamic>;
 
 using Eigen::PermutationMatrix;
 
@@ -61,6 +58,7 @@ using Eigen::Isometry3d;
 using Eigen::Isometry3f;
 using Eigen::AlignedScaling3d;
 using Eigen::AlignedScaling3f;
+using Eigen::Scaling;
 using Eigen::AngleAxisf;
 using Eigen::Translation3f;
 

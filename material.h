@@ -10,6 +10,7 @@
 class Material {
 public:
   Material(); // default material
+  Material(const Material &mat);
   Material(const aiMaterial &mat);
   Material(const Vector3f &ka, const Vector3f &kd, const Vector3f &ks,
                 float shininess, float reflectivity, float opacity);
