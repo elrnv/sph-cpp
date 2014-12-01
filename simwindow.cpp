@@ -8,7 +8,7 @@
 #include "fluid.h"
 
 #ifndef CONFIGDIR
-  #define CONFIGDIR "/Users/egor/proj/sim2/data/"
+  #define CONFIGDIR "/Users/egor/proj/sph/data/"
 #endif
 
 void SimWindow::toggle_shortcuts()

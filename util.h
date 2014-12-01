@@ -244,7 +244,7 @@ loadScene( const std::string &filename )
     global::sceneset.normalize = true;
     cfg.lookupValue("scene.normalize", global::sceneset.normalize);
 
-    std::string objdir = cfg.lookup("scene.objdir");
+    std::string objdir = cfg.lookup("scene.geodir");
     libconfig::Setting& objset = cfg.lookup("scene.objects");
 
     int num = objset.getLength();
@@ -256,7 +256,7 @@ loadScene( const std::string &filename )
     {
       try
       {
-        std::string objfile = objset[i]["objfile"];
+        std::string objfile = objset[i]["geofile"];
         DynParamsPtr params_ptr(NULL);
         try
         {
