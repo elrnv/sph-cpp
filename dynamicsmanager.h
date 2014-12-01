@@ -247,7 +247,7 @@ public:
     return false;
   }
 
-  void run(SPHGrid &grid);
+  void run(SPHGrid *grid);
 
   // one leapfrom integrator step
   inline bool step(float dt, bool first_step, SPHGrid &grid, float *substep_t=NULL);

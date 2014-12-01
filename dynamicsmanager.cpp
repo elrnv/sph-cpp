@@ -3,10 +3,12 @@
 #include "dynamicsmanager.h"
 
 void 
-DynamicsManager::run(SPHGrid &grid)
+DynamicsManager::run(SPHGrid *g)
 {
   if (get_num_fluids() < 1)
     return;
+
+  SPHGrid &grid = *g; // reference pointer for convenience
 
   // timestep
   float dt = 1.0f/(global::dynset.fps * global::dynset.substeps);

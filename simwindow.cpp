@@ -188,12 +188,6 @@ SimWindow::clear_cache()
   glprintf_trc(CYAN, "Cache cleared\n");
 }
 
-
-static void run_dynamics(DynamicsManager &dynman, SPHGrid &grid) 
-{
-  dynman.run(grid);
-}
-
 void 
 SimWindow::toggle_dynamics()
 {
@@ -213,8 +207,7 @@ SimWindow::toggle_dynamics()
     m_dynman.glprint_fluids(m_matman);
 
     // run simulation
-    // TODO: make this work
-    m_sim_thread = std::thread(&run_dynamics, m_dynman, m_grid);
+    m_sim_thread = std::thread(&DynamicsManager::run, &m_dynman, m_grid);
 
   }
   set_animating(m_dynamics);
