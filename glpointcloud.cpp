@@ -15,11 +15,10 @@ GLPointCloud::GLPointCloud(
     MaterialManager &matman,
     UniformBuffer &ubo,
     ShaderManager &shaderman)
-  : GLPrimitive(matman.get_material(mesh.get_material_idx()), ubo, shaderman)
+  : GLPrimitive(matman[pc.get_material_idx()], ubo)
   , m_pc(pc)
-  , m_vertices(3, get_num_vertices())
-  , m_radius(pc->get_radius())
-  , m_halo_radius(pc->get_halo_radius())
+  , m_radius(pc.get_radius())
+  , m_halo_radius(pc.get_halo_radius())
   , m_halos(false)
   , m_isdynamic(dynamic)
 {
@@ -30,7 +29,7 @@ GLPointCloud::GLPointCloud(
   this->m_pos.setUsagePattern( 
       is_dynamic() ? QOpenGLBuffer::StreamDraw : QOpenGLBuffer::StaticDraw );
 
-  Matrix3XR<GLfloat> &vispos = m_pc->template get_vispos<GLfloat>();
+  const Matrix3XT<GLfloat> &vispos = m_pc.get_vispos();
   this->m_pos.bind();
   this->m_pos.allocate( vispos.data(), sizeof( GLfloat ) * vispos.size() );
 
@@ -42,14 +41,11 @@ GLPointCloud::GLPointCloud(
 GLPointCloud::~GLPointCloud()
 { }
 
-inline Vector3f GLPointCloud::get_closest_pt() const
-{
-  return Vector3f(m_vertices.col(get_num_vertices()-1));
-}
-
 typedef PermutationMatrix<Dynamic,Dynamic,Size> SortMatrix;
 
-inline void GLPointCloud::sort_by_z(Matrix3XR<GLfloat> &pos)
+//inline void GLPointCloud::sort_by_z(Matrix3XT<GLfloat> &pos)
+inline void GLPointCloud::sort_by_z(const Matrix3XT<GLfloat> &pos,
+                                    Matrix3XT<GLfloat> &outpos)
 {
   // Sort all vertices by the z value
   clock_t s = clock();
@@ -64,14 +60,15 @@ inline void GLPointCloud::sort_by_z(Matrix3XR<GLfloat> &pos)
       [pos](Size i, Size j) { return pos.col(i)[2] < pos.col(j)[2]; });
   clock_t sort_t = clock();
 
-  pos = pos * PermutationMatrix<Dynamic, Dynamic, Size>(perm_vec);
+  outpos = outpos * SortMatrix(perm_vec);
 
   clock_t mult_t = clock();
   fprintf(stderr, "\rsort: %05.2e  mult: %05.2e", float(sort_t - s), float(mult_t - sort_t));
 }
 
 // private helper for the function below
-inline void GLPointCloud::update_glbuf(const Matrix3XR<GLfloat> &vispos)
+inline void 
+GLPointCloud::update_glbuf(const Matrix3XT<GLfloat> &vispos)
 {
   this->m_pos.bind();
   this->m_pos.write( 0, vispos.data(), sizeof( GLfloat ) * vispos.size() );
@@ -85,28 +82,30 @@ inline void
 GLPointCloud::update_glbuf_withsort(const AffineCompact3f &mvtrans,
                                     const AffineCompact3f &nmlmvtrans)
 {
-  if (m_pc->is_stalepos())
-    return;
+  //if (m_pc.is_stalepos())
+  //  return;
 
-  Matrix3XR<GLfloat> vispos = mvtrans * m_pc->template get_vispos<GLfloat>();
-  sort_by_z(vispos);
-  update_glbuf(vispos); // write to gl buffer
+  Matrix3XT<GLfloat> pos = m_pc.get_vispos();
+  Matrix3XT<GLfloat> vispos = mvtrans * m_pc.get_vispos();
+  sort_by_z(vispos, pos);
+  update_glbuf(pos); // write to gl buffer
 
-  m_pc->set_stalepos(true);
+  m_pc.set_stalepos(false);
+  (void) nmlmvtrans; // we dont map normals for point clouds
 }
 inline void 
 GLPointCloud::update_glbuf_nosort()
 {
-  if (m_pc->is_stalepos())
+  if (m_pc.is_stalepos())
     return;
 
-  update_glbuf(m_pc->template get_vispos<GLfloat>()); // write to gl buffer
-  m_pc->set_stalepos(true);
+  update_glbuf(m_pc.get_vispos()); // write to gl buffer
+  m_pc.set_stalepos(true);
 }
 
 inline void 
 GLPointCloud::update_shader(ShaderManager::ShaderType type,
-                                 ShaderManager &shaderman)
+                            ShaderManager &shaderman)
 {
   if (this->m_prog)
   {

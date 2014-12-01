@@ -3,28 +3,27 @@
 #include <limits>
 #include <fstream>
 #include <sstream>
-#include "fluid.h"
-#include "pointcloud.h"
+#include "sphgrid.h"
+#include "boundary.h"
 
-BoundaryPC::BoundaryPC(const aiMesh *pc, Index matidx, DynParamsPtr params)
-  : m_pc(pc)
+BoundaryPC::BoundaryPC(const aiMesh *pc, Index matidx, RigidParamsPtr params)
+  : m_pc(pc, matidx)
   , m_params(params)
   , m_kernel_radius(get_kernel_radius())
 { }
 
 // A default transparent boundary resembing a box covering the given sph grid
-BoundaryPC::BoundaryPC(SPHGrid &grid, int particles_per_cell_length = 4)
+BoundaryPC::BoundaryPC(SPHGrid &grid, int particles_per_cell_length)
   : m_pc(generate_grid_box_pc(grid, particles_per_cell_length))
   , m_params(NULL)
   , m_kernel_radius(grid.get_cell_size())
 { }
 
 // helper function to the constructor above
-inline Matrix3XR<Real> 
+inline Matrix3XT<Real> 
 BoundaryPC::generate_grid_box_pc(SPHGrid &grid, int particles_per_cell_length)
 {
-  float h = grid.get_cell_size();
-  SPHGrid::Array3Index &gridsize = grid.get_grid_size();
+  const SPHGrid::Array3Index &gridsize = grid.get_grid_size();
   const Vector3f &bmin = grid.get_bmin();
   const Vector3f &bmax = grid.get_bmax();
 
@@ -39,11 +38,11 @@ BoundaryPC::generate_grid_box_pc(SPHGrid &grid, int particles_per_cell_length)
   float incz = (bmax[2] - bmin[2] + 2*pad)/nz;
 
   Size i,j,k; // indices
-  Matrix3XR<Real> pos; // result
+  Matrix3XT<Real> pos; // result
   
   auto f = [&](Size i, Size j, Size k)
   {
-    pos << Vector3R<Real>(bmin[0] - pad + i*incx, 
+    pos << Vector3T<Real>(bmin[0] - pad + i*incx, 
                           bmin[1] - pad + j*incy,
                           bmin[2] - pad + k*incz);
     //fprintf(stderr, "v %f %f %f\n", pos[0], pos[1], pos[2]);

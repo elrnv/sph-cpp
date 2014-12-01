@@ -24,41 +24,6 @@
 namespace Util
 {
 
-/* NOT USED ANYMORE
-// converts an assimp scene to an internal scene
-SceneNode *
-convertScene( const aiScene *scene, const aiNode *node, DynParamsPtr dyn_params )
-{
-  SceneNode *scene_node = new SceneNode(node);
-
-  unsigned int num_meshes = node->mNumMeshes;
-
-  // copy the meshes if any
-  unsigned int *meshidx = node->mMeshes;
-  for (unsigned int i = 0; i < num_meshes; ++i)
-  {
-    aiMesh *aimesh = scene->mMeshes[meshidx[i]];
-    aiMaterial *aimat = scene->mMaterials[aimesh->mMaterialIndex];
-    if (dyn_params)
-    {
-      if (dyn_params->type == DynParams::FLUID)
-        scene_node->add_child(new FluidNode(aimesh, aimat, 
-              boost::static_pointer_cast<FluidParams>(dyn_params)));
-      //else if (dyn_params->type == DynParams::RIGID)
-      //  scene_node->add_child(new RigidNode(aimesh, aimat, dyn_params));
-    }
-    else
-      scene_node->add_child(new GeometryNode(aimesh, aimat));
-  }
-
-  // Continue for all child nodes
-  unsigned int num_children = node->mNumChildren;
-  for (unsigned int i = 0; i < num_children; ++i)
-    scene_node->add_child(convertScene(scene, node->mChildren[i], dyn_params));
-
-  return scene_node;
-} */
-
 // converts an assimp scene to an internal representation
 void
 convertScene(const aiScene *scene, const aiNode *node, DynParamsPtr dyn_params,
@@ -73,13 +38,13 @@ convertScene(const aiScene *scene, const aiNode *node, DynParamsPtr dyn_params,
   assert(meshidx || !num_meshes);
   for (unsigned int i = 0; i < num_meshes; ++i)
   {
-    aiMesh *aimesh = scene->mMeshes[meshidx[i]];
-    aiMaterial *aimat = scene->mMaterials[aimesh->mMaterialIndex];
+    aiMesh     *aimesh = scene->mMeshes[meshidx[i]];
+    aiMaterial *aimat  = scene->mMaterials[aimesh->mMaterialIndex];
 
     Index matidx = matman.add_material(aimat);
 
     if (dyn_params)
-      dynman.add_dynamic_object(aimesh, matidx, dynparams);
+      dynman.add_dynamic_object(aimesh, matidx, matman, dyn_params);
     else
       geoman.add_geometry_object(aimesh, matidx);
   }
@@ -115,6 +80,11 @@ loadDynamics( const std::string &filename )
     if (boost::iequals(var_name, std::string("fluid")))
     {
       params_ptr = FluidParamsPtr(new FluidParams());
+      continue;
+    }
+    else if (boost::iequals(var_name, std::string("rigid")))
+    {
+      params_ptr = RigidParamsPtr(new RigidParams());
       continue;
     }
 
@@ -158,8 +128,8 @@ loadDynamics( const std::string &filename )
             fparams.fluid_type = MCG03;
           else if (boost::iequals(fluid_type, "bt07"))
             fparams.fluid_type = BT07;
-          else if (boost::iequals(fluid_type, "ics13"))
-            fparams.fluid_type = ICS13;
+          //else if (boost::iequals(fluid_type, "ics13"))
+          //  fparams.fluid_type = ICS13;
         }
         else if (boost::iequals(var_name, "d"))
           iss >> fparams.density;
@@ -177,6 +147,32 @@ loadDynamics( const std::string &filename )
           iss >> fparams.kernel_inflation;
         else if (boost::iequals(var_name, "rvd"))
           iss >> fparams.recoil_velocity_damping;
+      }
+    }
+  }
+  else if (params_ptr && params_ptr->type == DynParams::RIGID)
+  {
+    RigidParams &rparams = static_cast<RigidParams&>(*params_ptr);
+
+    file.clear();
+    file.seekg(0); // rewind
+
+    while (getline(file, line))
+    {
+      std::istringstream iss(line);
+      std::string var_name;
+      iss >> var_name;
+
+      if (params_ptr->type == DynParams::FLUID)
+      {
+        if (boost::iequals(var_name, "d"))
+          iss >> rparams.density;
+        else if (boost::iequals(var_name, "f"))
+          iss >> rparams.friction;
+        else if (boost::iequals(var_name, "ki"))
+          iss >> rparams.kernel_inflation;
+        else if (boost::iequals(var_name, "rvd"))
+          iss >> rparams.recoil_velocity_damping;
       }
     }
   }
@@ -216,6 +212,7 @@ loadObjects( const std::string &filename, DynParamsPtr params_ptr,
 
   convertScene(scene, scene->mRootNode, params_ptr,
                matman, geoman, dynman);
+  return true;
 }
 
 // helper function to find the root filename from the path
@@ -237,6 +234,7 @@ loadScene( const std::string &filename,
            GeometryManager &geoman,
            DynamicsManager &dynman )
 {
+  bool something_loaded = false;
   libconfig::Config cfg;
   try
   {
@@ -265,9 +263,7 @@ loadScene( const std::string &filename,
       qWarning() << "Setting " << te.getPath() << "has the wrong type!";
     }
     catch (libconfig::SettingNotFoundException &nfe) 
-    {
-      qWarning() << "Setting " << nfe.getPath() << "not found!";
-    }
+    { /* ok, gravity is optional, defaults to y = -9.81 */ }
 
     global::dynset.hashfile = "";
     if (!global::dynset.savedir.empty()) 
@@ -290,9 +286,7 @@ loadScene( const std::string &filename,
       qWarning() << "Setting " << te.getPath() << "has the wrong type!";
     }
     catch (libconfig::SettingNotFoundException &nfe) 
-    { 
-      qWarning() << "Setting " << nfe.getPath() << "not found!";
-    }
+    { /* ok, padding is optional*/ }
     
     global::sceneset.rotx = 0.0f;
     global::sceneset.roty = 0.0f;
@@ -310,7 +304,6 @@ loadScene( const std::string &filename,
       return false;
 
     // get scene objects
-    bool something_loaded = false;
     for (int i = 0; i < num; ++i)
     {
       try
@@ -364,60 +357,9 @@ loadScene( const std::string &filename,
   return something_loaded;
 }
 
-/*  NOT USED ANYMORE
 // PRE: we must have the current GL context
 void loadGLData(
-    const SceneNode *node,
-    std::vector< GLPrimitive * > &gl_prims,
-    UniformBuffer &ubo,
-    ShaderManager &shaderman)
-{
-  if (node->is_geometry())
-  {
-    const GeometryNode *geonode = static_cast<const GeometryNode*>(node);
-    if (geonode->is_dynamic())
-    {
-      FluidPtr prim = geonode->get_primitive();
-      if (prim)
-      {
-        if (prim->is_mesh())
-        {
-          gl_prims.push_back(new GLMesh(boost::static_pointer_cast<Mesh>(prim),
-                                    geonode->get_material(), ubo, shaderman));
-        }
-        else if (prim->is_pointcloud())
-        {
-          gl_prims.push_back(new GLPointCloud(boost::static_pointer_cast<PointCloud>(prim),
-                true, geonode->get_material(), ubo, shaderman));
-        }
-      }
-    }
-    else
-    {
-      PrimitivePtr prim = geonode->get_primitive();
-      if (prim)
-      {
-        if (prim->is_mesh())
-        {
-          gl_prims.push_back(new GLMesh(boost::static_pointer_cast<Mesh>(prim),
-                                    geonode->get_material(), ubo, shaderman));
-        }
-        else if (prim->is_pointcloud())
-        {
-          gl_prims.push_back(new GLPointCloud(boost::static_pointer_cast<PointCloud>(prim),
-                false, geonode->get_material(), ubo, shaderman));
-        }
-      }
-    }
-  }
-
-  for ( const SceneNode *child : node->get_children())
-    loadGLData(child, gl_prims, ubo, shaderman);
-} */
-
-// PRE: we must have the current GL context
-void loadGLData(
-    std::vector< GLPrimitive * > &gl_prims,
+    std::vector< GLPrimitivePtr > &gl_prims,
     UniformBuffer &ubo,
     ShaderManager &shaderman,
     MaterialManager &matman,
@@ -426,18 +368,18 @@ void loadGLData(
 {
   PointCloudVec &pcvec = geoman.get_pointclouds();
   for ( auto &pc : pcvec )
-    gl_prims.push_back(GLPointCloud(pc, /*is dynamic*/false, 
-          matman, ubo, shaderman));
+    gl_prims.push_back(GLPrimitivePtr(new GLPointCloud(pc, /*is dynamic*/false,
+          matman, ubo, shaderman)));
 
   MeshVec &meshvec = geoman.get_meshes();
   for ( auto &mesh : meshvec)
-    gl_prims.push_back(GLMesh(mesh, /*is dynamic*/false,
-          matman, ubo, shaderman));
+    gl_prims.push_back(GLPrimitivePtr(new GLMesh(mesh, /*is dynamic*/false,
+          matman, ubo, shaderman)));
 
   FluidVec &flvec = dynman.get_fluids();
   for ( auto &fl : flvec )
-    gl_prims.push_back(GLPointCloud(fl, /*is dynamic*/true,
-          matman, ubo, shaderman));
+    gl_prims.push_back(GLPrimitivePtr(new GLPointCloud(fl.get_pc(), /*is dynamic*/true,
+          matman, ubo, shaderman)));
 }
 
 };

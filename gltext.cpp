@@ -149,7 +149,7 @@ void GLTextPainter::set_screen_size(const Vector2f &dim)
   m_screen_size = dim;
 }
 
-void GLTextPainter::draw_text(int xcur, int ycur)
+void GLTextPainter::draw_text()
 {
   glEnable(GL_BLEND);
   glDisable(GL_DEPTH_TEST);

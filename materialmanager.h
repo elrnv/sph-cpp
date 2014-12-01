@@ -1,6 +1,7 @@
 #ifndef MATERIALMANAGER_H
 #define MATERIALMANAGER_H
 
+#include <iostream>
 #include "material.h"
 #include "types.h"
 
@@ -26,12 +27,17 @@ public:
 
   typedef std::vector< Material > MaterialVec;
 
-  inline const Material &get_material(Index matidx)
+  inline const Material &get_material(Index matidx) const
   { 
     return m_materials[matidx]; 
   }
 
-  inline const Material &operator[] (Index matidx)
+  inline const Material &operator[] (Index matidx) const
+  { 
+    return m_materials[matidx]; 
+  }
+
+  inline Material &operator[] (Index matidx)
   { 
     return m_materials[matidx]; 
   }

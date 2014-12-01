@@ -8,16 +8,19 @@
 #include "glpointcloud.h"
 #include "gltext.h"
 #include "settings.h"
+#include "sphgrid.h"
 
 #define M_G 9.81f
 
 // Fluid stuff
 
-Fluid::Fluid(const aiMesh *pc, Index matidx, FluidParamsPtr params)
-  : m_pc(pc)
+Fluid::Fluid(const aiMesh *pc, Index matidx, 
+             MaterialManager &matman, FluidParamsPtr params)
+  : m_pc(pc, matidx)
   , m_params(params)
   , m_avg_density(0.0f)
   , m_avg_pressure(0.0f)
+  , m_color(matman[matidx].kd())
   , m_cache(global::dynset.frames+1)
 { }
 
@@ -26,12 +29,11 @@ Fluid::~Fluid()
 
 // the fluid must be initialized before being simulated
 
-inline void 
-Fluid::init(const SPHGrid &grid)
+void 
+Fluid::init(const AlignedBox3f &box)
 {
-
-  m_bmin = grid.get_bmin();
-  m_bmax = grid.get_bmax();
+  m_bmin = box.corner(AlignedBox3f::BottomLeftFloor);
+  m_bmax = box.corner(AlignedBox3f::TopRightCeil);
 
   m_kernel_radius = get_kernel_radius();
   m_rest_density = m_params->density;
@@ -52,7 +54,7 @@ Fluid::init(const SPHGrid &grid)
     m_c2 = max_velocity2 / m_params->compressibility;
   }
 
-  Matrix3XR<Real> &pos = m_pc.get_pos();
+  Matrix3XT<Real> &pos = m_pc.get_pos();
   m_accel.resizeLike(pos);
   m_dinv.resize(pos.cols());
   m_extern_accel.resizeLike(pos);
@@ -217,7 +219,7 @@ Fluid::load_saved_cache()
     for (unsigned int fr = 0; fr <= global::dynset.frames; ++fr)
     {
       read_successful &= read_saved(fr);
-      glprintf_trcv(get_color(), "\rLoading cache %d%%", 100*fr/global::dynset.frames);
+      glprintf_trcv(m_color, "\rLoading cache %d%%", 100*fr/global::dynset.frames);
     }
     glprintf_tr("\r   ");
 

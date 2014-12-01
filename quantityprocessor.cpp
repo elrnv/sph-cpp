@@ -229,9 +229,9 @@ public:
 
   inline void init_particle(FluidParticle &p)
   { 
-    p.c = p.vol * Real(p.color) * m_color_kern(Vector3R<Real>(0.0f,0.0f,0.0f));
+    p.c = p.vol * Real(p.color) * m_color_kern(Vector3T<Real>(0.0f,0.0f,0.0f));
     p.n[0] = p.n[1] = p.n[2] = 0.0f;
-    p.m[0] = p.vol * m_color_kern(Vector3R<Real>(0.0f,0.0f,0.0f));
+    p.m[0] = p.vol * m_color_kern(Vector3T<Real>(0.0f,0.0f,0.0f));
   }
 
   inline void fluid(FluidParticle &p, FluidParticle &near_p)
@@ -239,10 +239,10 @@ public:
     if (&p == &near_p)
       return;
     
-    Vector3R<Real> v_ab(p.vel - near_p.vel);
-    Vector3R<Real> x_ab(p.pos - near_p.pos);
+    Vector3T<Real> v_ab(p.vel - near_p.vel);
+    Vector3T<Real> x_ab(p.pos - near_p.pos);
 
-    Vector3R<Real> res(
+    Vector3T<Real> res(
     // pressure
         near_p.vol * 0.5*(p.pressure + near_p.pressure)*m_spikygrad_kern(x_ab)
         +
@@ -340,7 +340,7 @@ inline void CFSurfaceTensionT<FT>::fluid(FluidParticle &p, FluidParticle &near_p
   // compute curvature
   if (p.m[1] && near_p.m[1]) // if normals are in good shape
   {
-    Vector3R<Real> x_ab = p.pos - near_p.pos;
+    Vector3T<Real> x_ab = p.pos - near_p.pos;
     p.m[2] -= near_p.vol * (near_p.n*near_p.m[1] - p.n*p.m[1]).dot(m_grad_kern(x_ab));
     p.m[0] += near_p.vol * m_kern(x_ab); // denom for color
   }
@@ -393,7 +393,7 @@ public:
 
     // viscosity
 
-    Vector3R<Real> x_ab = p.pos - near_p.pos;
+    Vector3T<Real> x_ab = p.pos - near_p.pos;
     Real vx = x_ab.dot(p.vel - near_p.vel);
     if (vx < 0)
     {
@@ -416,7 +416,7 @@ public:
     // this way (in the finish_particle method)
 
 #ifdef BT07_BOUNDARY_PARTICLES // the following handles boundaries as in AIAST12
-    Vector3R<Real> x_ab = p.pos - near_p.pos;
+    Vector3T<Real> x_ab = p.pos - near_p.pos;
     float massb = this->m_rest_density * near_p.dinv;
 
     // pressure force contribution from boundary particles
@@ -441,11 +441,11 @@ public:
     // particle, such that m_b / (m_a + m_b) == 1 where m_a and m_b are the
     // masses of the fluid and boundary particles respectively
 #ifndef BT07_BOUNDARY_PARTICLES
-    Vector3R<Real> hvec(m_bound_kern.h,m_bound_kern.h,m_bound_kern.h);
-    Vector3R<Real> res(0.0f, 0.0f, 0.0f);
-    Vector3R<Real> dmin =  // distances to min boundaries
+    Vector3T<Real> hvec(m_bound_kern.h,m_bound_kern.h,m_bound_kern.h);
+    Vector3T<Real> res(0.0f, 0.0f, 0.0f);
+    Vector3T<Real> dmin =  // distances to min boundaries
       0.5*hvec + p.pos - this->m_bmin.template cast<Real>();
-    Vector3R<Real> dmax =  // distances to max boundaries
+    Vector3T<Real> dmax =  // distances to max boundaries
       0.5*hvec + this->m_bmax.template cast<Real>() - p.pos;
     if ( dmin[0] < m_bound_kern.h )
       res[0] += m_bound_kern(Vector3d(dmin[0],0,0));// / dmin[0];
@@ -463,7 +463,7 @@ public:
       res[2] -= m_bound_kern(Vector3d(dmax[2],0,0));// / dmax[2];
 
     // acceleration due to boundary collisions
-    Vector3R<Real> bdry_accel( this->m_compressibility*this->m_cs2*res );
+    Vector3T<Real> bdry_accel( this->m_compressibility*this->m_cs2*res );
 #endif
     for (unsigned char i = 0; i < 3; ++i)
     {
@@ -507,7 +507,7 @@ public:
     // viscosity
 
     Real res = 0.0f;
-    Vector3R<Real> x_ab = p.pos - near_p.pos;
+    Vector3T<Real> x_ab = p.pos - near_p.pos;
     Real vx = x_ab.dot(p.vel - near_p.vel);
     if (vx < 0)
     {
@@ -578,8 +578,8 @@ inline void CFPrepareJacobiT<FT>::fluid(FluidParticle &p, FluidParticle &near_p)
   if (&p == &near_p)
     return;
 
-  Vector3R<Real> x_ab(p.pos - near_p.pos);
-  Vector3R<Real> v_ab(p.vel - near_p.vel);
+  Vector3T<Real> x_ab(p.pos - near_p.pos);
+  Vector3T<Real> v_ab(p.vel - near_p.vel);
   p.b += near_p.d*near_p.vol*v_ab.dot(m_grad_kern(x_ab)); // density guess
   p.c += near_p.d*near_p.vol*(-dt*dt*p.m - 
       (-dt*dt*this->m_mass/(p.d*p.d))*m_grad_kern(-x_ab)).dot(m_grad_kern(x_ab));
@@ -587,7 +587,7 @@ inline void CFPrepareJacobiT<FT>::fluid(FluidParticle &p, FluidParticle &near_p)
 template<int FT>
 inline void CFPrepareJacobiT<FT>::bound(FluidParticle &p, Particle &near_p)
 {
-//  Vector3R<Real> x_ab(p.pos - near_p.pos);
+//  Vector3T<Real> x_ab(p.pos - near_p.pos);
 //  p.b += p.dinv*p.dinv*this->m_rest_density*near_p.dinv*p.vel.dot(m_grad_kern(x_ab)); // density guess
 }
 template<int FT>
@@ -617,7 +617,7 @@ inline void CFJacobiSolveFirstT<FT>::fluid(FluidParticle &p, FluidParticle &near
   if (&p == &near_p)
     return;
   
-  Vector3R<Real> x_ab(p.pos - near_p.pos);
+  Vector3T<Real> x_ab(p.pos - near_p.pos);
   p.n = p.n - dt*dt*(near_p.pressure*near_p.vol*near_p.dinv)*m_grad_kern(x_ab);
 }
 template<int FT>
@@ -647,7 +647,7 @@ inline void CFJacobiSolveSecondT<FT>::fluid(FluidParticle &p, FluidParticle &nea
   if (&p == &near_p)
     return;
   
-  Vector3R<Real> x_ab(p.pos - near_p.pos);
+  Vector3T<Real> x_ab(p.pos - near_p.pos);
   p.b += (near_p.vol/near_p.dinv)*(p.n + dt*dt*near_p.m*near_p.pressure - near_p.n
       - dt*dt*(p.pressure*p.vol*p.dinv)*m_grad_kern(-x_ab)
       ).dot(m_grad_kern(x_ab));
@@ -655,7 +655,7 @@ inline void CFJacobiSolveSecondT<FT>::fluid(FluidParticle &p, FluidParticle &nea
 template<int FT>
 inline void CFJacobiSolveSecondT<FT>::bound(FluidParticle &p, Particle &near_p)
 {
- // Vector3R<Real> x_ab(p.pos - near_p.pos);
+ // Vector3T<Real> x_ab(p.pos - near_p.pos);
  // p.b -= (p.vol/this->m_mass)*(this->m_rest_density*near_p.vol*p.n).dot(m_grad_kern(x_ab));
 }
 template<int FT>
@@ -698,14 +698,14 @@ inline void CFPressureAccelT<FT>::fluid(FluidParticle &p, FluidParticle &near_p)
   if (&p == &near_p)
     return;
   
-  Vector3R<Real> x_ab(p.pos - near_p.pos);
+  Vector3T<Real> x_ab(p.pos - near_p.pos);
   p.n = p.n - (near_p.vol/near_p.dinv)*(p.pressure*(p.dinv*p.dinv)+
       near_p.pressure*(near_p.dinv*near_p.dinv)) * m_grad_kern(x_ab);
 }
 template<int FT>
 inline void CFPressureAccelT<FT>::bound(FluidParticle &p, Particle &near_p)
 {
-  Vector3R<Real> x_ab = p.pos - near_p.pos;
+  Vector3T<Real> x_ab = p.pos - near_p.pos;
   float massb = this->m_rest_density * near_p.dinv;
 
   // pressure force contribution from boundary particles

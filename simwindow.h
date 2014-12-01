@@ -10,12 +10,12 @@
 #include "dynamicsmanager.h"
 #include "geometrymanager.h"
 #include "materialmanager.h"
+#include "glprimitive.h"
 
 // forward declarations
 class SPHGrid;
-class GLPrimitive; 
 
-typedef std::vector< GLPrimitive * > GLPrimPtrVec;
+typedef std::vector< GLPrimitivePtr > GLPrimPtrVec;
 
 class SimWindow : public OpenGLWindow
 {
@@ -73,7 +73,7 @@ private:
   ViewMode m_viewmode;
   bool m_change_prog;   // flag true if m_viewmode is recently changed
 
-  ShaderManager m_shaderman;
+  ShaderManager   m_shaderman;
   DynamicsManager m_dynman;
   GeometryManager m_geoman;
   MaterialManager m_matman;

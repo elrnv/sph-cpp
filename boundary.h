@@ -5,14 +5,14 @@
 #include <assimp/scene.h>
 #include "types.h"
 #include "dynparams.h"
-#include "sphgrid.h"
+#include "pointcloud.h"
 
 // BoundaryPC (Boundary Point Cloud)
 // Def'n: this boundary is a static cloud of points, which passively interacts
 //        with other objects.
 
 // Forward declaration
-class PointCloud;
+class SPHGrid;
 
 // A static cloud of points
 
@@ -20,16 +20,28 @@ class BoundaryPC
 {
 public:
   // dynamic point cloud from a regular updatable gl point cloud
-  explicit BoundaryPC(const aiMesh *pc, Index matidx, DynParamsPtr params);
+  explicit BoundaryPC(const aiMesh *pc, Index matidx, RigidParamsPtr params);
   explicit BoundaryPC(SPHGrid &grid, int particles_per_cell_length = 4);
   ~BoundaryPC();
 
-  Matrix3XR<Real> generate_grid_box_pc(
+  Matrix3XT<Real> generate_grid_box_pc(
       SPHGrid &grid, int particles_per_cell_length);
 
+  // interface for point cloud
+  void transform_in_place(const Affine3f &trans)
+  {
+    m_pc.transform_in_place(trans);
+  }
+  AlignedBox3f compute_bbox() { return m_pc.compute_bbox(); }
+  inline Index get_material_idx() const { return m_pc.get_material_idx(); }
+  inline void prepare_vispos() { m_pc.prepare_vispos(); }
+  inline const Matrix3Xf &get_vispos() const { return m_pc.get_vispos(); }
+  inline bool is_stalepos() { return m_pc.is_stalepos(); }
+  inline void set_stalepos(bool sp) { m_pc.set_stalepos(sp); }
+
   inline Size get_num_vertices() const { return m_pc.get_num_vertices(); }
-  inline Matrix3XR<Real> &get_pos()    { return m_pc.get_pos(); }
-  inline const Matrix3XR<Real> &get_pos() const { return m_pc.get_pos(); }
+  inline Matrix3XT<Real> &get_pos()    { return m_pc.get_pos(); }
+  inline const Matrix3XT<Real> &get_pos() const { return m_pc.get_pos(); }
 
   // kernel support radius
   inline Real get_kernel_radius()
@@ -45,9 +57,9 @@ public:
   }
 
 protected:
-  DynParamsPtr m_params;
-  Real         m_kernel_radius;
-  PointCloud   m_pc;   // The underlying dynamic cloud of points
+  PointCloud     m_pc;   // The underlying dynamic cloud of points
+  RigidParamsPtr m_params;
+  Real           m_kernel_radius;
 }; // class BoundaryPC
 
 typedef std::vector< BoundaryPC > BoundaryPCVec;

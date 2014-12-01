@@ -20,9 +20,9 @@ public:
   inline Vector3f get_color(MaterialManager &matman) const 
   { return matman[m_material_idx].kd(); }
 
-  virtual bool is_mesh()       const = 0;
-  virtual bool is_pointcloud() const = 0;
-  virtual inline void transform_in_place(const AffineCompact3f &trans) = 0;
+  virtual bool is_mesh()       const { return false; }
+  virtual bool is_pointcloud() const { return false; }
+  virtual inline void transform_in_place(const Affine3f &trans) = 0;
   virtual inline AlignedBox3f &compute_bbox() = 0;
 
   inline AlignedBox3f &get_bbox() { return m_bbox; }

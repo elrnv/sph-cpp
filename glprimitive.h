@@ -51,19 +51,17 @@ public:
   float get_opacity()  const { return m_opacity; }
   float get_reflectivity() const { return m_reflectivity; }
 
-  virtual bool is_pointcloud() const = 0;
-  virtual bool is_mesh()       const = 0;
+  virtual bool is_pointcloud() const { return false; }
+  virtual bool is_mesh()       const { return false; }
 
   virtual inline Size get_num_indices()  const = 0;
   virtual inline Size get_num_vertices() const = 0;
 
-  // get the coordinates of the point closest to the camera (needed for sorting)
-  virtual Vector3f get_closest_pt() const = 0;
-
   virtual void update_glbuf_withsort(const AffineCompact3f &trans,
                                      const AffineCompact3f &nmltrans) = 0;
   virtual void update_glbuf_nosort() = 0;
-  virtual void update_shader(ShaderManager::ShaderType type) = 0;
+  virtual void update_shader(ShaderManager::ShaderType type,
+                             ShaderManager &shaderman) = 0;
 
   virtual void print() const = 0;
 

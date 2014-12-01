@@ -9,19 +9,17 @@
 // GLMesh stuff
 
 GLMesh::GLMesh(
-    MeshPtr mesh,
+    Mesh &mesh,
     bool dynamic,
     MaterialManager &matman,
     UniformBuffer &ubo,
     ShaderManager &shaderman)
-  : GLPrimitive(matman.get_material(mesh.get_material_idx()), ubo, shaderman)
+  : GLPrimitive(matman[mesh.get_material_idx()], ubo)
   , m_mesh(mesh)
-  , m_vertices(3, get_num_vertices())
-  , m_normals(3, get_num_vertices())
-  , m_insync(true)
 {
+  (void) dynamic; // TODO: implement dynamic meshes
   // collect vertex attributes
-  const VertexVec &verts = mesh->get_verts();
+  const VertexVec &verts = mesh.get_verts();
 
   GLfloat vertices[verts.size()*3];
   GLfloat normals[verts.size()*3];
@@ -38,7 +36,7 @@ GLMesh::GLMesh(
   }
 
   // collect indices
-  const FaceVec &faces = mesh->get_faces();
+  const FaceVec &faces = mesh.get_faces();
 
   GLuint indices[faces.size()*3];
 
@@ -73,7 +71,7 @@ GLMesh::GLMesh(
 
   this->m_vao.release();
 
-  update_shader(ShaderManager::PHONG);
+  update_shader(ShaderManager::PHONG, shaderman);
 }
 
 
@@ -81,38 +79,16 @@ GLMesh::~GLMesh()
 {
 }
 
-
 void
-GLMesh::update_data()
-{
-  std::lock_guard<std::mutex> guard(this->m_lock);
-
-  if (!m_insync)
-    return;
-
-  // collect vertex attributes
-  const VertexVec &verts = m_mesh->get_verts();
-
-  int i = 0;
-  for ( auto &v : verts )
-  {
-    m_vertices.col(i) = v.pos.template cast<GLfloat>();
-    m_normals.col(i)  = v.nml.template cast<GLfloat>();
-    i += 1;
-  }
-
-  m_insync = false;
-}
-
-void
-GLMesh::update_glbuf(const Matrix3XR<GLfloat &vispos, const Matrix3XR<GLfloat> &visnml)
+GLMesh::update_glbuf(const Matrix3XT<GLfloat> &vispos,
+                     const Matrix3XT<GLfloat> &visnml)
 {
   this->m_vao.bind();
   this->m_pos.bind();
   this->m_pos.write( 0, vispos.data(), sizeof( vispos ) );
 
   this->m_nml.bind();
-  this->m_nml.write( 0, visnml.data(), sizeof( visnml) );
+  this->m_nml.write( 0, visnml.data(), sizeof( visnml ) );
   this->m_vao.release();
 }
 
@@ -120,28 +96,28 @@ void
 GLMesh::update_glbuf_withsort(const AffineCompact3f &mvtrans,
                               const AffineCompact3f &nmlmvtrans)
 { // no actual sort needed here
-  if (!m_mesh->is_staleposnml())
+  if (!m_mesh.is_staleposnml())
   {
-    update_glbuf(mvtrans * m_mesh->template get_vispos<GLfloat>());
-    update_glbuf(nmlmvtrans * m_mesh->template get_visnml<GLfloat>());
-    m_mesh->set_staleposnml(true);
+    update_glbuf(mvtrans * m_mesh.get_vispos(),
+                 nmlmvtrans * m_mesh.get_visnml());
+    m_mesh.set_staleposnml(true);
   }
 }
 
 void
 GLMesh::update_glbuf_nosort()
 {
-  if (!m_mesh->is_staleposnml())
+  if (!m_mesh.is_staleposnml())
   {
-    update_glbuf(m_mesh->template get_vispos<GLfloat>());
-    update_glbuf(m_mesh->template get_visnml<GLfloat>());
-    m_mesh->set_staleposnml(true);
+    update_glbuf(m_mesh.get_vispos(), m_mesh.get_visnml());
+    m_mesh.set_staleposnml(true);
   }
 }
 
 
 void
-GLMesh::update_shader(ShaderManager::ShaderType type)
+GLMesh::update_shader(ShaderManager::ShaderType type,
+                      ShaderManager &shaderman)
 {
   if (this->m_prog)
   {
@@ -151,11 +127,11 @@ GLMesh::update_shader(ShaderManager::ShaderType type)
   }
 
   if (type == ShaderManager::PHONG)
-    this->m_prog = this->m_shaderman.get_phong_shader();
+    this->m_prog = shaderman.get_phong_shader();
   else if (type == ShaderManager::PARTICLE)
-    this->m_prog = this->m_shaderman.get_particle_shader();
+    this->m_prog = shaderman.get_particle_shader();
   else
-    this->m_prog = this->m_shaderman.get_normals_shader();
+    this->m_prog = shaderman.get_normals_shader();
 
   this->m_vao.bind();
 

@@ -6,7 +6,6 @@
 #include "pointcloud.h"
 #include "glprimitive.h"
 #include "dynparams.h"
-#include "dynamics.h"
 
 class UniformGrid;
 class Fluid;
@@ -17,11 +16,11 @@ class GLPointCloud : public GLPrimitive
 {
 public:
   explicit GLPointCloud(
-      PointCloudPtr pc,
+      PointCloud &pc,
       bool dynamic,
+      MaterialManager &matman,
       UniformBuffer &ubo,
-      ShaderManager &shaderman,
-      Material &mat); // its ok to pass by ref since we just copy it anyways
+      ShaderManager &shaderman);
   ~GLPointCloud();
 
   inline bool is_pointcloud() const { return true; }
@@ -30,10 +29,10 @@ public:
   inline Real get_halo_radius() const { return m_halo_radius; }
 
   inline Size get_num_indices()  const { return get_num_vertices(); }
-  inline Size get_num_vertices() const { return m_pc->get_num_vertices(); }
+  inline Size get_num_vertices() const { return m_pc.get_num_vertices(); }
 
-  Vector3f get_closest_pt() const;
-  void sort_by_z(Matrix3XR<Glfloat> &vispos);
+  //void sort_by_z(Matrix3XT<GLfloat> &vispos);
+  void sort_by_z(const Matrix3XT<GLfloat> &pos, Matrix3XT<GLfloat> &outpos);
   void update_glbuf_withsort(const AffineCompact3f &trans,
                              const AffineCompact3f &nmltrans);
   void update_glbuf_nosort();
@@ -44,16 +43,16 @@ public:
   bool is_halos() const { return m_halos; }
   void toggle_halos() { m_halos = !m_halos; }
 
-  void print() const { std::cerr << *m_pc << std::endl; }
+  void print() const { std::cerr << m_pc << std::endl; }
 
 
   friend UniformGrid;
 
 private:  // helper functions
-  void update_glbuf(const Matrix3XR<GLfloat> &vispos);
+  void update_glbuf(const Matrix3XT<GLfloat> &vispos);
 
 private:
-  PointCloudPtr m_pc; // reference to the native point cloud object
+  PointCloud &m_pc; // reference to the native point cloud object
 
   Real m_radius;      // particle radius inherited from point cloud
   Real m_halo_radius; // particle influence radius inherited from point cloud
@@ -61,5 +60,7 @@ private:
   bool m_halos; // show kernel influence visually
   bool m_isdynamic;
 };
+
+typedef boost::shared_ptr< GLPointCloud > GLPointCloudPtr;
 
 #endif // GLPOINTCLOUD_H

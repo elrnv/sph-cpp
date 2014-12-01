@@ -215,7 +215,7 @@ void OpenGLWindow::renderNow()
 
 	render();
   if (m_show_text)
-    m_text_painter.draw_text(m_prev_x, m_prev_y);
+    m_text_painter.draw_text();
 
 	m_context->swapBuffers(this);
 

@@ -1,6 +1,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include "eigen.h"
+
 // This file contains type defines used throughout the program. Most importantly,
 // floating point types, integral types and some constants
 
@@ -13,10 +15,10 @@ typedef Size Index;
 
 #define INVALID_INDEX Index(-1)
 
-#define ALL_PARTICLE_TYPES DEFAULT, MCG03, BT07, STATIC
-#define NUMTYPES 4
 #define ALL_FLUID_PARTICLE_TYPES DEFAULT, MCG03, BT07
 #define NUMFLUIDTYPES 3
+#define ALL_PARTICLE_TYPES ALL_FLUID_PARTICLE_TYPES, STATIC
+#define NUMTYPES 4
 
 // SPH particle types
 enum ParticleType
@@ -32,6 +34,6 @@ enum ComputeType
   Volume
 };
 
-AlignedBox3f UnitBox(Vector3f(-1.f,-1.f,-1.f), Vector3f(1.f,1.f,1.f));
+extern AlignedBox3f UnitBox;
 
 #endif // TYPES_H

@@ -73,13 +73,22 @@ Mesh::Mesh(const aiMesh *mesh, Index matidx)
   prepare_visposnml();
 }
 
+Mesh::Mesh(const Mesh &orig)
+  : Primitive(static_cast<const Primitive&>(orig))
+  , m_verts(orig.m_verts)
+  , m_faces(orig.m_faces)
+  , m_vispos(orig.m_vispos)
+  , m_visnml(orig.m_visnml)
+  , m_staleposnml(true)
+{ }
 
 Mesh::~Mesh()
 {
 }
 
 
-void Mesh::compute_face_normals()
+void
+Mesh::compute_face_normals()
 {
   for ( auto &f : m_faces )
   {
@@ -90,7 +99,8 @@ void Mesh::compute_face_normals()
 }
 
 
-AlignedBox3f &Mesh::compute_bbox()
+AlignedBox3f &
+Mesh::compute_bbox()
 {
   m_bbox.setEmpty();
   for ( auto &v : m_verts )
@@ -99,14 +109,15 @@ AlignedBox3f &Mesh::compute_bbox()
 }
 
 
-void Mesh::transform_in_place(const AffineCompact3f &trans)
+void 
+Mesh::transform_in_place(const Affine3f &trans)
 {
   // convert positions to canonical homogenized coordinates
   for ( auto &v : m_verts )
   {
-    Vector3R<Real> vec( trans.linear().template cast<Real>() * v.pos );
+    Vector3T<Real> vec( trans.linear().template cast<Real>() * v.pos );
     Translation3f T( trans.translation() );
-    v.pos = vec + Vector3R<Real>(T.x(), T.y(), T.z());
+    v.pos = vec + Vector3T<Real>(T.x(), T.y(), T.z());
     v.nml = trans.inverse().linear().transpose().template cast<Real>() * v.nml;
   }
   for ( auto &f : m_faces )
@@ -119,7 +130,8 @@ void Mesh::transform_in_place(const AffineCompact3f &trans)
 // Called from the dynamics thread
 // copies internal representation of vertices and faces to a visualizable
 // representation
-inline void prepare_visposnml()
+void
+Mesh::prepare_visposnml()
 {
   if (m_staleposnml)
   {
@@ -127,8 +139,8 @@ inline void prepare_visposnml()
     for ( Size i = 0; i < num_verts; ++i )
     {
       Vertex &v = m_verts[i];
-      m_vispos.col(i) << v.pos;
-      m_visnml.col(i) << v.nml;
+      m_vispos.col(i) << v.pos.template cast<float>();
+      m_visnml.col(i) << v.nml.template cast<float>();
     }
 
     m_staleposnml = false;

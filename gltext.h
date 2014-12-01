@@ -18,7 +18,7 @@ public:
 
   void init();
   void set_screen_size(const Vector2f &dim);
-  void draw_text(int x, int y);
+  void draw_text();
 
 protected:
   boost::unordered_map<int, QOpenGLVertexArrayObject *> m_width_vao_map; // dictionary of vaos

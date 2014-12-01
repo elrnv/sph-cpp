@@ -7,6 +7,7 @@ SOURCES += \
   gltext.cpp \
   settings.cpp \
   openglwindow.cpp \
+  dynamicsmanager.cpp \
   simwindow.cpp \
   mesh.cpp \
   pointcloud.cpp \
@@ -15,9 +16,11 @@ SOURCES += \
   shadermanager.cpp \
   fluid.cpp \
   boundary.cpp \
+  particle.cpp \
   sphgrid.cpp \
   glmesh.cpp \
-  glpointcloud.cpp
+  glpointcloud.cpp \
+  types.cpp
 
 HEADERS += \
   gltext.h \
@@ -45,32 +48,41 @@ HEADERS += \
   eigen.h \
   extramath.h \
   util.h \
-  kernel.h
+  kernel.h \
+  types.h
 
 DESTDIR = ../bin
+
+# directory containing scene configurations
+QMAKE_CXXFLAGS += -DCONFIGDIR=/Users/egor/proj/sph/data
 
 # compile with latest c++ specs
 CONFIG += c++11
 
+# create a Debug and Release makefiles
+CONFIG += debug_and_release
+
+MACPORTS_INCLUDEPATH = /opt/local/include
 macx {
   QMAKE_MAC_SDK = macosx10.10
-}
-QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
+  QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
+  INCLUDEPATH += $${MACPORTS_INCLUDEPATH}/eigen3
+  INCLUDEPATH += $${MACPORTS_INCLUDEPATH}
 
-INCLUDEPATH += /opt/local/include/eigen3
-INCLUDEPATH += /Users/egor/proj/boost_include
-INCLUDEPATH += /Users/egor/Qt5.2.0/5.2.0/clang_64/include
-#INCLUDEPATH += /opt/local/include
-INCLUDEPATH += /Users/egor/proj/assimp/include
-#LIBS += -L/opt/local/lib 
-LIBS += -L/Users/egor/proj/assimp/lib
-LIBS += -lassimp
+# Opne Asset Import Library include path
+  INCLUDEPATH += $${MACPORTS_INCLUDEPATH}/assimp
+# INCLUDEPATH += /Users/egor/proj/assimp/include
+# LIBS += -L/Users/egor/proj/assimp/lib
+
+  LIBS += -L/opt/local/lib  # macports libs path
+}
+
+LIBS += -lassimp            # 3D asset loading library
+LIBS += -ltbb               # concurrency library
 LIBS += -lboost_system-mt
+LIBS += -lconfig++          # lib to read config files
 
 # LIBS += /opt/intel/lib/libiomp5.a
-
-# link to libconfig library to read config files
-LIBS += -lconfig++
 
 # MKL setup
 #MKLROOT = /opt/intel/mkl
@@ -83,10 +95,9 @@ LIBS += -lconfig++
 # use the following to boost performance
 QMAKE_CXXFLAGS += -DBOOST_DISABLE_ASSERTS
 
-# show warnings if a function is not inlined
-QMAKE_CXXFLAGS += -stdlib=libc++ -Winline -Wno-unused-parameter -U__STRICT_ANSI__
-
-# directory containing scene configurations
-QMAKE_CXXFLAGS += -DCONFIGDIR=/Users/egor/proj/sph/data
+# show warnings if a function is not defined when inlined
+QMAKE_CXXFLAGS += -stdlib=libc++ -Winline -Wno-unused-parameter
+QMAKE_CXXFLAGS_RELEASE -= -O2
+QMAKE_CXXFLAGS_RELEASE += -O3
 
 RESOURCES += resources.qrc

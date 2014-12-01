@@ -6,7 +6,6 @@
 #include <limits>
 #include <queue>
 #include "pointcloud.h"
-#include "dynamics.h"
 
 // PointCloud stuff
 PointCloud::PointCloud(const aiMesh *mesh, Index matidx)
@@ -29,20 +28,28 @@ PointCloud::PointCloud(const aiMesh *mesh, Index matidx)
 }
 
 // Default constructor used for ghost and boundary particles
-PointCloud::PointCloud(const Matrix3XR<Real> &pos)
+PointCloud::PointCloud(const Matrix3XT<Real> &pos)
   : Primitive(0)
   , m_mindist(-1.f)
-  , m_stalepos(true)
   , m_pos(pos)
+  , m_stalepos(true)
 {
   prepare_vispos(); // copy data for visualizer
 }
+
+PointCloud::PointCloud(const PointCloud &orig)
+  : Primitive(orig)
+  , m_mindist(orig.m_mindist)
+  , m_pos(orig.m_pos)
+  , m_vispos(orig.m_vispos)
+  , m_stalepos(true)
+{ }
 
 PointCloud::~PointCloud()
 { }
 
 inline void
-PointCloud::transform_in_place(const AffineCompact3f &trans)
+PointCloud::transform_in_place(const Affine3f &trans)
 {
   m_pos = trans.template cast<Real>() * m_pos;
 }
@@ -124,11 +131,12 @@ PointCloud::compute_mindist()
 
 // Visualization stuff
 // Called from the dynamics thread
-inline void prepare_vispos()
+void
+PointCloud::prepare_vispos()
 {
   if (m_stalepos)
   {
-    m_vispos = m_pos;
+    m_vispos = m_pos.template cast<float>();
     m_stalepos = false;
   }
 }

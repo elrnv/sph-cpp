@@ -4,11 +4,12 @@
 #include "util.h"
 #include "mesh.h"
 #include "simwindow.h"
+#include "glpointcloud.h"
+#include "sphgrid.h"
+#include "types.h"
 
 #define STRINGIZE_VALUE(x) #x
 #define STRINGIZE(x) STRINGIZE_VALUE(x)
-
-extern AffineBox3f UnitBox;
 
 SimWindow::SimWindow()
   : m_show_shortcuts(true) // immediately toggled below
@@ -41,11 +42,12 @@ SimWindow::clear_dynamics()
   if (!m_grid)
     return;
 
-  m_grid->un_pause();
+  m_dynman.un_pause();
 
-  m_grid->request_stop(); // stop thread
-  m_sim_thread.join();
-  delete m_grid; m_grid = 0;
+  m_dynman.request_stop(); // stop thread
+  if (m_sim_thread.joinable())
+    m_sim_thread.join();
+  delete m_grid; m_grid = NULL;
 }
 
 void 
@@ -73,7 +75,7 @@ SimWindow::load_model(int i)
   m_dynman.clear();
   m_geoman.clear();
   std::string cfg_filename = 
-    STRINGIZE(CONFIGDIR) + "/scene" + std::to_string(i) + ".cfg";
+    std::string(STRINGIZE(CONFIGDIR)) + "/scene" + std::to_string(i) + ".cfg";
   bool loaded = Util::loadScene(cfg_filename, m_matman, m_geoman, m_dynman);
 
   if (!loaded) // nothing loaded, nothing to do
@@ -82,33 +84,32 @@ SimWindow::load_model(int i)
   if (global::sceneset.normalize)
   {
     m_dynman.normalize_models();
-    m_dynman.transform_models(
+    m_dynman.transform_models( Affine3f::Identity() *
         AngleAxisf(global::sceneset.rotx, Vector3f::UnitX()));
-    m_dynman.transform_models(
+    m_dynman.transform_models( Affine3f::Identity() *
         AngleAxisf(global::sceneset.roty, Vector3f::UnitY()));
 
-    m_dynman.normalize_model(
+    m_dynman.normalize_models(
         global::sceneset.padx,
         global::sceneset.pady,
         global::sceneset.padz);
 
     m_geoman.normalize_models();
-    m_geoman.transform_models(
+    m_geoman.transform_models(Affine3f::Identity() *
         AngleAxisf(global::sceneset.rotx, Vector3f::UnitX()));
-    m_geoman.transform_models(
+    m_geoman.transform_models(Affine3f::Identity() *
         AngleAxisf(global::sceneset.roty, Vector3f::UnitY()));
 
-    m_geoman.normalize_model(
+    m_geoman.normalize_models(
         global::sceneset.padx,
         global::sceneset.pady,
         global::sceneset.padz);
   }
 
+  m_dynman.init_fluids(UnitBox);
+
   m_udata.modelmtx.setIdentity();
   m_udata.normalmtx.block(0,0,3,3) = m_udata.modelmtx.block(0,0,3,3).inverse().transpose();
-
-  for ( auto &glprim : m_glprims )
-    delete glprim;
 
   m_glprims.clear();
   Size num_prims = 
@@ -170,12 +171,12 @@ SimWindow::toggle_bbox()
 void 
 SimWindow::toggle_halos()
 {
-  for ( auto &glprim : m_glprims )
+  for ( auto glprim : m_glprims )
   {
     if (!glprim->is_pointcloud())
       continue;
 
-    GLPointCloud *glpc = static_cast<GLPointCloud*>(glprim);
+    GLPointCloudPtr glpc = boost::static_pointer_cast<GLPointCloud>(glprim);
     glpc->toggle_halos();
   }
 }
@@ -185,6 +186,12 @@ SimWindow::clear_cache()
 {
   m_dynman.clear_cache();
   glprintf_trc(CYAN, "Cache cleared\n");
+}
+
+
+static void run_dynamics(DynamicsManager &dynman, SPHGrid &grid) 
+{
+  dynman.run(grid);
 }
 
 void 
@@ -205,10 +212,9 @@ SimWindow::toggle_dynamics()
     m_grid->init();
     m_dynman.glprint_fluids(m_matman);
 
-    m_dynman.init_fluids(m_grid);
-
     // run simulation
-    m_sim_thread = std::thread(&run, m_dynman, m_grid);
+    // TODO: make this work
+    m_sim_thread = std::thread(&run_dynamics, m_dynman, m_grid);
 
   }
   set_animating(m_dynamics);
@@ -217,7 +223,7 @@ SimWindow::toggle_dynamics()
 void 
 SimWindow::toggle_simulation()
 { 
-  if (m_grid) { m_grid->toggle_pause(); } 
+  m_dynman.toggle_pause();
 }
 
 void 
@@ -226,25 +232,18 @@ SimWindow::render()
   glDepthMask(GL_TRUE); // depthmask needs to be true before clearing the depth bit
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-  if (m_show_bbox)
-    draw_wire_bbox();
-
-  glFinish();
-
-  reset_viewmode();
-
   Affine3f vtrans(get_view_trans()); // view transformation
 
   AffineCompact3f &mvtrans = get_view_trans();
   if (m_viewmode == ViewMode::PARTICLE)
   { // explicitly transform and sort by depth
-    for ( auto &glprim : m_glprims )
+    for ( auto glprim : m_glprims )
       glprim->update_glbuf_withsort(mvtrans, mvtrans);
-    vtrans.setIdentity(); // reset the view matrix
+  //  vtrans.setIdentity(); // reset the view matrix
   }
   else
   {
-    for ( auto &glprim : m_glprims )
+    for ( auto glprim : m_glprims )
       glprim->update_glbuf_nosort();
   }
 
@@ -269,18 +268,23 @@ SimWindow::render()
 
   glFinish(); // Finish writing uniform buffer before drawing
 
-  for ( auto &glprim : m_glprims )
+  if (m_show_bbox)
+    draw_wire_bbox();
+
+  reset_viewmode();
+
+  for ( auto glprim : m_glprims )
   {
     if (m_change_prog)
-      glprim->update_shader(m_viewmode);
+      glprim->update_shader(m_viewmode, m_shaderman);
 
     glprim->get_program()->bind();
 
-    glprim->get_program()->setUniformValue("ambient", glprim->get_ambient());
-    glprim->get_program()->setUniformValue("diffuse", glprim->get_diffuse());
+    glprim->get_program()->setUniformValue("ambient",  glprim->get_ambient());
+    glprim->get_program()->setUniformValue("diffuse",  glprim->get_diffuse());
     glprim->get_program()->setUniformValue("specular", glprim->get_specular());
-    glprim->get_program()->setUniformValue("specpow", glprim->get_specpow());
-    glprim->get_program()->setUniformValue("opacity", glprim->get_opacity());
+    glprim->get_program()->setUniformValue("specpow",  glprim->get_specpow());
+    glprim->get_program()->setUniformValue("opacity",  glprim->get_opacity());
 
     Vector4f l1 = m_udata.vinvmtx * Vector4f(0.0, 0.0, 10.0, 1.0);
     glprim->get_program()->setUniformValue("lights[0].pos", QVector4D(l1[0], l1[1], l1[2], l1[3]));
@@ -295,7 +299,7 @@ SimWindow::render()
       glprim->get_program()->setUniformValue("pt_scale", float(14.5*window_dim()[1]*m_near));
       if (glprim->is_pointcloud())
       {
-        GLPointCloud *glpc = static_cast<GLPointCloud*>(glprim);
+        GLPointCloudPtr glpc = boost::static_pointer_cast<GLPointCloud>(glprim);
         glprim->get_program()->setUniformValue( "pt_radius", GLfloat(glpc->get_radius()));
         if (!glpc->is_halos())
           glprim->get_program()->setUniformValue( "pt_halo", GLfloat(glpc->get_radius()));

@@ -8,9 +8,10 @@
 // computations. The values in these structs are used directly by the Particles
 struct FluidData
 {
-  explicit FluidData(Fluid &fl)
-    : fl(fl)
+  explicit FluidData(Size flidx, FluidVec &fluids)
+    : flidx(flidx)
   { 
+    Fluid &fl = fluids[flidx];
     m_mass = fl.get_mass();
     m_rest_density = fl.get_rest_density();
     m_viscosity = fl.get_viscosity();
@@ -24,7 +25,7 @@ struct FluidData
     m_bmax = fl.get_bmax();
   }
 
-  Fluid &fl;
+  Size flidx;
 
   Real m_mass;
   //Real m_radius;
@@ -50,7 +51,8 @@ struct FluidData
 template<int PT>
 struct FluidDataT : public FluidData
 {
-  explicit FluidDataT(Fluid &fl) : FluidData(fl) { }
+  explicit FluidDataT(Size flidx, FluidVec &fluids) 
+    : FluidData(flidx, fluids) { }
 
   void init_kernel(float h)
   {
@@ -63,7 +65,8 @@ struct FluidDataT : public FluidData
 template<>
 struct FluidDataT<MCG03> : public FluidData
 {
-  explicit FluidDataT(Fluid &fl) : FluidData(fl) { }
+  explicit FluidDataT(Size flidx, FluidVec &fluids) 
+    : FluidData(flidx, fluids) { }
 
   void init_kernel(float h)
   {
@@ -83,9 +86,8 @@ struct FluidDataT<MCG03> : public FluidData
 template<>
 struct FluidDataT<BT07> : public FluidData
 {
-  explicit FluidDataT(Fluid &fl)
-    : FluidData(fl)
-  { }
+  explicit FluidDataT(Size flidx, FluidVec &fluids) 
+    : FluidData(flidx, fluids) { }
 
   void init_kernel(float h)
   {
@@ -99,5 +101,9 @@ struct FluidDataT<BT07> : public FluidData
   CubicSplineGradKernel m_grad_kern;
   MKI04Kernel           m_bound_kern;
 }; // FluidDataT<BT07>
+
+// templated "typedef"
+template<int PT>
+using FluidDataVecT = std::vector< FluidDataT<PT> >;
 
 #endif // FLUIDDATA_H

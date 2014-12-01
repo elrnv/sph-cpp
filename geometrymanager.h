@@ -18,7 +18,7 @@ public:
   // normalization routines used to fit the dynamic objects within a unit cube
   void normalize_models()
   {
-    normalize_model(Vector3f(0.0f, 0.0f, 0.0f),Vector3f(0.0f, 0.0f, 0.0f));
+    normalize_models(Vector3f(0.0f, 0.0f, 0.0f),Vector3f(0.0f, 0.0f, 0.0f));
   }
   void normalize_models(
       const Vector2f &ext_x,
@@ -38,17 +38,17 @@ public:
     m_bbox.extend( trc + ext_trc );
 
     Vector3f sizevec = m_bbox.sizes();
-    transform_models(Scaling(2.0f/sizevec.maxCoeff()));
+    transform_models(Affine3f::Identity() * Scaling(2.0f/sizevec.maxCoeff()));
     Vector3f box_center = m_bbox.center();
-    transform_models(Translation3f(-box_center));
+    transform_models(Affine3f::Identity() * Translation3f(-box_center));
   }
 
   void transform_models(const Affine3f &trans)
   {
     for ( auto &mesh : m_meshes )
-      mesh.transform_in_place(Translation3f(-box_center));
+      mesh.transform_in_place(trans);
     for ( auto &pc : m_pointclouds )
-      pc.transform_in_place(Translation3f(-box_center));
+      pc.transform_in_place(trans);
   }
 
   AlignedBox3f &compute_bbox()
@@ -81,7 +81,7 @@ public:
     m_pointclouds.push_back(PointCloud(mesh, mat_idx));
   }
 
-  void add_mesh(const aiMesh *mesh)
+  void add_mesh(const aiMesh *mesh, Index mat_idx)
   {
     m_meshes.push_back(Mesh(mesh, mat_idx));
   }
@@ -95,9 +95,6 @@ public:
   inline Size get_num_meshes() { return m_meshes.size(); }
   inline Size get_num_pointclouds() { return m_pointclouds.size(); }
   
-  typedef std::vector< PointCloud > PointCloudVec;
-  typedef std::vector< Mesh >       MeshVec;
-
   PointCloudVec &get_pointclouds() { return m_pointclouds; }
   MeshVec       &get_meshes()      { return m_meshes; }
 

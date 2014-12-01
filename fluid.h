@@ -2,15 +2,18 @@
 #define FLUID_H
 
 #include <vector>
+#include <assimp/mesh.h>
 #include "types.h"
 //#include "quantityprocessor.h"
 #include "dynparams.h"
+#include "pointcloud.h"
 
 // Fluid Stuff
 
 // Forward declaration
 class PointCloud;
 class SPHGrid;
+class MaterialManager;
 
 // A dynamic cloud of points
 
@@ -19,12 +22,12 @@ class Fluid
 public:
   struct __attribute__ ((__packed__)) CachedFrame
   {
-    Matrix3XR<Real> pos;
-    Matrix3XR<Real> vel;
+    Matrix3XT<Real> pos;
+    Matrix3XT<Real> vel;
     bool valid;
 
     CachedFrame() : valid(false) { }
-    CachedFrame(const Matrix3XR<Real> &p, const Matrix3XR<Real> &v, bool good)
+    CachedFrame(const Matrix3XT<Real> &p, const Matrix3XT<Real> &v, bool good)
       : pos(p), vel(v), valid(good) { }
   };
 
@@ -32,10 +35,24 @@ public:
   typedef std::vector< CachedFrame > Cache;
 
   // dynamic point cloud from a regular updatable gl point cloud
-  explicit Fluid(const aiMesh *pc, Index matidx, FluidParamsPtr params);
+  explicit Fluid(const aiMesh *pc, Index matidx, 
+                 MaterialManager &matman, FluidParamsPtr params);
   ~Fluid();
 
-  void init(const SPHGrid &grid);
+  void init(const AlignedBox3f &box);
+
+  // interface for point cloud
+  inline PointCloud &get_pc() { return m_pc; }
+  void transform_in_place(const Affine3f &trans) 
+  { 
+    m_pc.transform_in_place(trans); 
+  }
+  AlignedBox3f compute_bbox() { return m_pc.compute_bbox(); }
+  inline Index get_material_idx() const { return m_pc.get_material_idx(); }
+  inline void prepare_vispos() { m_pc.prepare_vispos(); }
+  inline const Matrix3Xf &get_vispos() const { return m_pc.get_vispos(); }
+  inline bool is_stalepos() { return m_pc.is_stalepos(); }
+  inline void set_stalepos(bool sp) { m_pc.set_stalepos(sp); }
 
   // get pointers to be able to externally evolve data
   inline Real *vel_at(Size i)    { return m_vel.data() + i*3; }
@@ -46,11 +63,11 @@ public:
   inline Real &get_avg_density()  { return m_avg_density; }
   inline Real &get_avg_pressure()  { return m_avg_pressure; }
 
-  inline Matrix3XR<Real> &get_pos()          { return m_pc.get_pos(); }
-  inline const Matrix3XR<Real> &get_pos() const  { return m_pc.get_pos(); }
-  inline Matrix3XR<Real> &get_vel()          { return m_vel; }
-  inline Matrix3XR<Real> &get_accel()        { return m_accel; }
-  inline Matrix3XR<Real> &get_extern_accel() { return m_extern_accel; }
+  inline Matrix3XT<Real> &get_pos()          { return m_pc.get_pos(); }
+  inline const Matrix3XT<Real> &get_pos() const  { return m_pc.get_pos(); }
+  inline Matrix3XT<Real> &get_vel()          { return m_vel; }
+  inline Matrix3XT<Real> &get_accel()        { return m_accel; }
+  inline Matrix3XT<Real> &get_extern_accel() { return m_extern_accel; }
 
   // boundary getters
   inline const Vector3f &get_bmin() const { return m_bmin; }
@@ -99,6 +116,8 @@ public:
   bool load_cached(unsigned int frame);
 
 protected:
+  PointCloud      m_pc;    // The underlying dynamic cloud of points
+
   FluidParamsPtr m_params;
 
   Vector3f m_bmin;
@@ -114,12 +133,12 @@ protected:
   Real m_avg_density; // used in ICS13 computations
   Real m_avg_pressure; // used in ICS13 computations
 
-  Matrix3XR<Real> m_vel;   // velocities
-  Matrix3XR<Real> m_accel; // accelerations
-  Matrix3XR<Real> m_extern_accel; // accelerations
-  VectorXR<Real>  m_dinv;  // density inverses
+  Matrix3XT<Real> m_vel;   // velocities
+  Matrix3XT<Real> m_accel; // accelerations
+  Matrix3XT<Real> m_extern_accel; // accelerations
+  VectorXT<Real>  m_dinv;  // density inverses
 
-  PointCloud     &m_pc;    // The underlying dynamic cloud of points
+  Vector3f m_color; // used for reporting to distinguish one fluid from another
 
   std::string m_savefmt;
 

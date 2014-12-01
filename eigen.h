@@ -5,6 +5,7 @@
 // algebra library used by this project, so we don't have to do this every time
 
 #include <cmath> // needed for the EigenTransformPlugin.h below
+#include <ostream>
 #include <QtGui/QMatrix4x4>
 
 // Plugin implementing custom tranformations
@@ -30,7 +31,7 @@ using VectorXT = Matrix<T, Dynamic, 1>;
 
 template<typename T>
 using Vector3T = Matrix<T, 3, 1>;
-template<typename REAL>
+template<typename T>
 using Vector4T = Matrix<T, 3, 1>;
 
 using Eigen::Matrix3d;

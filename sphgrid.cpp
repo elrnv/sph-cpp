@@ -1,14 +1,11 @@
-#include <ctime>
 #include <algorithm>
-#include <limits>
-#include <fstream>
-#include <iomanip>
-#include "sph.h"
+#include "settings.h"
 #include "glpointcloud.h"
 #include "gltext.h"
 //#include "quantityprocessor.h"
 #include "fluid.h"
-#include "settings.h"
+#include "dynamicsmanager.h"
+#include "sphgrid.h"
 #define BOOST_CHRONO_HEADER_ONLY
 #include <boost/chrono.hpp>
 
@@ -61,7 +58,7 @@ SPHGrid::init()
     return;
 
   // set cell size to be the maximum of the kernel support over all fluids;
-  m_h = std::max(m_dynman.get_max_radius(), m_h);
+  m_h = std::max(float(m_dynman.get_max_radius()), m_h);
 
   m_hinv = 1.0f/m_h;
   glprintf_tr("cell size: %f\n", m_h);
@@ -87,7 +84,7 @@ SPHGrid::init()
   //m_bound_volume_proc = NULL;
 }
 
-inline void
+void
 SPHGrid::update_grid()
 {
   clear_fluid_data();
@@ -104,108 +101,6 @@ SPHGrid::clear_fluid_data()
         m_grid[i][j][k].clear();
 }
 
-// variadic base case
-template<int F, typename ParticleType>
-inline void
-SPHGrid::interact_with_neigh_cell( ParticleType &p, Cell &cell )
-{ }
-
-// variadic induction
-template<int F, typename ParticleType, int NPT, int... NPTs>
-inline void
-SPHGrid::interact_with_neigh_cell( ParticleType &p, Cell &cell )
-{
-  auto &neigh_pvec = cell.template get_pvec<NPT>();
-  for ( auto &neigh_p : neigh_pvec )
-    p.neigh<F>(neigh_p); // process neighbouring particles
-
-  interact_with_neigh_cell<F,ParticleType, NPTs...>(p,cell);
-}
-
-// variadic base case
-template<int F>
-inline void
-SPHGrid::compute_quantity_in_cell( Size i,  Size j,  Size k, 
-                                   Size nx, Size ny, Size nz )
-{ }
-
-// variadic induction
-template<int F, int PT, int... PTs>
-inline void
-SPHGrid::compute_quantity_in_cell( Size i, Size j, Size k,
-                                   Size nx, Size ny, Size nz )
-{
-  auto &pvec = m_grid[i][j][k].template get_pvec<PT>();
-  if (pvec.empty())
-    return;
-
-  IndexRange xrange = range3(i,nx);
-  IndexRange yrange = range3(j,ny);
-  IndexRange zrange = range3(k,nz);
-  // TODO: why do we need the GridView? just iterate directly in the grid
-  GridView neigh_view = m_grid[ boost::indices[xrange][yrange][zrange] ];
-
-  for ( auto &p : pvec )  // prepare data
-    p.init<F>();
-
-  Size xrange_size = xrange.finish() - xrange.start();
-  Size yrange_size = yrange.finish() - yrange.start();
-  Size zrange_size = zrange.finish() - zrange.start();
-  for (Size near_i = 0; near_i < xrange_size; ++near_i)
-  {
-    for (Size near_j = 0; near_j < yrange_size; ++near_j)
-    {
-      for (Size near_k = 0; near_k < zrange_size; ++near_k)
-      {
-        Cell &cell = neigh_view[near_i][near_j][near_k];
-        for ( auto &p : pvec )
-          interact_with_neigh_cell<F,PT,decltype(p),ALL_PARTICLE_TYPES>(p,cell);
-      }
-    }
-  }
-
-  for ( auto &p : pvec )  // finalize data
-    p.finish<F>();
-
-  compute_quantity_in_cell<F,PTs...>(i,j,k,nx,ny,nz);
-}
-
-template<typename F, int... PT>
-inline void
-SPHGrid::compute_quantity()
-{
-//  clock_t s = clock();
-  Size nx = m_gridsize[0];
-  Size ny = m_gridsize[1];
-  Size nz = m_gridsize[2];
-  for (Size i = 0; i < nx; ++i)
-  {
-    for (Size j = 0; j < ny; ++j)
-    {
-      for (Size k = 0; k < nz; ++k)
-      {
-        compute_quantity_in_cell<F,PT...>(i,j,k,nx,ny,nz);
-      } // for k
-    } // for j
-  } // for i
-
-  //qDebug() << "average time" << (float(clock() - s) / CLOCKS_PER_SEC);
-}
-
-#if 0
-template<int FT>
-inline void FTiter<FT>::update_density(SPHGrid &g,float timestep)
-{
-  if (g.m_fluids[FT].size())
-  {
-    for (auto &fl : g.m_fluids[FT])
-      fl->template cast<FT>()->m_fluid_density_update_proc.init( timestep ); 
-
-    g.template compute_density_updateT<FT>();
-  }
-  FTiter<FT+1>::update_density(g,timestep); // recurse
-}
-#endif
 
 template<int PT>
 inline void
@@ -232,24 +127,17 @@ SPHGrid::compute_density()
   compute_quantity<Density,PT>();
 
 #ifdef REPORT_DENSITY_VARIATION
+  FluidVec &fluids = m_dynman.get_fluids();
   i = 0;
   for (auto &fldata : fldatavec )
   {
-    avg_var[i] = avg_var[i]/fldata.fl.get_num_vertices();
+    avg_var[i] = avg_var[i]/fluids[fldata.flidx].get_num_vertices();
     qDebug("Fluid %d:  max: %.0f, %.1f percent;    avg: %.0f, %.1f percent", i,
-        max_var[i], 100.00f*max_var[i]/fldata.fl.get_rest_density(), 
-        avg_var[i], 100.00f*avg_var[i]/fldata.fl.get_rest_density());
+        max_var[i], 100.00f*max_var[i]/fluids[fldata.flidx].get_rest_density(), 
+        avg_var[i], 100.00f*avg_var[i]/fluids[fldata.flidx].get_rest_density());
     i++;
   }
 #endif
-}
-
-template<int PT, int PT2, int... PTs>
-inline void
-SPHGrid::compute_density()
-{
-  compute_density<PT>();       // do one
-  compute_density<PT2, PTs>(); // recurse on the rest
 }
 
 template<int PT>
@@ -260,59 +148,16 @@ SPHGrid::compute_accel()
   if (!fldatavec.size())
     return;
 
+  FluidVec &fluids = m_dynman.get_fluids();
   for ( auto &fldata : fldatavec )
-    fldata.fl.reset_accel();   
+    fluids[fldata.flidx].reset_accel();   
   // now we may assume all accelerations are zero
 
   compute_quantity<Accel,PT>();
 }
 
-template<int PT, int PT2, int... PTs>
-inline void 
-SPHGrid::compute_accel()
-{
-  compute_accel<PT>();
-  compute_accel<PT2, PTs>();
-}
-
-#if 0
-inline void SPHGrid::jacobi_pressure_solve(float dt, float factor)
-{
-  if (!m_fluids[ICS13].size())
-    return;
-  
-  for (auto &fl : m_fluids[ICS13])
-  {
-    //fl->template cast<ICS13>()->m_fluid_prepare_jacobi_proc.init( dt );
-    //fl->template cast<ICS13>()->m_fluid_jacobi_solve1_proc.init( dt );
-    //fl->template cast<ICS13>()->m_fluid_jacobi_solve2_proc.init( dt, fl->get_avg_density(), fl->get_avg_pressure() );
-    //fl->template cast<ICS13>()->reset_extern_accel();     // now may assume all accelerations are zero
-  }
-
-  //compute_fluid_quantity< CFPrepareJacobiT<ICS13>, ICS13 >();
-
-  bool proceed = false;
-  int iter = 0;
-  do
-  {
-    //compute_fluid_quantity< CFJacobiSolveFirstT<ICS13>, ICS13 >();
-    //compute_fluid_quantity< CFJacobiSolveSecondT<ICS13>, ICS13 >();
-    proceed = false;
-    for (auto &fl : m_fluids[ICS13])
-    {
-      proceed |= std::abs(fl->get_avg_density()/fl->get_num_vertices() -
-          fl->get_rest_density()) > 1;
-      qDebug() << "avg density  = " << fl->get_avg_density()/fl->get_num_vertices();
-      qDebug() << "avg pressure = " << fl->get_avg_pressure()/fl->get_num_vertices();
-      fl->get_avg_density() = 0.0f;
-      fl->get_avg_pressure() = 0.0f;
-    }
-  } while(proceed);
-
-  //compute_fluid_quantity< CFPressureAccelT<ICS13>, ICS13 >();
-
-  for (auto &fl : m_fluids[ICS13])
-    fl->get_vel() = fl->get_vel() + factor*dt*fl->get_extern_accel();
-}
-#endif
-
+// instance the quantity computation functions above for each type
+#define INSTANCE_COMPUTE_FUNC_TEMPLATE(z, PT, func) \
+  template void SPHGrid::func<PT>();
+BOOST_PP_REPEAT(NUMFLUIDTYPES, INSTANCE_COMPUTE_FUNC_TEMPLATE, compute_density)
+BOOST_PP_REPEAT(NUMFLUIDTYPES, INSTANCE_COMPUTE_FUNC_TEMPLATE, compute_accel)
