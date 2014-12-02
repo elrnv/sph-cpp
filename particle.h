@@ -66,13 +66,13 @@ struct ParticleT : public FluidParticle
   FluidDataT<PT> *fl;
 
   template<int T>
-  void init() { }
+  void init() {  std::cerr << PT << "  default init " << T << std::endl; }
   template<int T>
-  void neigh(Particle &neigh) { (void) neigh; }
+  void neigh(Particle &neigh) { (void) neigh; std::cerr << PT << " default neigh p " << T << std::endl;  }
   template<int T>
-  void neigh(FluidParticle &neigh) { (void) neigh; }
+  void neigh(FluidParticle &neigh) { (void) neigh; std::cerr << PT << " default neigh fp " << T << std::endl; }
   template<int T>
-  void finish() { }
+  void finish() { std::cerr << PT << " default finish " << T << std::endl;}
 };
 
 // particle vector (templated "typedef")
@@ -83,7 +83,6 @@ using ParticleVecT = std::vector< ParticleT<PT> >;
 template<>
 struct ParticleT<STATIC> : public Particle
 { 
-  // PRE: kernel should already be initialized
   explicit ParticleT(const Vector3T<Real> &p, Real h)
     : Particle(p), radius(h) { }
 
@@ -98,5 +97,4 @@ struct ParticleT<STATIC> : public Particle
   template<int T>
   void finish() { }
 };
-
 #endif // PARTICLE_H

@@ -134,11 +134,11 @@ PointCloud::compute_mindist()
 void
 PointCloud::prepare_vispos()
 {
-  if (m_stalepos)
-  {
-    m_vispos = m_pos.template cast<float>();
-    m_stalepos = false;
-  }
+  if (!m_stalepos)
+    return;
+
+  m_vispos = m_pos.template cast<float>();
+  m_stalepos = false;
 }
 
 // String representation

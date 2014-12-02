@@ -119,18 +119,36 @@ public:
     (void) mesh; (void) mat_idx; // meanwhile suppress warnings
   }
 
+  // Unit box boundary particles (transparent)
+  void add_default_boundary(SPHGrid &grid)
+  {
+    m_boundaries.push_back(BoundaryPC(grid));
+  }
+
   template<int PT>
   void add_fluid(const aiMesh *mesh, Index matidx, 
                  MaterialManager &matman, FluidParamsPtr fparams)
   {
     m_fluids.push_back(Fluid(mesh, matidx, matman, fparams));
-    get_fluiddatas<PT>().push_back(FluidDataT<PT>(m_fluids.size()-1, m_fluids));
   }
 
   inline void init_fluids(const AlignedBox3f &box)
   {
     for ( auto &fl : m_fluids )
       fl.init(box);
+  }
+
+  // Update fluid visualization positions
+  inline void update_fluid_vis()
+  {
+    for ( auto &fl : m_fluids )
+      fl.prepare_vispos();
+  }
+
+  // PRE: assume that fluids were already initialized (init_fluids was called)
+  inline void generate_fluiddatas()
+  {
+    generate_fluiddatas<ALL_FLUID_PARTICLE_TYPES>();
   }
 
   inline Size get_num_fluids() { return m_fluids.size(); }
@@ -329,6 +347,26 @@ private: // routine members
   template <int PT, int PT2, int... PTs>
   inline void push_fluiddatas_to_sph_grid(SPHGrid &grid, Real &color);
 
+  // helper functions for non templated generate_fluiddatas
+  template<int PT>
+  inline void generate_fluiddatas()
+  {
+    // This is one way to do it and is inefficient if there are a lot of fluids.
+    // But it's only done at initialization so who cares
+    Size num_fluids = m_fluids.size();
+    for ( Size i = 0; i < num_fluids; ++i )
+    {
+      if ( m_fluids[i].get_type() == PT )
+      {
+        get_fluiddatas<PT>().push_back(FluidDataT<PT>(i, m_fluids));
+        get_fluiddatas<PT>().back().init_kernel(m_fluids[i].get_kernel_radius());
+      }
+    }
+  }
+
+  template<int PT, int PT2, int... PTs> // recursive definition
+  inline void generate_fluiddatas();
+
 private: // data members
 #define FLUIDVEC_MEMBER(z, PT, _) \
   FluidDataVecT<PT> m_fluiddatas_##PT;
@@ -365,13 +403,21 @@ BOOST_PP_REPEAT(NUMFLUIDTYPES, FLUIDVEC_CONST_GETTER, _)
 #undef FLUIDVEC_CONST_GETTER
 
 
-// Variadic template definitions
+// Variadic template definitions, uninteresting stuff
 template <int PT, int PT2, int... PTs>
 inline void
 DynamicsManager::push_fluiddatas_to_sph_grid(SPHGrid &grid, Real &color)
 {
   push_fluiddatas_to_sph_grid<PT>(grid, color);
   push_fluiddatas_to_sph_grid<PT2, PTs...>(grid, color);
+}
+
+template<int PT, int PT2, int... PTs>
+inline void 
+DynamicsManager::generate_fluiddatas()
+{
+  generate_fluiddatas<PT>();
+  generate_fluiddatas<PT2,PTs...>();
 }
 
 #endif // DYNAMICSMANAGER_H

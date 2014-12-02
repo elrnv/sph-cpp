@@ -9,8 +9,6 @@
 #define BOOST_CHRONO_HEADER_ONLY
 #include <boost/chrono.hpp>
 
-//#define REPORT_DENSITY_VARIATION
-
 // From [Solenthaler and Pajarola 2008], an alternative density
 // (number_density * mass) is used
 /*
@@ -87,13 +85,13 @@ SPHGrid::init()
 void
 SPHGrid::update_grid()
 {
-  clear_fluid_data();
+  clear_fluid_particles();
   // populate grid with fluid particles
   m_dynman.populate_sph_grid_with_fluids(*this);
 }
 
 inline void
-SPHGrid::clear_fluid_data()
+SPHGrid::clear_fluid_particles()
 {
   for (Size i = 0; i < m_gridsize[0]; ++i)
     for (Size j = 0; j < m_gridsize[1]; ++j)

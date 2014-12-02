@@ -107,6 +107,8 @@ SimWindow::load_model(int i)
   }
 
   m_dynman.init_fluids(UnitBox);
+  m_dynman.generate_fluiddatas();
+  m_dynman.update_fluid_vis();
 
   m_udata.modelmtx.setIdentity();
   m_udata.normalmtx.block(0,0,3,3) = m_udata.modelmtx.block(0,0,3,3).inverse().transpose();
@@ -204,6 +206,10 @@ SimWindow::toggle_dynamics()
     // Create simulation grid
     m_grid = new SPHGrid(UnitBox, m_dynman);
     m_grid->init();
+
+    if (!m_dynman.get_bounds().size())
+      m_dynman.add_default_boundary(*m_grid); // always need a boundary
+
     m_dynman.glprint_fluids(m_matman);
 
     // run simulation

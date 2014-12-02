@@ -94,6 +94,7 @@ LIBS += -lconfig++          # lib to read config files
 
 # use the following to boost performance
 QMAKE_CXXFLAGS += -DBOOST_DISABLE_ASSERTS
+#QMAKE_CXXFLAGS += -DREPORT_DENSITY_VARIATION
 
 # show warnings if a function is not defined when inlined
 QMAKE_CXXFLAGS += -stdlib=libc++ -Winline -Wno-unused-parameter

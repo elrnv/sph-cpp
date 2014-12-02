@@ -5,6 +5,7 @@
 void 
 DynamicsManager::run(SPHGrid *g)
 {
+  std::cerr << " run started " << std::endl;
   if (get_num_fluids() < 1)
     return;
 
@@ -23,6 +24,7 @@ DynamicsManager::run(SPHGrid *g)
   
   if (!all_cached)
   {
+    std::cerr << "initializing " << std::endl;
     // Initialize the fluid for init_steps steps before simulating
     // temporarily disable gravity
     Vector3f grav = global::dynset.gravity;
@@ -32,6 +34,7 @@ DynamicsManager::run(SPHGrid *g)
       if (!step(dt, iter == 0, grid))
         break;
     } // for each substep
+    std::cerr << "done initializing " << std::endl;
 
     global::dynset.gravity = grav; // restore gravity
 
@@ -40,6 +43,8 @@ DynamicsManager::run(SPHGrid *g)
 
     cache(0);
   }
+
+  update_fluid_vis();
 
   real_t start_time;
   float file_read_t = 0.0f;
@@ -83,6 +88,8 @@ DynamicsManager::run(SPHGrid *g)
 
       cache(frame);
     }
+
+    update_fluid_vis();
 
     frame_t += float(clock() - s) / CLOCKS_PER_SEC;
 
@@ -157,8 +164,6 @@ DynamicsManager::step(float dt, bool first_step, SPHGrid &grid, float *substep_t
   // PTiter<DEFAULT>::update_density(*this, dt);
   //else
   grid.compute_density<ALL_FLUID_PARTICLE_TYPES>();
-
-
   grid.compute_accel<ALL_FLUID_PARTICLE_TYPES>(); // update m_accel
 
   //if (m_fluids[MCG03].size()) // extra steps to compute surface tension for MCG03
@@ -192,8 +197,7 @@ DynamicsManager::step(float dt, bool first_step, SPHGrid &grid, float *substep_t
   if (m_stop_requested) return false;
 
   // TODO: put this step after each frame instead of after each substep
-  for ( auto &fl : m_fluids )
-    fl.prepare_vispos(); // copy positions for visualization
+  update_fluid_vis();
 
   return true;
 }
@@ -231,10 +235,10 @@ DynamicsManager::populate_sph_grid(SPHGrid &grid)
 }
 
 template <int PT> // base case
-void
+inline void
 DynamicsManager::push_fluiddatas_to_sph_grid(SPHGrid &grid, Real &color)
 {
-  FluidDataVecT<PT> fldatavec = get_fluiddatas<PT>();
+  FluidDataVecT<PT> &fldatavec = get_fluiddatas<PT>();
   for ( auto &fldata : fldatavec )
   {
     Size num_vtx = m_fluids[fldata.flidx].get_num_vertices();

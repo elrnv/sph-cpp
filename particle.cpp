@@ -7,33 +7,33 @@
 
 // DEFAULT
 // Density
-template<> template<> inline void 
+template<> template<> void 
 ParticleT<DEFAULT>::init<Density>()
 { 
-  d = 0.0f; vol = 0.0f;
+  d = 0.0; vol = 0.0;
 }
 
-template<> template<> inline void 
+template<> template<> void 
 ParticleT<DEFAULT>::neigh<Density>(FluidParticle &neigh)
 {
   d += fl->m_mass * fl->m_kern[ pos - neigh.pos ];
   vol += fl->m_kern[ pos - neigh.pos ];
 }
-//template<> template<> inline void 
+//template<> template<> void 
 //ParticleT<DEFAULT>::neigh(Particle &neigh)
 //{
 //  // neigh.dinv is inverse number density (aka volume) of the boundary paticle
 //  //dinv += fl->m_rest_density * neigh.dinv * fl->m_kern[ pos - neigh.pos ];
 //  //vol += fl->m_kern[ pos - neigh.pos ];
 //}
-template<> template<> inline void 
+template<> template<> void 
 ParticleT<DEFAULT>::finish<Density>()
 {
   d = d * fl->m_kern.coef;
-  *_dinv = dinv = 1.0f/d;
-  vol = 1.0f / (vol * fl->m_kern.coef);
+  *_dinv = dinv = 1.0/d;
+  vol = 1.0 / (vol * fl->m_kern.coef);
 
-  pressure = 0.0f;
+  pressure = 0.0;
 
   //Real var = std::abs(d - fl->m_rest_density);
   //if ( var > *max_var )
@@ -43,44 +43,44 @@ ParticleT<DEFAULT>::finish<Density>()
 
 // MCG03
 // Density
-template<> template<> inline void 
+template<> template<> void 
 ParticleT<MCG03>::init<Density>()
 {
-  dinv = 0.0f;
+  dinv = 0.0;
 }
 
-template<> template<> inline void 
+template<> template<> void 
 ParticleT<MCG03>::neigh<Density>(FluidParticle &neigh)
 {
   dinv += fl->m_kern[ pos - neigh.pos ];
 }
-//template<> template<> inline void 
+//template<> template<> void 
 //ParticleT<MCG03>::neigh<Density>(Particle &neigh) { }
-template<> template<> inline void 
+template<> template<> void 
 ParticleT<MCG03>::finish<Density>()
 {
-  *_dinv = dinv = 1.0f / (fl->m_mass * dinv * fl->m_kern.coef);
+  *_dinv = dinv = 1.0 / (fl->m_mass * dinv * fl->m_kern.coef);
   vol = dinv * fl->m_mass;
 
-  pressure = std::max(Real(0), fl->m_cs2 * (1.0f/dinv - fl->m_rest_density));
+  pressure = std::max(Real(0), fl->m_cs2 * (1.0/dinv - fl->m_rest_density));
 
   // TODO: implement this
-  //Real var = std::abs(1.0f/dinv - fl->m_rest_density);
+  //Real var = std::abs(1.0/dinv - fl->m_rest_density);
   //if ( var > *max_var )
   //  *max_var = var;
   //*avg_var += var;
 }
 
 // Accel
-template<> template<> inline void 
+template<> template<> void 
 ParticleT<MCG03>::init<Accel>()
 { 
-  c = vol * Real(color) * fl->m_color_kern(Vector3T<Real>(0.0f,0.0f,0.0f));
-  n[0] = n[1] = n[2] = 0.0f;
-  m[0] = vol * fl->m_color_kern(Vector3T<Real>(0.0f,0.0f,0.0f));
+  c = vol * Real(color) * fl->m_color_kern(Vector3T<Real>(0.0,0.0,0.0));
+  n[0] = n[1] = n[2] = 0.0;
+  m[0] = vol * fl->m_color_kern(Vector3T<Real>(0.0,0.0,0.0));
 }
 
-template<> template<> inline void 
+template<> template<> void 
 ParticleT<MCG03>::neigh<Accel>(FluidParticle &neigh)
 {
   if (this == &neigh)
@@ -110,9 +110,9 @@ ParticleT<MCG03>::neigh<Accel>(FluidParticle &neigh)
   m[0] += neigh.vol * fl->m_color_kern(x_ab); // denom for smoothed color
 }
 
-//template<> template<> inline void 
+//template<> template<> void 
 //ParticleT<MCG03>::neigh<Accel>(Particle &neigh) { }
-template<> template<> inline void
+template<> template<> void
 ParticleT<MCG03>::finish<Accel>()
 {
   //qDebug() << "c = " << c;
@@ -133,20 +133,22 @@ ParticleT<MCG03>::finish<Accel>()
 // BT07
 #define BT07_BOUNDARY_PARTICLES
 // Density
-template<> template<> inline void
+template<> template<> void
 ParticleT<BT07>::init<Density>()
 { 
-  dinv = 0.0f;
-  vol = 0.0f;
+  dinv = 0.0;
+  vol = 0.0;
 }
-template<> template<> inline void
+template<> template<> void
 ParticleT<BT07>::neigh<Density>(FluidParticle &neigh)
 {
   dinv += fl->m_mass * fl->m_kern[ pos - neigh.pos ];
+  //std::cerr << "dist = " << (pos - neigh.pos).transpose() << std::endl;
+  //std::cerr << "kern = " << fl->m_kern[ pos - neigh.pos ] << std::endl;
   vol += fl->m_kern[ pos - neigh.pos ];
 }
 
-template<> template<> inline void
+template<> template<> void
 ParticleT<BT07>::neigh<Density>(Particle &neigh) 
 {
   // neigh.dinv is inverse number density (aka volume) of the boundary paticle
@@ -155,31 +157,34 @@ ParticleT<BT07>::neigh<Density>(Particle &neigh)
   vol += fl->m_kern[ pos - neigh.pos ];
 #endif
 }
-template<> template<> inline void
+template<> template<> void
 ParticleT<BT07>::finish<Density>()
 {
-  *_dinv = dinv = 1.0f / (dinv * fl->m_kern.coef);
-  vol = 1.0f / (vol * fl->m_kern.coef);
+  *_dinv = dinv = 1.0 / (dinv * fl->m_kern.coef);
+  vol = 1.0 / (vol * fl->m_kern.coef);
+  //std::cerr << "dinv = " << dinv << std::endl;
 
   pressure = std::max(Real(0),
     fl->m_rest_density * fl->m_cs2 * 0.14285714285714 * 
-    (pow7(1.0f / (dinv * fl->m_rest_density)) - 1.0f));
+    (pow7(1.0 / (dinv * fl->m_rest_density)) - 1.0));
 
-  //Real var = std::abs(1.0f/dinv - fl->m_rest_density);
-  //if ( var > *max_var )
-  //  *max_var = var;
-  //*avg_var += var;
+#ifdef REPORT_DENSITY_VARIATION
+  Real var = std::abs(1.0/dinv - fl->m_rest_density);
+  if ( var > *fl->m_max_var )
+    *fl->m_max_var = var;
+  *fl->m_avg_var += var;
+#endif
 }
 
 // Accel
-template<> template<> inline void
+template<> template<> void
 ParticleT<BT07>::init<Accel>()
 {
-  n[0] = n[1] = n[2] = 0.0f;
-  m[0] = m[1] = m[2] = 0.0f;
+  n[0] = n[1] = n[2] = 0.0;
+  m[0] = m[1] = m[2] = 0.0;
 }
 
-template<> template<> inline void
+template<> template<> void
 ParticleT<BT07>::neigh<Accel>(FluidParticle &neigh)
 {
   if (this == &neigh)
@@ -207,7 +212,7 @@ ParticleT<BT07>::neigh<Accel>(FluidParticle &neigh)
   if (color == neigh.color)
     n = n - (neigh.vol/(neigh.dinv*fl->m_mass))*fl->m_st * fl->m_kern(x_ab) * x_ab;
 }
-template<> template<> inline void
+template<> template<> void
 ParticleT<BT07>::neigh<Accel>(Particle &neigh)
 {
   // BT07 fluids dont interact with static boundary particles, instead they
@@ -234,7 +239,7 @@ ParticleT<BT07>::neigh<Accel>(Particle &neigh)
 #endif
 }
 
-template<> template<> inline void
+template<> template<> void
 ParticleT<BT07>::finish<Accel>()
 {
   // if the particle is close to the boundary and add a repulsive force
@@ -243,7 +248,7 @@ ParticleT<BT07>::finish<Accel>()
   // masses of the fluid and boundary particles respectively
 #ifndef BT07_BOUNDARY_PARTICLES
   Vector3T<Real> hvec(fl->m_bound_kern.h,fl->m_bound_kern.h,fl->m_bound_kern.h);
-  Vector3T<Real> res(0.0f, 0.0f, 0.0f);
+  Vector3T<Real> res(0.0, 0.0, 0.0);
   Vector3T<Real> dmin =  // distances to min boundaries
     0.5*hvec + pos - fl->m_bmin.template cast<Real>();
   Vector3T<Real> dmax =  // distances to max boundaries
@@ -280,20 +285,20 @@ ParticleT<BT07>::finish<Accel>()
 
 // Boundary
 
-template<> inline void
+template<> void
 ParticleT<STATIC>::init<Volume>() 
 { 
-  dinv = 0.0f; 
+  dinv = 0.0; 
 }
-//template<> template<> inline void 
+//template<> template<> void 
 //ParticleT<STATIC>::neigh<Volume>(FluidParticle &near_p) { }
-template<> inline void
+template<> void
 ParticleT<STATIC>::neigh<Volume>(Particle &neigh)
 {
   dinv += CubicSplineKernel::compute( pos - neigh.pos, radius );
 }
-template<> inline void
+template<> void
 ParticleT<STATIC>::finish<Volume>()
 {
-  dinv = 1.0f / dinv;
+  dinv = 1.0 / dinv;
 }

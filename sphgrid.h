@@ -72,7 +72,7 @@ public:
   
   void init();
   void update_grid();
-  void clear_fluid_data();
+  void clear_fluid_particles();
 
   inline Index clamp(Index d, Index min, Index max)
   {
@@ -89,34 +89,10 @@ public:
 
   inline Cell &get_cell_at(const Array3Index &idx) { return m_grid(idx); }
 
-  /*
-  template <typename ProcessPairFunc>
-  typename std::enable_if< std::is_same< ProcessPairFunc, CBVolume >::value,
-           CBVolume >::type &get_proc()
-           {
-             return *m_bound_volume_proc;
-           }
-
-  template <typename ProcessPairFunc, typename ParticleType>
-  typename std::enable_if< std::is_same< ParticleType, Particle >::value,
-           ProcessPairFunc & >::type determine_proc(const ParticleType &p)
-           {
-             Q_UNUSED(p); return get_proc<ProcessPairFunc>();
-           }
-*/
-
   inline float get_cell_size() { return m_h; }
   inline Array3Index get_grid_size() { return m_gridsize; }
   inline const Vector3f &get_bmin() const { return m_bmin; }
   inline const Vector3f &get_bmax() const { return m_bmax; }
-
-//  template <typename ProcessPairFunc, typename ParticleType>
-//  typename std::enable_if< std::is_base_of< FluidParticle, ParticleType >::value,
-//           ProcessPairFunc & >::type determine_proc(const FluidParticle &p)
-//           {
-//             return get_fluid<extract_fluid_type<ParticleType>::type>(p.id)
-//               ->template get_proc<ProcessPairFunc>();
-//           }
 
   // Low level quantity processing functions
   template<int F, int... PTs>

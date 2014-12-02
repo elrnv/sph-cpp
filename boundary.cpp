@@ -38,47 +38,50 @@ BoundaryPC::generate_grid_box_pc(SPHGrid &grid, int particles_per_cell_length)
   float incz = (bmax[2] - bmin[2] + 2*pad)/nz;
 
   Size i,j,k; // indices
-  Matrix3XT<Real> pos; // result
+  Size num_cols = 2*nx*ny + 2*nx*nz + 2*ny*nz + 2;
+  Matrix3XT<Real> pos(3, num_cols); // result
   
-  auto f = [&](Size i, Size j, Size k)
+  auto assign_col = [&](Size col, Size i, Size j, Size k)
   {
-    pos << Vector3T<Real>(bmin[0] - pad + i*incx, 
-                          bmin[1] - pad + j*incy,
-                          bmin[2] - pad + k*incz);
+    pos.col(col) = 
+      Vector3T<Real>(bmin[0] - pad + i*incx, 
+                     bmin[1] - pad + j*incy,
+                     bmin[2] - pad + k*incz);
     //fprintf(stderr, "v %f %f %f\n", pos[0], pos[1], pos[2]);
   };
 
+  Size col = 0;
   k = 0;
   for (i = 0; i < nx; ++i)
     for (j = 0; j < ny; ++j)
-      f(i,j,k);
+      assign_col(col++,i,j,k);
+
   k = nz;
   for (i = nx; i > 0; --i)
     for (j = ny; j > 0; --j)
-      f(i,j,k);
+      assign_col(col++,i,j,k);
 
   j = 0;
   for (i = nx; i > 0; --i)
     for (k = nz; k > 0; --k)
-      f(i,j,k);
+      assign_col(col++,i,j,k);
   j = ny;
   for (i = 0; i < nx; ++i)
     for (k = 0; k < nz; ++k)
-      f(i,j,k);
+      assign_col(col++,i,j,k);
 
   i = 0;
   for (j = 0; j < ny; ++j)
     for (k = nz; k > 0; --k)
-      f(i,j,k);
+      assign_col(col++,i,j,k);
   i = nx;
   for (j = ny; j > 0; --j)
     for (k = 0; k < nz; ++k)
-      f(i,j,k);
+      assign_col(col++,i,j,k);
 
   // two points not filled
-  f(0, ny, nz);
-  f(nx, 0, 0);
-
+  assign_col(col++, 0, ny, nz);
+  assign_col(col++, nx, 0, 0);
   return pos;
 }
 
