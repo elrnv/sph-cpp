@@ -163,8 +163,9 @@ DynamicsManager::step(float dt, bool first_step, SPHGrid &grid, float *substep_t
   //if (iter)
   // PTiter<DEFAULT>::update_density(*this, dt);
   //else
-  grid.compute_density<ALL_FLUID_PARTICLE_TYPES>();
-  grid.compute_accel<ALL_FLUID_PARTICLE_TYPES>(); // update m_accel
+  grid.compute_quantity<Density, ALL_FLUID_PARTICLE_TYPES>();
+  grid.reset_accel<ALL_FLUID_PARTICLE_TYPES>();
+  grid.compute_quantity<Accel,ALL_FLUID_PARTICLE_TYPES>(); // update m_accel
 
   //if (m_fluids[MCG03].size()) // extra steps to compute surface tension for MCG03
   //{

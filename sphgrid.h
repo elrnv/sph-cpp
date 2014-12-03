@@ -9,9 +9,7 @@
 #include "boundary.h"
 #include "fluiddata.h"
 #include "particle.h"
-
-// forward declaration
-class DynamicsManager;
+#include "dynamicsmanager.h"
 
 // Grid structure used to optimize computing particle properties using kernels
 class SPHGrid
@@ -98,15 +96,27 @@ public:
   template<int F, int... PTs>
   void compute_quantity();
 
-  template<int PT> // base case
-  void compute_accel();
-  template<int PT, int PT2, int... PTs>
-  void compute_accel();
+  template<int PT>
+  inline void reset_accel()
+  {
+    FluidDataVecT<PT> &fldatavec = m_dynman.get_fluiddatas<PT>();
+    FluidVec &fluids = m_dynman.get_fluids();
+    for ( auto &fldata : fldatavec )
+      fluids[fldata.flidx].reset_accel();   
+  }
 
-  template<int PT> // base case
-  void compute_density();
   template<int PT, int PT2, int... PTs>
-  void compute_density();
+  inline void reset_accel()
+  {
+    reset_accel<PT>();
+    reset_accel<PT2,PTs...>();
+  }
+
+  //template<int PT, int PT2, int... PTs>
+  //void compute_accel();
+
+  //template<int PT, int PT2, int... PTs>
+  //void compute_density();
 
   //void jacobi_pressure_solve(float dt,float factor);
 
@@ -209,36 +219,36 @@ SPHGrid::compute_quantity_in_cell( Size i, Size j, Size k,
                                    Size nx, Size ny, Size nz )
 {
   auto &pvec = m_grid[i][j][k].template get_pvec<PT>();
-  if (pvec.empty())
-    return;
-
-  IndexRange xrange = range3(i,nx);
-  IndexRange yrange = range3(j,ny);
-  IndexRange zrange = range3(k,nz);
-  // TODO: why do we need the GridView? just iterate directly in the grid
-  GridView neigh_view = m_grid[ boost::indices[xrange][yrange][zrange] ];
-
-  for ( auto &p : pvec )  // prepare data
-    p.template init<F>();
-
-  Size xrange_size = xrange.finish() - xrange.start();
-  Size yrange_size = yrange.finish() - yrange.start();
-  Size zrange_size = zrange.finish() - zrange.start();
-  for (Size near_i = 0; near_i < xrange_size; ++near_i)
+  if (!pvec.empty())
   {
-    for (Size near_j = 0; near_j < yrange_size; ++near_j)
+    IndexRange xrange = range3(i,nx);
+    IndexRange yrange = range3(j,ny);
+    IndexRange zrange = range3(k,nz);
+    // TODO: why do we need the GridView? just iterate directly in the grid
+    GridView neigh_view = m_grid[ boost::indices[xrange][yrange][zrange] ];
+
+    for ( auto &p : pvec )  // prepare data
+      p.template init<F>();
+
+    Size xrange_size = xrange.finish() - xrange.start();
+    Size yrange_size = yrange.finish() - yrange.start();
+    Size zrange_size = zrange.finish() - zrange.start();
+    for (Size near_i = 0; near_i < xrange_size; ++near_i)
     {
-      for (Size near_k = 0; near_k < zrange_size; ++near_k)
+      for (Size near_j = 0; near_j < yrange_size; ++near_j)
       {
-        Cell &cell = neigh_view[near_i][near_j][near_k];
-        for ( auto &p : pvec )
-          interact_with_neigh_cell<F,decltype(p),ALL_PARTICLE_TYPES>(p,cell);
+        for (Size near_k = 0; near_k < zrange_size; ++near_k)
+        {
+          Cell &cell = neigh_view[near_i][near_j][near_k];
+          for ( auto &p : pvec )
+            interact_with_neigh_cell<F,decltype(p),ALL_PARTICLE_TYPES>(p,cell);
+        }
       }
     }
-  }
 
-  for ( auto &p : pvec )  // finalize data
-    p.template finish<F>();
+    for ( auto &p : pvec )  // finalize data
+      p.template finish<F>();
+  }
 
   compute_quantity_in_cell<F,PTs...>(i,j,k,nx,ny,nz);
 }
@@ -280,6 +290,7 @@ inline void FTiter<FT>::update_density(SPHGrid &g,float timestep)
 }
 #endif
 
+#if 0
 template<int PT, int PT2, int... PTs>
 inline void
 SPHGrid::compute_density()
@@ -295,6 +306,7 @@ SPHGrid::compute_accel()
   compute_accel<PT>();
   compute_accel<PT2, PTs...>();
 }
+#endif
 
 #if 0
 inline void SPHGrid::jacobi_pressure_solve(float dt, float factor)
