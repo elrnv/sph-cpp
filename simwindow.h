@@ -51,7 +51,7 @@ protected:
 
 private:
   bool m_show_shortcuts;
-  bool m_dynamics;
+  std::atomic<bool> m_dynamics;
   bool m_show_bbox;
 
   UniformBuffer m_ubo;

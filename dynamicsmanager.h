@@ -138,13 +138,6 @@ public:
       fl.init(box);
   }
 
-  // Update fluid visualization positions
-  inline void update_fluid_vis()
-  {
-    for ( auto &fl : m_fluids )
-      fl.prepare_vispos();
-  }
-
   // PRE: assume that fluids were already initialized (init_fluids was called)
   inline void generate_fluiddatas()
   {
@@ -272,6 +265,7 @@ public:
 
   // request stop which will be checked by the owner thread
   void request_stop() { m_stop_requested = true; }
+  void unrequest_stop() { m_stop_requested = false; }
   void toggle_pause() 
   { 
     std::unique_lock<std::mutex> locker(m_pause_lock);

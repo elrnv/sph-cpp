@@ -28,6 +28,7 @@ public:
       SPHGrid &grid, int particles_per_cell_length);
 
   // interface for point cloud
+  inline PointCloud &get_pc() { return m_pc; }
   void transform_in_place(const Affine3f &trans)
   {
     m_pc.transform_in_place(trans);

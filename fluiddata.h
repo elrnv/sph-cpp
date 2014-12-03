@@ -13,7 +13,6 @@ struct FluidData
   { 
     Fluid &fl = fluids[flidx];
     m_mass = fl.get_mass();
-    std::cerr << " mass = " << m_mass << std::endl;
     m_rest_density = fl.get_rest_density();
     m_viscosity = fl.get_viscosity();
     m_st = fl.get_surface_tension();

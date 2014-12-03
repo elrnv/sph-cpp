@@ -101,14 +101,12 @@ struct RigidParams : public DynParams
   float density;
   float friction;
   float kernel_inflation;
-  float recoil_velocity_damping;
 
   RigidParams() // Default values:
    : is_dynamic(false)
    , density(1000.0f)
    , friction(0.5f)
    , kernel_inflation(3.0f)
-   , recoil_velocity_damping(0.4f)
   {
     this->type = RIGID;
   }
@@ -121,7 +119,6 @@ struct RigidParams : public DynParams
     boost::hash_combine(seed, rp.is_dynamic);
     boost::hash_combine(seed, rp.density);
     boost::hash_combine(seed, rp.kernel_inflation);
-    boost::hash_combine(seed, rp.recoil_velocity_damping);
     boost::hash_combine(seed, hash_value(static_cast<const DynParams &>(rp)));
     return seed;
   }

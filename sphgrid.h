@@ -180,7 +180,7 @@ BOOST_PP_REPEAT(NUMTYPES, PARTICLE_VEC_CONST_GETTER, _)
 inline void 
 SPHGrid::Cell::push_particle(BoundaryPC &bnd, Size vtxidx)
 {
-  Vector3T<Real> pos(bnd.get_pos().col(vtxidx));
+  const Vector3T<Real> &pos = bnd.get_pos().col(vtxidx);
   get_pvec<STATIC>().push_back(ParticleT<STATIC>(pos,
         bnd.get_kernel_radius()));
 }

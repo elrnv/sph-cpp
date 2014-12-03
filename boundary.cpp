@@ -3,6 +3,7 @@
 #include <limits>
 #include <fstream>
 #include <sstream>
+#include "dynparams.h"
 #include "sphgrid.h"
 #include "boundary.h"
 
@@ -15,7 +16,7 @@ BoundaryPC::BoundaryPC(const aiMesh *pc, Index matidx, RigidParamsPtr params)
 // A default transparent boundary resembing a box covering the given sph grid
 BoundaryPC::BoundaryPC(SPHGrid &grid, int particles_per_cell_length)
   : m_pc(generate_grid_box_pc(grid, particles_per_cell_length))
-  , m_params(NULL)
+  , m_params(RigidParamsPtr(new RigidParams()))
   , m_kernel_radius(grid.get_cell_size())
 { }
 

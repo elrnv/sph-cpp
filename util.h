@@ -171,8 +171,6 @@ loadDynamics( const std::string &filename )
           iss >> rparams.friction;
         else if (boost::iequals(var_name, "ki"))
           iss >> rparams.kernel_inflation;
-        else if (boost::iequals(var_name, "rvd"))
-          iss >> rparams.recoil_velocity_damping;
       }
     }
   }
@@ -379,6 +377,11 @@ void loadGLData(
   FluidVec &flvec = dynman.get_fluids();
   for ( auto &fl : flvec )
     gl_prims.push_back(GLPrimitivePtr(new GLPointCloud(fl.get_pc(), /*is dynamic*/true,
+          matman, ubo, shaderman)));
+
+  BoundaryPCVec &bdryvec = dynman.get_bounds();
+  for ( auto &bdry : bdryvec )
+    gl_prims.push_back(GLPrimitivePtr(new GLPointCloud(bdry.get_pc(), /*is dynamic*/false,
           matman, ubo, shaderman)));
 }
 

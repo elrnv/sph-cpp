@@ -3,13 +3,13 @@
 // Material
 
 // define the default material
-Material::Material()
+Material::Material(float opacity)
  : m_ka(0.0f,0.0f,0.0f)
  , m_kd(0.6f,0.6f,0.6f)
  , m_ks(0.2f,0.2f,0.0f)
  , m_shininess(25.0f)
  , m_reflectivity(0.0f)
- , m_opacity(0.3f)
+ , m_opacity(opacity)
 {}
 
 // define the copy constructor

@@ -47,6 +47,7 @@ SimWindow::clear_dynamics()
   m_dynman.request_stop(); // stop thread
   if (m_sim_thread.joinable())
     m_sim_thread.join();
+  m_dynman.unrequest_stop();
   delete m_grid; m_grid = NULL;
 }
 
@@ -108,7 +109,10 @@ SimWindow::load_model(int i)
 
   m_dynman.init_fluids(UnitBox);
   m_dynman.generate_fluiddatas();
-  m_dynman.update_fluid_vis();
+  m_dynman.prepare_vis_data();
+
+  glclear_tr(); // clear dynamics text buffer
+  m_dynman.glprint_fluids(m_matman);
 
   m_udata.modelmtx.setIdentity();
   m_udata.normalmtx.block(0,0,3,3) = m_udata.modelmtx.block(0,0,3,3).inverse().transpose();
@@ -201,8 +205,6 @@ SimWindow::toggle_dynamics()
 
   if (m_dynamics)
   {
-    glclear_tr(); // clear dynamics text buffer
-
     // Create simulation grid
     m_grid = new SPHGrid(UnitBox, m_dynman);
     m_grid->init();
@@ -210,11 +212,8 @@ SimWindow::toggle_dynamics()
     if (!m_dynman.get_bounds().size())
       m_dynman.add_default_boundary(*m_grid); // always need a boundary
 
-    m_dynman.glprint_fluids(m_matman);
-
     // run simulation
     m_sim_thread = std::thread(&DynamicsManager::run, &m_dynman, m_grid);
-
   }
   set_animating(m_dynamics);
 }
@@ -346,10 +345,7 @@ SimWindow::toggle_shortcuts()
   glprintf_blc(BLUE,  "    Q - particles\n");
   glprintf_blc(BLUE,  "    A - additive particles\n");
   glprintf_bl("  Scenes: \n");
-  glprintf_blc(BLUE,  "    5 - MCG03 Surface Tension test\n");
-  glprintf_blc(BLUE,  "    6 - MCG03 No Surface Tension test\n");
-  glprintf_blc(BLUE,  "    7 - BT07 Surface Tension test\n");
-  glprintf_blc(BLUE,  "    8 - BT07 No Surface Tension test\n");
+  glprintf_blc(BLUE,  "  0-9 - Custom scene configurations\n");
   glprintf_bl("  Dynamics: \n");
   glprintf_blc(RED,  "    D - start/stop\n");
   glprintf_blc(RED,  "    G - pause/resume\n");

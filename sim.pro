@@ -99,6 +99,6 @@ QMAKE_CXXFLAGS += -DBOOST_DISABLE_ASSERTS
 # show warnings if a function is not defined when inlined
 QMAKE_CXXFLAGS += -stdlib=libc++ -Winline -Wno-unused-parameter
 QMAKE_CXXFLAGS_RELEASE -= -O2
-QMAKE_CXXFLAGS_RELEASE += -O3
+QMAKE_CXXFLAGS_RELEASE += -O3 -DNDEBUG
 
 RESOURCES += resources.qrc
