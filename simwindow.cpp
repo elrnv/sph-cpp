@@ -338,7 +338,7 @@ SimWindow::toggle_shortcuts()
   glprintf_blc(BLUE,  "  0-9 - Custom scene configurations\n");
   glprintf_bl("  Dynamics: \n");
   glprintf_blc(RED,  "    D - start/stop\n");
-  glprintf_blc(RED,  "    G - pause/resume\n");
+  glprintf_blc(RED,  "    P - pause/resume\n");
   glprintf_blc(RED,  "    C - clear cache\n");
   glprintf_blc(CYAN, "    H - show/hide halos\n");
   glprintf_blc(CYAN, "    B - show/hide bounding box\n");
@@ -357,7 +357,7 @@ SimWindow::keyPressEvent(QKeyEvent *event)
     case Qt::Key_D:
       toggle_dynamics();
       break;
-    case Qt::Key_G:
+    case Qt::Key_P:
       toggle_simulation();
       break;
     case Qt::Key_H:
