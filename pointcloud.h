@@ -24,7 +24,6 @@ public:
   virtual ~PointCloud();
 
   inline Real get_radius() { return 0.5*compute_mindist(); }
-  virtual Real get_halo_radius() { return get_radius(); }
   inline Size get_num_vertices() const { return m_pos.cols(); }
   inline Real *pos_at(Size i)    { return m_pos.data() + i*3; }
 
@@ -40,7 +39,16 @@ public:
   Real compute_mindist_brute();
 
   // manage position visualization data
-  void prepare_vispos();
+  // Called from the dynamics thread
+  inline void prepare_vispos()
+  {
+    if (!m_stalepos)
+      return;
+
+    m_vispos = m_pos.template cast<float>();
+    m_stalepos = false;
+  }
+
   inline const Matrix3Xf &get_vispos() const { return m_vispos; }
   inline bool is_stalepos() { return m_stalepos; }
   inline void set_stalepos(bool sp) { m_stalepos = sp; }

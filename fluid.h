@@ -80,7 +80,6 @@ public:
   }
 
   inline Size get_num_vertices() const { return m_pc.get_num_vertices(); }
-  inline Real get_halo_radius()   { return get_kernel_radius(); }
 
   inline Real get_mass() const            { return m_mass; }
   inline Real get_rest_density() const    { return m_rest_density; }
@@ -90,7 +89,7 @@ public:
   inline Real get_sound_speed2() const    { return m_c2; }
   inline Real get_compressibility() const { return m_params->compressibility; }
   inline Real get_friction() const        { return m_params->friction; }
-  inline ParticleType get_type() const    { return m_params->fluid_type; }
+  inline SPHParticleType get_type() const { return m_params->fluid_type; }
 
   friend std::size_t hash_value( const Fluid &fl ) 
   { 

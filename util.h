@@ -307,6 +307,8 @@ loadScene( const std::string &filename,
       try
       {
         std::string geofile = objset[i]["geofile"];
+        
+        // try to find a dynamics file
         DynParamsPtr params_ptr(nullptr);
         try
         {
@@ -326,9 +328,7 @@ loadScene( const std::string &filename,
           qWarning() << "Setting " << te.getPath() << "has the wrong type!";
         }
         catch (libconfig::SettingNotFoundException &nfe)
-        {
-          qWarning() << "Setting " << nfe.getPath() << "not found!";
-        }
+        { /* no dynamics, this is simply a geometry file */ }
 
         something_loaded |=
           loadObjects(geodir+"/"+geofile, params_ptr, matman, geoman, dynman);
@@ -377,12 +377,16 @@ void loadGLData(
   FluidVec &flvec = dynman.get_fluids();
   for ( auto &fl : flvec )
     gl_prims.push_back(GLPrimitivePtr(new GLPointCloud(fl.get_pc(), /*is dynamic*/true,
-          matman, ubo, shaderman)));
+          matman, ubo, shaderman, fl.get_kernel_radius())));
 
   BoundaryPCVec &bdryvec = dynman.get_boundaries();
   for ( auto &bdry : bdryvec )
+  {
+    if (bdry.get_material_idx() == matman.get_transparent_material_idx())
+      continue;
     gl_prims.push_back(GLPrimitivePtr(new GLPointCloud(bdry.get_pc(), /*is dynamic*/false,
           matman, ubo, shaderman)));
+  }
 }
 
 };

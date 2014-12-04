@@ -8,13 +8,11 @@
 #include "sphgrid.h"
 #include "types.h"
 
-#define STRINGIZE_VALUE(x) #x
-#define STRINGIZE(x) STRINGIZE_VALUE(x)
-
 SimWindow::SimWindow()
   : m_show_shortcuts(true) // immediately toggled below
   , m_dynamics(false)
   , m_show_bbox(true)
+  , m_show_halos(false)
   , m_viewmode(ViewMode::ADDITIVE_PARTICLE)
   , m_change_prog(true)
   , m_shaderman(this)
@@ -72,7 +70,7 @@ SimWindow::load_model(int i)
   m_dynman.clear();
   m_geoman.clear();
   std::string cfg_filename = 
-    std::string(STRINGIZE(CONFIGDIR)) + "/scene" + std::to_string(i) + ".cfg";
+    std::string(BOOST_PP_STRINGIZE(CONFIGDIR)) + "/scene" + std::to_string(i) + ".cfg";
   bool loaded = Util::loadScene(cfg_filename, m_matman, m_geoman, m_dynman);
 
   if (!loaded) // nothing loaded, nothing to do
@@ -181,14 +179,8 @@ SimWindow::toggle_bbox()
 void 
 SimWindow::toggle_halos()
 {
-  for ( auto glprim : m_glprims )
-  {
-    if (!glprim->is_pointcloud())
-      continue;
-
-    GLPointCloudPtr glpc = boost::static_pointer_cast<GLPointCloud>(glprim);
-    glpc->toggle_halos();
-  }
+  m_show_halos = !m_show_halos;
+  renderLater();
 }
 
 void 
@@ -298,11 +290,9 @@ SimWindow::render()
       if (glprim->is_pointcloud())
       {
         GLPointCloudPtr glpc = boost::static_pointer_cast<GLPointCloud>(glprim);
-        glprim->get_program()->setUniformValue( "pt_radius", GLfloat(glpc->get_radius()));
-        if (!glpc->is_halos())
-          glprim->get_program()->setUniformValue( "pt_halo", GLfloat(glpc->get_radius()));
-        else
-          glprim->get_program()->setUniformValue("pt_halo", GLfloat(glpc->get_halo_radius()));
+        glprim->get_program()->setUniformValue("pt_radius", GLfloat(glpc->get_radius()));
+        glprim->get_program()->setUniformValue("pt_halo", 
+            GLfloat(m_show_halos ? glpc->get_halo_radius() : glpc->get_radius()));
       }
       else
       {

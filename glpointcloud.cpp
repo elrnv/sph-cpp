@@ -14,12 +14,12 @@ GLPointCloud::GLPointCloud(
     bool dynamic,
     MaterialManager &matman,
     UniformBuffer &ubo,
-    ShaderManager &shaderman)
+    ShaderManager &shaderman,
+    float halo_radius)
   : GLPrimitive(matman[pc.get_material_idx()], ubo)
   , m_pc(pc)
   , m_radius(pc.get_radius())
-  , m_halo_radius(pc.get_halo_radius())
-  , m_halos(false)
+  , m_halo_radius(halo_radius)
   , m_isdynamic(dynamic)
 {
   this->m_vao.create();

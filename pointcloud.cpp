@@ -129,18 +129,6 @@ PointCloud::compute_mindist()
 }
 
 
-// Visualization stuff
-// Called from the dynamics thread
-void
-PointCloud::prepare_vispos()
-{
-  if (!m_stalepos)
-    return;
-
-  m_vispos = m_pos.template cast<float>();
-  m_stalepos = false;
-}
-
 // String representation
 std::ostream&
 operator<<(std::ostream& out, const PointCloud& pc)

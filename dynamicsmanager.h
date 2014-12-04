@@ -30,7 +30,7 @@ typedef real_clock::time_point real_t;
     break;
 
 #define FLUID_TYPE_CASE_FUNC_CALL(func, params) \
-  BOOST_PP_REPEAT(NUMFLUIDTYPES, FLUID_TYPE_CASE_FUNC_TEMPLATE, (func, params))
+  BOOST_PP_REPEAT(NUMFLUIDSPHTYPES, FLUID_TYPE_CASE_FUNC_TEMPLATE, (func, params))
 
 class DynamicsManager
 {
@@ -147,7 +147,7 @@ public:
   // PRE: assume that fluids were already initialized (init_fluids was called)
   inline void generate_fluiddatas()
   {
-    generate_fluiddatas<ALL_FLUID_PARTICLE_TYPES>();
+    generate_fluiddatas<ALL_FLUID_SPH_TYPES>();
   }
 
   inline Size get_num_fluids() { return m_fluids.size(); }
@@ -169,7 +169,7 @@ public:
     clear_rigid_sph_particles();
     m_fluids.clear();
     m_boundaries.clear();
-    clear_fluiddatas<ALL_FLUID_PARTICLE_TYPES>();
+    clear_fluiddatas<ALL_FLUID_SPH_TYPES>();
   }
 
   template <int PT>
@@ -332,14 +332,8 @@ public:
     {
       const Vector3f &color = matman[fl.get_material_idx()].kd();
       glprintf_trcv(color, " Fluid ---");
-      ParticleType pt = fl.get_type();
-      switch (pt)
-      {
-        case 1: glprintf_trcv(color, "MCG03"); break;
-        case 2: glprintf_trcv(color, "BT07"); break;
-        case 3: glprintf_trcv(color, "ICS13"); break;
-        default: break;
-      }
+      SPHParticleType pt = fl.get_type();
+      glprintf_trcv(color, SPHParticleTypeString[pt]);
       glprintf_trcv(color, "--- \n");
       glprintf_trcv(color, "# of particles: %d  \n", fl.get_num_vertices());
       glprintf_trcv(color, "rest density: %.2f  \n", fl.get_rest_density());
@@ -400,7 +394,7 @@ private: // data members
 #define FLUIDVEC_MEMBER(z, PT, _) \
   FluidDataVecT<PT> m_fluiddatas_##PT;
 
-  BOOST_PP_REPEAT(NUMFLUIDTYPES, FLUIDVEC_MEMBER, _)
+  BOOST_PP_REPEAT(NUMFLUIDSPHTYPES, FLUIDVEC_MEMBER, _)
 
   BoundaryPCVec m_boundaries;
 
@@ -427,8 +421,8 @@ private: // data members
   inline const FluidDataVecT<PT> &DynamicsManager::get_fluiddatas<PT>() const \
   { return m_fluiddatas_##PT; }
 
-BOOST_PP_REPEAT(NUMFLUIDTYPES, FLUIDVEC_GETTER, _)
-BOOST_PP_REPEAT(NUMFLUIDTYPES, FLUIDVEC_CONST_GETTER, _)
+BOOST_PP_REPEAT(NUMFLUIDSPHTYPES, FLUIDVEC_GETTER, _)
+BOOST_PP_REPEAT(NUMFLUIDSPHTYPES, FLUIDVEC_CONST_GETTER, _)
 
 #undef FLUIDVEC_GETTER
 #undef FLUIDVEC_CONST_GETTER

@@ -5,42 +5,6 @@
 
 // Particle Type specializations implementing the interface given above
 
-// DEFAULT
-// Density
-template<> template<> void 
-ParticleT<DEFAULT>::init<Density>()
-{ 
-  d = 0.0; vol = 0.0;
-}
-
-template<> template<> void 
-ParticleT<DEFAULT>::neigh<Density>(FluidParticle &neigh)
-{
-  d += fl->m_mass * fl->m_kern[ pos - neigh.pos ];
-  vol += fl->m_kern[ pos - neigh.pos ];
-}
-//template<> template<> void 
-//ParticleT<DEFAULT>::neigh(Particle &neigh)
-//{
-//  // neigh.dinv is inverse number density (aka volume) of the boundary paticle
-//  //dinv += fl->m_rest_density * neigh.dinv * fl->m_kern[ pos - neigh.pos ];
-//  //vol += fl->m_kern[ pos - neigh.pos ];
-//}
-template<> template<> void 
-ParticleT<DEFAULT>::finish<Density>()
-{
-  d = d * fl->m_kern.coef;
-  *_dinv = dinv = 1.0/d;
-  vol = 1.0 / (vol * fl->m_kern.coef);
-
-  pressure = 0.0;
-
-  //Real var = std::abs(d - fl->m_rest_density);
-  //if ( var > *max_var )
-  //  *max_var = var;
-  //*avg_var += var;
-}
-
 // MCG03
 // Density
 template<> template<> void 
@@ -54,8 +18,8 @@ ParticleT<MCG03>::neigh<Density>(FluidParticle &neigh)
 {
   dinv += fl->m_kern[ pos - neigh.pos ];
 }
-//template<> template<> void 
-//ParticleT<MCG03>::neigh<Density>(Particle &neigh) { }
+template<> template<> void 
+ParticleT<MCG03>::neigh<Density>(Particle &neigh) { (void) neigh; }
 template<> template<> void 
 ParticleT<MCG03>::finish<Density>()
 {
@@ -110,8 +74,8 @@ ParticleT<MCG03>::neigh<Accel>(FluidParticle &neigh)
   m[0] += neigh.vol * fl->m_color_kern(x_ab); // denom for smoothed color
 }
 
-//template<> template<> void 
-//ParticleT<MCG03>::neigh<Accel>(Particle &neigh) { }
+template<> template<> void 
+ParticleT<MCG03>::neigh<Accel>(Particle &neigh) { (void) neigh; }
 template<> template<> void
 ParticleT<MCG03>::finish<Accel>()
 {

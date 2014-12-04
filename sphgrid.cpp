@@ -88,4 +88,4 @@ SPHGrid::compute_density()
 // instance the quantity computation functions above for each type
 #define INSTANCE_COMPUTE_FUNC_TEMPLATE(z, PT, func) \
   template void SPHGrid::func<PT>();
-BOOST_PP_REPEAT(NUMFLUIDTYPES, INSTANCE_COMPUTE_FUNC_TEMPLATE, compute_density)
+BOOST_PP_REPEAT(NUMFLUIDSPHTYPES, INSTANCE_COMPUTE_FUNC_TEMPLATE, compute_density)

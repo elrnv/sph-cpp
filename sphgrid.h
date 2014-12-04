@@ -42,7 +42,7 @@ public:
     inline void clear_fluid_particles() 
     {
 #define CLEAR_PVEC_TEMPLATE(z, PT, _) m_pvec_##PT.clear();
-      BOOST_PP_REPEAT(NUMFLUIDTYPES, CLEAR_PVEC_TEMPLATE, _)
+      BOOST_PP_REPEAT(NUMFLUIDSPHTYPES, CLEAR_PVEC_TEMPLATE, _)
     }
     void clear_rigid_particles();
     
@@ -56,7 +56,7 @@ public:
 #define PARTICLE_VEC_MEMBER(z, PT, _) \
     ParticleVecT<PT> m_pvec_##PT;
 
-    BOOST_PP_REPEAT(NUMTYPES, PARTICLE_VEC_MEMBER, _)
+    BOOST_PP_REPEAT(NUMSPHTYPES, PARTICLE_VEC_MEMBER, _)
   };
 
   typedef boost::multi_array< Cell, 3 > Array3;
@@ -168,8 +168,8 @@ private: // member variables
   inline const ParticleVecT<PT> & \
   SPHGrid::Cell::get_pvec<PT>() const { return m_pvec_##PT; }
 
-BOOST_PP_REPEAT(NUMTYPES, PARTICLE_VEC_GETTER, _)
-BOOST_PP_REPEAT(NUMTYPES, PARTICLE_VEC_CONST_GETTER, _)
+BOOST_PP_REPEAT(NUMSPHTYPES, PARTICLE_VEC_GETTER, _)
+BOOST_PP_REPEAT(NUMSPHTYPES, PARTICLE_VEC_CONST_GETTER, _)
 
 #undef PARTICLE_VEC_GETTER
 #undef PARTICLE_VEC_CONST_GETTER
@@ -244,7 +244,7 @@ SPHGrid::compute_quantity_in_cell( Size i, Size j, Size k,
         {
           Cell &cell = neigh_view[near_i][near_j][near_k];
           for ( auto &p : pvec )
-            interact_with_neigh_cell<F,decltype(p),ALL_PARTICLE_TYPES>(p,cell);
+            interact_with_neigh_cell<F,decltype(p),ALL_SPH_TYPES>(p,cell);
         }
       }
     }

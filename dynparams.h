@@ -51,7 +51,7 @@ struct DynParams
 
 struct FluidParams : public DynParams
 {
-  ParticleType fluid_type;
+  SPHParticleType fluid_type;
 
   float density;
   float viscosity;
@@ -63,7 +63,7 @@ struct FluidParams : public DynParams
   float recoil_velocity_damping;
 
   FluidParams() // Default values:
-   : fluid_type(DEFAULT)
+   : fluid_type(static_cast<SPHParticleType>(0))
    , density(1000.0f)
    , viscosity(0.5f)
    , surface_tension(0.0728f)

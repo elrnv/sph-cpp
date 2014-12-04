@@ -66,13 +66,13 @@ struct ParticleT : public FluidParticle
   FluidDataT<PT> *fl;
 
   template<int T>
-  void init() {  std::cerr << PT << "  default init " << T << std::endl; }
+  void init();
   template<int T>
-  void neigh(Particle &neigh) { (void) neigh; std::cerr << PT << " default neigh p " << T << std::endl;  }
+  void neigh(Particle &neigh);
   template<int T>
-  void neigh(FluidParticle &neigh) { (void) neigh; std::cerr << PT << " default neigh fp " << T << std::endl; }
+  void neigh(FluidParticle &neigh);
   template<int T>
-  void finish() { std::cerr << PT << " default finish " << T << std::endl;}
+  void finish();
 };
 
 // particle vector (templated "typedef")

@@ -123,7 +123,7 @@ DynamicsManager::step(float dt, bool first_step, float *substep_t)
   ///////// testing adaptive time step
   float fdt = std::numeric_limits<float>::infinity();
   float cvdt = std::numeric_limits<float>::infinity();
-  for (int j = 0; j < NUMFLUIDTYPES; ++j)
+  for (int j = 0; j < NUMFLUIDSPHTYPES; ++j)
     for (auto &fl : m_fluids[j])
     {
       for (Size i = 0; i < fl.get_num_vertices(); ++i)
@@ -159,10 +159,10 @@ DynamicsManager::step(float dt, bool first_step, float *substep_t)
   //if (iter)
   // PTiter<DEFAULT>::update_density(*this, dt);
   //else
-  //m_grid.compute_quantity<Density, ALL_FLUID_PARTICLE_TYPES>();
-  m_grid.compute_density<ALL_FLUID_PARTICLE_TYPES>();
-  reset_accel<ALL_FLUID_PARTICLE_TYPES>();
-  m_grid.compute_quantity<Accel,ALL_FLUID_PARTICLE_TYPES>(); // update m_accel
+  //m_grid.compute_quantity<Density, ALL_FLUID_SPH_TYPES>();
+  m_grid.compute_density<ALL_FLUID_SPH_TYPES>();
+  reset_accel<ALL_FLUID_SPH_TYPES>();
+  m_grid.compute_quantity<Accel,ALL_FLUID_SPH_TYPES>(); // update m_accel
 
   //if (m_fluids[MCG03].size()) // extra steps to compute surface tension for MCG03
   //{
@@ -215,16 +215,14 @@ DynamicsManager::populate_sph_grid_with_boundaries()
   }
 
   // compute the needed boundary data right away
-  clock_t s = clock();
   m_grid.compute_quantity<Volume,STATIC>();
-  qDebug() << float(clock() - s) / float(CLOCKS_PER_SEC);
 }
 
 void 
 DynamicsManager::populate_sph_grid_with_fluids()
 {
   Real color = 1.0;
-  push_fluiddatas_to_sph_grid<ALL_FLUID_PARTICLE_TYPES>(color);
+  push_fluiddatas_to_sph_grid<ALL_FLUID_SPH_TYPES>(color);
 }
 
 void 
@@ -258,4 +256,4 @@ DynamicsManager::push_fluiddatas_to_sph_grid(Real &color)
 // instance the function above for each fluid type
 #define INSTANCE_PUSH_FLUIDDATAS_TEMPLATE(z, PT, _) \
   template void DynamicsManager::push_fluiddatas_to_sph_grid<PT>(Real &);
-BOOST_PP_REPEAT(NUMFLUIDTYPES, INSTANCE_PUSH_FLUIDDATAS_TEMPLATE, _)
+BOOST_PP_REPEAT(NUMFLUIDSPHTYPES, INSTANCE_PUSH_FLUIDDATAS_TEMPLATE, _)

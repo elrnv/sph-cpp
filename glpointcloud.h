@@ -20,7 +20,8 @@ public:
       bool dynamic,
       MaterialManager &matman,
       UniformBuffer &ubo,
-      ShaderManager &shaderman);
+      ShaderManager &shaderman,
+      float halo_radius = 0.0f);
   ~GLPointCloud();
 
   inline bool is_pointcloud() const { return true; }
@@ -40,11 +41,7 @@ public:
 
   void clear_cache();
 
-  bool is_halos() const { return m_halos; }
-  void toggle_halos() { m_halos = !m_halos; }
-
   void print() const { std::cerr << m_pc << std::endl; }
-
 
   friend UniformGrid;
 
@@ -57,7 +54,6 @@ private:
   Real m_radius;      // particle radius inherited from point cloud
   Real m_halo_radius; // particle influence radius inherited from point cloud
   bool m_insync;
-  bool m_halos; // show kernel influence visually
   bool m_isdynamic;
 };
 

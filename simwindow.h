@@ -53,6 +53,7 @@ private:
   bool m_show_shortcuts;
   bool m_dynamics;
   bool m_show_bbox;
+  bool m_show_halos;
 
   UniformBuffer m_ubo;
 
