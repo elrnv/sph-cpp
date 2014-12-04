@@ -156,8 +156,6 @@ ParticleT<BT07>::neigh<Density>(Particle &neigh)
 #ifdef BT07_BOUNDARY_PARTICLES
   dinv += fl->m_rest_density * neigh.dinv * fl->m_kern[ pos - neigh.pos ];
   vol += fl->m_kern[ pos - neigh.pos ];
-  std::cerr << "computing bdry particle vol = " << vol;
-  std::cerr << "; dinv = " << dinv << std::endl;
 #endif
 }
 template<> template<> void
@@ -288,13 +286,15 @@ ParticleT<BT07>::finish<Accel>()
 
 // Boundary
 
+// From [Solenthaler and Pajarola 2008], an alternative density
+// (number_density * mass) is used
 template<> void
 ParticleT<STATIC>::init<Volume>() 
 { 
   dinv = 0.0; 
 }
-//template<> template<> void 
-//ParticleT<STATIC>::neigh<Volume>(FluidParticle &near_p) { }
+template<> void 
+ParticleT<STATIC>::neigh<Volume>(FluidParticle &neigh) { (void) neigh; }
 template<> void
 ParticleT<STATIC>::neigh<Volume>(Particle &neigh)
 {
@@ -303,5 +303,5 @@ ParticleT<STATIC>::neigh<Volume>(Particle &neigh)
 template<> void
 ParticleT<STATIC>::finish<Volume>()
 {
-  dinv = 1.0 / dinv;
+  dinv = 1.0 / (CubicSplineKernel::compute_coef(radius) * dinv);
 }

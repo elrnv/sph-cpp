@@ -379,7 +379,7 @@ void loadGLData(
     gl_prims.push_back(GLPrimitivePtr(new GLPointCloud(fl.get_pc(), /*is dynamic*/true,
           matman, ubo, shaderman)));
 
-  BoundaryPCVec &bdryvec = dynman.get_bounds();
+  BoundaryPCVec &bdryvec = dynman.get_boundaries();
   for ( auto &bdry : bdryvec )
     gl_prims.push_back(GLPrimitivePtr(new GLPointCloud(bdry.get_pc(), /*is dynamic*/false,
           matman, ubo, shaderman)));

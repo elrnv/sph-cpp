@@ -7,6 +7,7 @@ SOURCES += \
   gltext.cpp \
   settings.cpp \
   openglwindow.cpp \
+  sphgrid.cpp \
   dynamicsmanager.cpp \
   simwindow.cpp \
   mesh.cpp \
@@ -17,7 +18,6 @@ SOURCES += \
   fluid.cpp \
   boundary.cpp \
   particle.cpp \
-  sphgrid.cpp \
   glmesh.cpp \
   glpointcloud.cpp \
   types.cpp

@@ -3,12 +3,10 @@
 #include "dynamicsmanager.h"
 
 void 
-DynamicsManager::run(SPHGrid *g)
+DynamicsManager::run()
 {
   if (get_num_fluids() < 1)
     return;
-
-  SPHGrid &grid = *g; // reference pointer for convenience
 
   // timestep
   float dt = 1.0f/(global::dynset.fps * global::dynset.substeps);
@@ -29,7 +27,7 @@ DynamicsManager::run(SPHGrid *g)
     global::dynset.gravity = Vector3f(0.0,0.0,0.0);
     for (unsigned int iter = 0; iter < global::dynset.init_steps; ++iter)
     { // for each simulation substep
-      if (!step(dt, iter == 0, grid))
+      if (!step(dt, iter == 0))
         break;
     } // for each substep
 
@@ -79,7 +77,7 @@ DynamicsManager::run(SPHGrid *g)
       for (unsigned int iter = 0; iter < global::dynset.substeps; ++iter)
       { // for each simulation substep
         bool first_step = iter == 0 && frame == 1 && global::dynset.init_steps == 0;
-        if (!step(dt, first_step, grid, &substep_t))
+        if (!step(dt, first_step, &substep_t))
           break;
       } // for each substep
 
@@ -119,7 +117,7 @@ DynamicsManager::run(SPHGrid *g)
 }
 
 inline bool
-DynamicsManager::step(float dt, bool first_step, SPHGrid &grid, float *substep_t)
+DynamicsManager::step(float dt, bool first_step, float *substep_t)
 {
 #if 0
   ///////// testing adaptive time step
@@ -153,16 +151,18 @@ DynamicsManager::step(float dt, bool first_step, SPHGrid &grid, float *substep_t
   //////// end of adaptive timestep test
 #endif
 
-  grid.update_grid(); // prepare grid for simulation step
+  clear_fluid_sph_particles(); // prepare grid for simulation step
+  populate_sph_grid_with_fluids();
 
   clock_t prev_t = clock();
 
   //if (iter)
   // PTiter<DEFAULT>::update_density(*this, dt);
   //else
-  grid.compute_quantity<Density, ALL_FLUID_PARTICLE_TYPES>();
-  grid.reset_accel<ALL_FLUID_PARTICLE_TYPES>();
-  grid.compute_quantity<Accel,ALL_FLUID_PARTICLE_TYPES>(); // update m_accel
+  //m_grid.compute_quantity<Density, ALL_FLUID_PARTICLE_TYPES>();
+  m_grid.compute_density<ALL_FLUID_PARTICLE_TYPES>();
+  reset_accel<ALL_FLUID_PARTICLE_TYPES>();
+  m_grid.compute_quantity<Accel,ALL_FLUID_PARTICLE_TYPES>(); // update m_accel
 
   //if (m_fluids[MCG03].size()) // extra steps to compute surface tension for MCG03
   //{
@@ -183,10 +183,10 @@ DynamicsManager::step(float dt, bool first_step, SPHGrid &grid, float *substep_t
   for ( auto &fl : m_fluids )
   {
     fl.get_pos() = (fl.get_pos() + dt*fl.get_vel()).eval();
-    //if (fl.get_type() == MCG03)
-    //  fl.resolve_collisions();
+    if (fl.get_type() == MCG03)
+      fl.resolve_collisions();
     //else
-    //  fl.clamp(0.5*grid.get_cell_size()-0.01,0.01f);
+    //  fl.clamp(0.5*m_grid.get_cell_size()-0.01,0.01f);
 
     // prepare velocities for acceleration computation in next step
     fl.get_vel() = fl.get_vel() + 0.5*dt*fl.get_accel();
@@ -201,7 +201,7 @@ DynamicsManager::step(float dt, bool first_step, SPHGrid &grid, float *substep_t
 }
 
 void 
-DynamicsManager::populate_sph_grid_with_boundaries(SPHGrid &grid)
+DynamicsManager::populate_sph_grid_with_boundaries()
 {
   for ( auto &bound : m_boundaries )
   {
@@ -209,32 +209,37 @@ DynamicsManager::populate_sph_grid_with_boundaries(SPHGrid &grid)
     for ( Size i = 0; i < num_vtx; ++i )
     {
       Vector3T<Real> pos(bound.get_pos().col(i));
-      typename SPHGrid::Array3Index idx = grid.get_voxel_index(pos);
-      grid.get_cell_at(idx).push_particle(bound, i);
+      typename SPHGrid::Array3Index idx = m_grid.get_voxel_index(pos);
+      m_grid.get_cell_at(idx).push_particle(bound, i);
     }
   }
+
+  // compute the needed boundary data right away
+  clock_t s = clock();
+  m_grid.compute_quantity<Volume,STATIC>();
+  qDebug() << float(clock() - s) / float(CLOCKS_PER_SEC);
 }
 
 void 
-DynamicsManager::populate_sph_grid_with_fluids(SPHGrid &grid)
+DynamicsManager::populate_sph_grid_with_fluids()
 {
   Real color = 1.0;
-  push_fluiddatas_to_sph_grid<ALL_FLUID_PARTICLE_TYPES>(grid, color);
+  push_fluiddatas_to_sph_grid<ALL_FLUID_PARTICLE_TYPES>(color);
 }
 
 void 
-DynamicsManager::populate_sph_grid(SPHGrid &grid)
+DynamicsManager::populate_sph_grid()
 { 
   // fluids
-  populate_sph_grid_with_fluids(grid);
+  populate_sph_grid_with_fluids();
 
   // statics
-  populate_sph_grid_with_boundaries(grid);
+  populate_sph_grid_with_boundaries();
 }
 
 template <int PT> // base case
 inline void
-DynamicsManager::push_fluiddatas_to_sph_grid(SPHGrid &grid, Real &color)
+DynamicsManager::push_fluiddatas_to_sph_grid(Real &color)
 {
   FluidDataVecT<PT> &fldatavec = get_fluiddatas<PT>();
   for ( auto &fldata : fldatavec )
@@ -243,8 +248,8 @@ DynamicsManager::push_fluiddatas_to_sph_grid(SPHGrid &grid, Real &color)
     for ( Size i = 0; i < num_vtx; ++i )
     {
       Vector3T<Real> pos(m_fluids[fldata.flidx].get_pos().col(i));
-      typename SPHGrid::Array3Index idx = grid.get_voxel_index(pos);
-      grid.get_cell_at(idx).push_particle<PT>(fldata, m_fluids, color, i);
+      typename SPHGrid::Array3Index idx = m_grid.get_voxel_index(pos);
+      m_grid.get_cell_at(idx).push_particle<PT>(fldata, m_fluids, color, i);
     }
     color += 1.0f;
   }
@@ -252,5 +257,5 @@ DynamicsManager::push_fluiddatas_to_sph_grid(SPHGrid &grid, Real &color)
 
 // instance the function above for each fluid type
 #define INSTANCE_PUSH_FLUIDDATAS_TEMPLATE(z, PT, _) \
-  template void DynamicsManager::push_fluiddatas_to_sph_grid<PT>(SPHGrid &, Real &);
+  template void DynamicsManager::push_fluiddatas_to_sph_grid<PT>(Real &);
 BOOST_PP_REPEAT(NUMFLUIDTYPES, INSTANCE_PUSH_FLUIDDATAS_TEMPLATE, _)

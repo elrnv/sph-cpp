@@ -13,15 +13,13 @@
 #include "fluid.h"
 #include "fluiddata.h"
 #include "materialmanager.h"
+#include "sphgrid.h"
 #define BOOST_CHRONO_HEADER_ONLY
 #include <boost/chrono.hpp>
 
 typedef boost::chrono::process_real_cpu_clock real_clock;
 typedef boost::chrono::nanoseconds ns_t;
 typedef real_clock::time_point real_t;
-
-// forward declaration
-class SPHGrid;
 
 // Helper template using two arguments from the data arguemnt
 // where data is of the form (fluid, for loop body)
@@ -38,7 +36,9 @@ class DynamicsManager
 {
 public:
   DynamicsManager() 
-    : m_stop_requested(false)
+    : m_bbox(Vector3f(0.0f,0.0f,0.0f), Vector3f(0.0f,0.0f,0.0f))
+    , m_grid(*this)
+    , m_stop_requested(false)
     , m_pause(false)
   { }
   ~DynamicsManager() { }
@@ -120,9 +120,10 @@ public:
   }
 
   // Unit box boundary particles (transparent)
-  void add_default_boundary(SPHGrid &grid)
+  // PRE: assume grid has been initialized
+  void add_default_boundary(Index matidx)
   {
-    m_boundaries.push_back(BoundaryPC(grid));
+    m_boundaries.push_back(BoundaryPC(m_grid, matidx));
   }
 
   template<int PT>
@@ -138,6 +139,11 @@ public:
       fl.init(box);
   }
 
+  inline void init_sphgrid(const AlignedBox3f &box)
+  {
+    m_grid.init(box);
+  }
+
   // PRE: assume that fluids were already initialized (init_fluids was called)
   inline void generate_fluiddatas()
   {
@@ -147,8 +153,20 @@ public:
   inline Size get_num_fluids() { return m_fluids.size(); }
   inline Size get_num_boundaries() { return m_boundaries.size(); }
 
+  inline void clear_fluid_sph_particles()
+  {
+    m_grid.clear_fluid_particles();
+  }
+
+  inline void clear_rigid_sph_particles()
+  {
+    m_grid.clear_rigid_particles();
+  }
+
   inline void clear()
   {
+    clear_fluid_sph_particles();
+    clear_rigid_sph_particles();
     m_fluids.clear();
     m_boundaries.clear();
     clear_fluiddatas<ALL_FLUID_PARTICLE_TYPES>();
@@ -258,10 +276,27 @@ public:
     return false;
   }
 
-  void run(SPHGrid *grid);
+  template<int PT>
+  inline void reset_accel()
+  {
+    FluidDataVecT<PT> &fldatavec = get_fluiddatas<PT>();
+    FluidVec &fluids = get_fluids();
+    for ( auto &fldata : fldatavec )
+      fluids[fldata.flidx].reset_accel();   
+  }
+
+  template<int PT, int PT2, int... PTs>
+  inline void reset_accel()
+  {
+    reset_accel<PT>();
+    reset_accel<PT2,PTs...>();
+  }
+
+
+  void run();
 
   // one leapfrom integrator step
-  inline bool step(float dt, bool first_step, SPHGrid &grid, float *substep_t=NULL);
+  inline bool step(float dt, bool first_step, float *substep_t=NULL);
 
   // request stop which will be checked by the owner thread
   void request_stop() { m_stop_requested = true; }
@@ -316,10 +351,10 @@ public:
     }
   }
 
-  void populate_sph_grid_with_boundaries(SPHGrid &grid);
-  void populate_sph_grid_with_fluids(SPHGrid &grid);
+  void populate_sph_grid_with_boundaries();
+  void populate_sph_grid_with_fluids();
 
-  void populate_sph_grid(SPHGrid &grid);
+  void populate_sph_grid();
 
 // The following macros generate the fluid vector members and their respective
 // getters. 
@@ -329,17 +364,17 @@ public:
   template<int PT>
   const FluidDataVecT<PT> &get_fluiddatas() const;
 
-  BoundaryPCVec &get_bounds() { return m_boundaries; }
+  BoundaryPCVec &get_boundaries() { return m_boundaries; }
   FluidVec      &get_fluids() { return m_fluids; }
 
 private: // routine members
 
   // helper functions to populate_sph_grid
   template <int PT> // base case
-  inline void push_fluiddatas_to_sph_grid(SPHGrid &grid, Real &color);
+  inline void push_fluiddatas_to_sph_grid(Real &color);
 
   template <int PT, int PT2, int... PTs>
-  inline void push_fluiddatas_to_sph_grid(SPHGrid &grid, Real &color);
+  inline void push_fluiddatas_to_sph_grid(Real &color);
 
   // helper functions for non templated generate_fluiddatas
   template<int PT>
@@ -373,6 +408,8 @@ private: // data members
 
   AlignedBox3f m_bbox; // bounding box of all stored models
 
+  SPHGrid      m_grid; // sph grid
+
   // dynamics thread concurrency primitives
   std::atomic<bool> m_stop_requested;
 
@@ -400,10 +437,10 @@ BOOST_PP_REPEAT(NUMFLUIDTYPES, FLUIDVEC_CONST_GETTER, _)
 // Variadic template definitions, uninteresting stuff
 template <int PT, int PT2, int... PTs>
 inline void
-DynamicsManager::push_fluiddatas_to_sph_grid(SPHGrid &grid, Real &color)
+DynamicsManager::push_fluiddatas_to_sph_grid(Real &color)
 {
-  push_fluiddatas_to_sph_grid<PT>(grid, color);
-  push_fluiddatas_to_sph_grid<PT2, PTs...>(grid, color);
+  push_fluiddatas_to_sph_grid<PT>(color);
+  push_fluiddatas_to_sph_grid<PT2, PTs...>(color);
 }
 
 template<int PT, int PT2, int... PTs>

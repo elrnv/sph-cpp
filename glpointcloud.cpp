@@ -90,7 +90,7 @@ GLPointCloud::update_glbuf_withsort(const AffineCompact3f &mvtrans,
   sort_by_z(vispos, pos);
   update_glbuf(pos); // write to gl buffer
 
-  m_pc.set_stalepos(false);
+  m_pc.set_stalepos(true);
   (void) nmlmvtrans; // we dont map normals for point clouds
 }
 inline void 

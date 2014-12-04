@@ -28,8 +28,8 @@ PointCloud::PointCloud(const aiMesh *mesh, Index matidx)
 }
 
 // Default constructor used for ghost and boundary particles
-PointCloud::PointCloud(const Matrix3XT<Real> &pos)
-  : Primitive(0)
+PointCloud::PointCloud(const Matrix3XT<Real> &pos, Index matidx)
+  : Primitive(matidx)
   , m_mindist(-1.f)
   , m_pos(pos)
   , m_stalepos(true)

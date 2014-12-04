@@ -9,7 +9,8 @@
 #include "boundary.h"
 #include "fluiddata.h"
 #include "particle.h"
-#include "dynamicsmanager.h"
+
+class DynamicsManager;
 
 // Grid structure used to optimize computing particle properties using kernels
 class SPHGrid
@@ -38,11 +39,12 @@ public:
 
     void push_particle(BoundaryPC &bnd, Size vtxidx);
 
-    inline void clear() 
+    inline void clear_fluid_particles() 
     {
 #define CLEAR_PVEC_TEMPLATE(z, PT, _) m_pvec_##PT.clear();
-      BOOST_PP_REPEAT(NUMTYPES, CLEAR_PVEC_TEMPLATE, _)
+      BOOST_PP_REPEAT(NUMFLUIDTYPES, CLEAR_PVEC_TEMPLATE, _)
     }
+    void clear_rigid_particles();
     
   template<int PT>
   ParticleVecT<PT> & get_pvec();
@@ -65,12 +67,24 @@ public:
   typedef typename Array3::template array_view<3>::type GridView;
 
   // Constructors/Destructor
-  SPHGrid(AlignedBox3f &box, DynamicsManager &dynman);
+  SPHGrid(DynamicsManager &dynman);
   ~SPHGrid();
   
-  void init();
-  void update_grid();
-  void clear_fluid_particles();
+  void init(const AlignedBox3f &box);
+  inline void clear_fluid_particles()
+  {
+    for (Size i = 0; i < m_gridsize[0]; ++i)
+      for (Size j = 0; j < m_gridsize[1]; ++j)
+        for (Size k = 0; k < m_gridsize[2]; ++k)
+          m_grid[i][j][k].clear_fluid_particles();
+  }
+  inline void clear_rigid_particles()
+  {
+    for (Size i = 0; i < m_gridsize[0]; ++i)
+      for (Size j = 0; j < m_gridsize[1]; ++j)
+        for (Size k = 0; k < m_gridsize[2]; ++k)
+          m_grid[i][j][k].clear_rigid_particles();
+  }
 
   inline Index clamp(Index d, Index min, Index max)
   {
@@ -97,26 +111,9 @@ public:
   void compute_quantity();
 
   template<int PT>
-  inline void reset_accel()
-  {
-    FluidDataVecT<PT> &fldatavec = m_dynman.get_fluiddatas<PT>();
-    FluidVec &fluids = m_dynman.get_fluids();
-    for ( auto &fldata : fldatavec )
-      fluids[fldata.flidx].reset_accel();   
-  }
-
+  void compute_density();
   template<int PT, int PT2, int... PTs>
-  inline void reset_accel()
-  {
-    reset_accel<PT>();
-    reset_accel<PT2,PTs...>();
-  }
-
-  //template<int PT, int PT2, int... PTs>
-  //void compute_accel();
-
-  //template<int PT, int PT2, int... PTs>
-  //void compute_density();
+  void compute_density();
 
   //void jacobi_pressure_solve(float dt,float factor);
 
@@ -176,6 +173,12 @@ BOOST_PP_REPEAT(NUMTYPES, PARTICLE_VEC_CONST_GETTER, _)
 
 #undef PARTICLE_VEC_GETTER
 #undef PARTICLE_VEC_CONST_GETTER
+
+inline void
+SPHGrid::Cell::clear_rigid_particles()
+{
+  get_pvec<STATIC>().clear();
+}
 
 inline void 
 SPHGrid::Cell::push_particle(BoundaryPC &bnd, Size vtxidx)
@@ -247,7 +250,9 @@ SPHGrid::compute_quantity_in_cell( Size i, Size j, Size k,
     }
 
     for ( auto &p : pvec )  // finalize data
+    {
       p.template finish<F>();
+    }
   }
 
   compute_quantity_in_cell<F,PTs...>(i,j,k,nx,ny,nz);
@@ -290,7 +295,6 @@ inline void FTiter<FT>::update_density(SPHGrid &g,float timestep)
 }
 #endif
 
-#if 0
 template<int PT, int PT2, int... PTs>
 inline void
 SPHGrid::compute_density()
@@ -298,15 +302,6 @@ SPHGrid::compute_density()
   compute_density<PT>();       // do one
   compute_density<PT2, PTs...>(); // recurse on the rest
 }
-
-template<int PT, int PT2, int... PTs>
-inline void 
-SPHGrid::compute_accel()
-{
-  compute_accel<PT>();
-  compute_accel<PT2, PTs...>();
-}
-#endif
 
 #if 0
 inline void SPHGrid::jacobi_pressure_solve(float dt, float factor)

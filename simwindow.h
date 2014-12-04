@@ -51,7 +51,7 @@ protected:
 
 private:
   bool m_show_shortcuts;
-  std::atomic<bool> m_dynamics;
+  bool m_dynamics;
   bool m_show_bbox;
 
   UniformBuffer m_ubo;
@@ -65,8 +65,6 @@ private:
     Matrix4f vinvmtx;
     Vector4f eyepos;
   } m_udata;
-
-  SPHGrid *m_grid;      // simulation grid
 
   GLPrimPtrVec m_glprims;
 

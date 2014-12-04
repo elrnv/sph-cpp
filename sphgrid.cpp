@@ -9,51 +9,24 @@
 #define BOOST_CHRONO_HEADER_ONLY
 #include <boost/chrono.hpp>
 
-// From [Solenthaler and Pajarola 2008], an alternative density
-// (number_density * mass) is used
-/*
-class CBVolume : public CBQ<CBVolume>
-{
-public:
-  inline void init_kernel(float h) { m_kern.init(h); }
-  inline void init_particle(Particle &p) 
-  { p.dinv = 0.0f; }
-  inline void fluid(Particle &p, FluidParticle &near_p)
-  { }
-  inline void bound(Particle &p, Particle &near_p)
-  {
-    p.dinv += this->m_kern[ p.pos - near_p.pos ];
-  }
-  inline void finish_particle(Particle &p)
-  {
-    p.dinv = 1.0f/(p.dinv * this->m_kern.coef);
-  }
-private:
-  CubicSplineKernel m_kern;
-};
-*/
-
-// SPHGrid stuff
-
-
 SPHGrid::SPHGrid(
-    AlignedBox3f &box,
     DynamicsManager &dynman ) 
   : m_dynman(dynman)
   , m_h(2e-3f) // minimum possible cell size
   , m_hinv(500.0f)
-  , m_bmin(box.corner(AlignedBox3f::BottomLeftFloor))// smallest boundary corner
-  , m_bmax(box.corner(AlignedBox3f::TopRightCeil))   // largest boundary corner
 { }
 
 
 SPHGrid::~SPHGrid() { }
 
 void
-SPHGrid::init()
+SPHGrid::init(const AlignedBox3f &box)
 {
   if (m_dynman.get_num_fluids() < 1)
     return;
+
+  m_bmin = box.corner(AlignedBox3f::BottomLeftFloor);// smallest boundary corner
+  m_bmax = box.corner(AlignedBox3f::TopRightCeil);   // largest boundary corner
 
   // set cell size to be the maximum of the kernel support over all fluids;
   m_h = std::max(float(m_dynman.get_max_radius()), m_h);
@@ -72,35 +45,8 @@ SPHGrid::init()
       m_gridsize[0]*m_gridsize[1]*m_gridsize[2]);
 
   m_grid.resize( boost::extents[m_gridsize[0]][m_gridsize[1]][m_gridsize[2]] );
-  
-  m_dynman.populate_sph_grid(*this); // populate grid with particles
-
-  //CBVolume proc;
-  //proc.init_kernel(m_h);
-  //m_bound_volume_proc = &proc;
-  //compute_bound_quantity< CBVolume >();
-  //m_bound_volume_proc = NULL;
 }
 
-void
-SPHGrid::update_grid()
-{
-  clear_fluid_particles();
-  // populate grid with fluid particles
-  m_dynman.populate_sph_grid_with_fluids(*this);
-}
-
-inline void
-SPHGrid::clear_fluid_particles()
-{
-  for (Size i = 0; i < m_gridsize[0]; ++i)
-    for (Size j = 0; j < m_gridsize[1]; ++j)
-      for (Size k = 0; k < m_gridsize[2]; ++k)
-        m_grid[i][j][k].clear();
-}
-
-
-#if 0
 template<int PT>
 inline void
 SPHGrid::compute_density()
@@ -139,26 +85,7 @@ SPHGrid::compute_density()
 #endif
 }
 
-template<int PT>
-inline void 
-SPHGrid::compute_accel()
-{
-  FluidDataVecT<PT> &fldatavec = m_dynman.get_fluiddatas<PT>();
-  if (!fldatavec.size())
-    return;
-
-  FluidVec &fluids = m_dynman.get_fluids();
-  for ( auto &fldata : fldatavec )
-    fluids[fldata.flidx].reset_accel();   
-
-  // now we may assume all accelerations are zero
-
-  compute_quantity<Accel,PT>();
-}
-#endif
-
 // instance the quantity computation functions above for each type
 #define INSTANCE_COMPUTE_FUNC_TEMPLATE(z, PT, func) \
   template void SPHGrid::func<PT>();
-//BOOST_PP_REPEAT(NUMFLUIDTYPES, INSTANCE_COMPUTE_FUNC_TEMPLATE, compute_density)
-//BOOST_PP_REPEAT(NUMFLUIDTYPES, INSTANCE_COMPUTE_FUNC_TEMPLATE, compute_accel)
+BOOST_PP_REPEAT(NUMFLUIDTYPES, INSTANCE_COMPUTE_FUNC_TEMPLATE, compute_density)

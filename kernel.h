@@ -31,7 +31,7 @@ public:
   /// core kernel computation without requiring an instance
   /// this function allows the programmer to sacrifice a bit of performance for
   /// ease of use
-  inline static OutputType compute(const Vector3T<InputType> &r, InputType h)
+  inline static OutputType compute_full(const Vector3T<InputType> &r, InputType h)
   {
     return KernelType::compute_coef(h) * KernelType::compute(r,h);
   }
@@ -65,10 +65,10 @@ struct MKI04Kernel : public Kerneld<MKI04Kernel>
     return kern_base(r[0]/h);
   }
 
+  inline static double compute_coef(double h) { return (27.0f/(h*11.0f)); }
+
   friend class Kernel;
 private:
-  inline static double compute_coef(double h) { return (27.0f/(h*11.0f)); }
-  
   inline static double kern_base(double q)
   {
     if (q < 1)
@@ -98,21 +98,21 @@ struct CubicSplineKernel : public Kerneld<CubicSplineKernel>
     return kern_base(r.norm()/h);
   }
 
+  inline static double compute_coef(double h) { return 16.0/(M_PI*pow3(h)); }
+  
   friend class Kernel;
 private:
-  inline static double compute_coef(double h) { return 16.0f/(M_PI*pow3(h)); }
-  
   inline static double kern_base(double q)
   {
     if (q < 1)
     {
       if (q <= 0.5)
-        return 3.0f*pow3(q) - 3.0f*pow2(q) + 0.5f;
+        return 3.0*pow3(q) - 3.0*pow2(q) + 0.5;
 
-      return pow3(1 - q);
+      return pow3(1.0 - q);
     }
 
-    return 0;
+    return 0.0;
   }
 }; // CubicSplineKernel
 
@@ -129,10 +129,10 @@ struct CubicSplineGradKernel : public Kernel3d<CubicSplineGradKernel>
     return kern_base(r,q);
   }
 
-  friend class Kernel;
-private:
   inline static double compute_coef(double h) { return 48.0f/(M_PI*pow5(h)); }
   
+  friend class Kernel;
+private:
   inline static Vector3d kern_base(const Vector3d &r, double q)
   {
     if (q > 0 && q < 1)
@@ -159,10 +159,10 @@ struct CubicSplineLapKernel : public Kerneld<CubicSplineLapKernel>
     return kern_base(r.norm()/h);
   }
 
-  friend class Kernel;
-private:
   inline static double compute_coef(double h) { return 96.0f/(M_PI*pow5(h)); }
   
+  friend class Kernel;
+private:
   inline static double kern_base(double q)
   {
     if (q > 0 && q < 1)
@@ -189,10 +189,10 @@ struct Poly6Kernel : public Kerneld<Poly6Kernel>
     return kern_base(r.squaredNorm()/pow2(h));
   }
 
-  friend class Kernel;
-private:
   inline static double compute_coef(double h) { return 315.0f/(64.0f*M_PI*pow3(h)); }
   
+  friend class Kernel;
+private:
   inline static double kern_base(double q2)
   {
     return q2 <= 1 ? pow3(1 - q2) : 0;
@@ -210,10 +210,10 @@ struct Poly6GradKernel : public Kernel3d<Poly6GradKernel>
     return kern_base(r, r.squaredNorm()/pow2(h));
   }
 
-  friend class Kernel;
-private:
   inline static double compute_coef(double h) { return 945.0f/(32.0f*M_PI*pow5(h)); }
 
+  friend class Kernel;
+private:
   inline static Vector3d kern_base(const Vector3d &r, double q2)
   {
     return q2 <= 1 ? -r*pow2(1-q2) : Vector3d(0,0,0);
@@ -231,10 +231,10 @@ struct Poly6LapKernel : public Kerneld<Poly6LapKernel>
     return kern_base(r.squaredNorm()/pow2(h));
   }
 
-  friend class Kernel;
-private:
   inline static double compute_coef(double h) { return 945.0f/(32.0f*M_PI*pow5(h)); }
 
+  friend class Kernel;
+private:
   inline static double kern_base(double q2)
   {
     return q2 <= 1 ? (1.0f-q2)*(7*q2 - 3.0f) : 0;
@@ -255,10 +255,9 @@ struct SpikyKernel : public Kerneld<SpikyKernel>
     return rn <= h ? pow3(h - rn) : 0;
   }
 
-  friend class Kernel;
-private:
   inline static double compute_coef(double h) { return 15.0f/(M_PI*pow6(h)); }
 
+  friend class Kernel;
 }; // SpikyKernel
 
 struct SpikyGradKernel : public Kernel3d<SpikyGradKernel>
@@ -283,9 +282,9 @@ struct SpikyGradKernel : public Kernel3d<SpikyGradKernel>
     return rn <= h ? -r*(pow2(h - rn) / rn) : Vector3d(0,0,0);
   }
 
-  friend class Kernel;
-private:
   inline static double compute_coef(double h) { return 45.0f/(M_PI*pow6(h)); }
+
+  friend class Kernel;
 }; // SpikyGradKernel
 
 // laplacian of spiky kernel
@@ -306,9 +305,9 @@ struct SpikyLapKernel : public Kerneld<SpikyLapKernel>
     }
   }
 
-  friend class Kernel;
-private:
   inline static double compute_coef(double h) { return 90.0f/(M_PI*pow6(h)); }
+  
+  friend class Kernel;
 }; // SpikyLapKern
 
 
@@ -340,10 +339,9 @@ struct ViscKernel : public Kerneld<ViscKernel>
     }
   }
 
-  friend class Kernel;
-private:
   inline static double compute_coef(double h) { return 15.0f/(2*M_PI*pow3(h)); }
 
+  friend class Kernel;
 }; // ViscKernel
 
 struct ViscGradKernel : public Kernel3d<ViscGradKernel>
@@ -364,9 +362,9 @@ struct ViscGradKernel : public Kernel3d<ViscGradKernel>
     return rn < h ? Vector3d(r*((4.0f*h*r3 - 3.f*r2*r2 - h3*h) / (2.f*h3*r3))) : Vector3d(0,0,0);
   }
 
-  friend class Kernel;
-private:
   inline static double compute_coef(double h) { return 15.0f/(2*M_PI*pow3(h)); }
+
+  friend class Kernel;
 }; // ViscGradKernel
 
 struct ViscLapKernel : public Kerneld<ViscLapKernel>
@@ -381,9 +379,9 @@ struct ViscLapKernel : public Kerneld<ViscLapKernel>
     return rn <= h ? (h-rn) : 0;
   }
 
-  friend class Kernel;
-private:
   inline static double compute_coef(double h) { return 45.0f/(M_PI*pow6(h)); }
+
+  friend class Kernel;
 }; // ViscLapKernel
 
 

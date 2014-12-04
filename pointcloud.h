@@ -19,7 +19,7 @@ class PointCloud : public Primitive
 {
 public:
   explicit PointCloud(const aiMesh *pc, Index matidx);
-  explicit PointCloud(const Matrix3XT<Real> &pos);
+  explicit PointCloud(const Matrix3XT<Real> &pos, Index matidx);
   explicit PointCloud(const PointCloud &orig);
   virtual ~PointCloud();
 

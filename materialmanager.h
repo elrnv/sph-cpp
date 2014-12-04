@@ -12,8 +12,14 @@ class MaterialManager
 public:
   MaterialManager()
     : m_materials(1, Material())
-  { }
+  {
+    // also add a default fully transparent material
+    m_materials.push_back(Material(0.0f));
+  }
   ~MaterialManager() { }
+
+  Index get_transparent_material_idx() { return 1; }
+  Index get_default_material_idx() { return 0; }
 
   /// Manager interface
   Index add_material(const aiMaterial *mat)

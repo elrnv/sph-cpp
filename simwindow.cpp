@@ -15,7 +15,6 @@ SimWindow::SimWindow()
   : m_show_shortcuts(true) // immediately toggled below
   , m_dynamics(false)
   , m_show_bbox(true)
-  , m_grid(NULL)
   , m_viewmode(ViewMode::ADDITIVE_PARTICLE)
   , m_change_prog(true)
   , m_shaderman(this)
@@ -39,8 +38,6 @@ SimWindow::clear_dynamics()
 {
   m_dynamics = false;
   set_animating(false);
-  if (!m_grid)
-    return;
 
   m_dynman.un_pause();
 
@@ -48,7 +45,6 @@ SimWindow::clear_dynamics()
   if (m_sim_thread.joinable())
     m_sim_thread.join();
   m_dynman.unrequest_stop();
-  delete m_grid; m_grid = NULL;
 }
 
 void 
@@ -63,7 +59,7 @@ SimWindow::init()
   m_ubo.allocate( sizeof(m_udata) );
   m_ubo.bindToIndex();
 
-  load_model(0);
+  load_model(6);
 
   init_bbox();
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -114,8 +110,16 @@ SimWindow::load_model(int i)
   glclear_tr(); // clear dynamics text buffer
   m_dynman.glprint_fluids(m_matman);
 
+  // Create simulation grid
+  m_dynman.init_sphgrid(UnitBox);
+
+  if (!m_dynman.get_boundaries().size())
+    m_dynman.add_default_boundary(m_matman.get_transparent_material_idx());
+  m_dynman.populate_sph_grid_with_boundaries();
+
   m_udata.modelmtx.setIdentity();
-  m_udata.normalmtx.block(0,0,3,3) = m_udata.modelmtx.block(0,0,3,3).inverse().transpose();
+  m_udata.normalmtx.block(0,0,3,3) =
+    m_udata.modelmtx.block(0,0,3,3).inverse().transpose();
 
   m_glprims.clear();
   Size num_prims = 
@@ -205,15 +209,11 @@ SimWindow::toggle_dynamics()
 
   if (m_dynamics)
   {
-    // Create simulation grid
-    m_grid = new SPHGrid(UnitBox, m_dynman);
-    m_grid->init();
-
-    if (!m_dynman.get_bounds().size())
-      m_dynman.add_default_boundary(*m_grid); // always need a boundary
+    m_dynman.clear_fluid_sph_particles();
+    m_dynman.populate_sph_grid_with_fluids(); // popualte grid with particles
 
     // run simulation
-    m_sim_thread = std::thread(&DynamicsManager::run, &m_dynman, m_grid);
+    m_sim_thread = std::thread(&DynamicsManager::run, &m_dynman);
   }
   set_animating(m_dynamics);
 }

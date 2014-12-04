@@ -21,7 +21,7 @@ class BoundaryPC
 public:
   // dynamic point cloud from a regular updatable gl point cloud
   explicit BoundaryPC(const aiMesh *pc, Index matidx, RigidParamsPtr params);
-  explicit BoundaryPC(SPHGrid &grid, int particles_per_cell_length = 4);
+  explicit BoundaryPC(SPHGrid &grid, Index matidx, int particles_per_cell_length = 4);
   ~BoundaryPC();
 
   Matrix3XT<Real> generate_grid_box_pc(
@@ -47,7 +47,7 @@ public:
   // kernel support radius
   inline Real get_kernel_radius()
   { 
-    return m_params->kernel_inflation * m_pc.get_radius();
+    return m_kernel_radius;
   }
 
   inline Real get_halo_radius()         { return get_kernel_radius(); }

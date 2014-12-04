@@ -89,12 +89,12 @@ struct ParticleT<STATIC> : public Particle
   Real radius;
 
   template<int T>
-  void init() { }
+  void init();
   template<int T>
-  void neigh(Particle &neigh) { (void) neigh; }
+  void neigh(Particle &neigh);
   template<int T>
-  void neigh(FluidParticle &neigh) { (void) neigh; }
+  void neigh(FluidParticle &neigh);
   template<int T>
-  void finish() { }
+  void finish();
 };
 #endif // PARTICLE_H

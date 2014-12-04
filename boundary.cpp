@@ -14,8 +14,8 @@ BoundaryPC::BoundaryPC(const aiMesh *pc, Index matidx, RigidParamsPtr params)
 { }
 
 // A default transparent boundary resembing a box covering the given sph grid
-BoundaryPC::BoundaryPC(SPHGrid &grid, int particles_per_cell_length)
-  : m_pc(generate_grid_box_pc(grid, particles_per_cell_length))
+BoundaryPC::BoundaryPC(SPHGrid &grid, Index matidx, int particles_per_cell_length)
+  : m_pc(generate_grid_box_pc(grid, particles_per_cell_length), matidx)
   , m_params(RigidParamsPtr(new RigidParams()))
   , m_kernel_radius(grid.get_cell_size())
 { }
