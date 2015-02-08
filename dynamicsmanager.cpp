@@ -153,6 +153,7 @@ DynamicsManager::step(float dt, bool first_step, float *substep_t)
 
   clear_fluid_sph_particles(); // prepare grid for simulation step
   populate_sph_grid_with_fluids();
+  //m_grid.update_particle_cell_positions();
 
   clock_t prev_t = clock();
 
@@ -194,7 +195,6 @@ DynamicsManager::step(float dt, bool first_step, float *substep_t)
 
   if (m_stop_requested) return false;
 
-  // TODO: put this step after each frame instead of after each substep
   prepare_vis_data();
 
   return true;

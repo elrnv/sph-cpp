@@ -47,6 +47,28 @@ SPHGrid::init(const AlignedBox3f &box)
   m_grid.resize( boost::extents[m_gridsize[0]][m_gridsize[1]][m_gridsize[2]] );
 }
 
+template<int PT, int PT2, int... PTs>
+inline void
+SPHGrid::update_particle_cell_positions()
+{
+  Size nx = m_gridsize[0];
+  Size ny = m_gridsize[1];
+  Size nz = m_gridsize[2];
+#if 0
+  for (Size i = 0; i < nx; ++i)
+  {
+    for (Size j = 0; j < ny; ++j)
+    {
+      for (Size k = 0; k < nz; ++k)
+      {
+        
+        
+      } // for k
+    } // for j
+  } // for i
+#endif
+}
+
 template<int PT>
 inline void
 SPHGrid::compute_density()

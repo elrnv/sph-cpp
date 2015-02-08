@@ -106,6 +106,9 @@ public:
   inline const Vector3f &get_bmin() const { return m_bmin; }
   inline const Vector3f &get_bmax() const { return m_bmax; }
 
+  template<int PT, int PT2, int... PTs>
+  void update_particle_cell_positions();
+
   // Low level quantity processing functions
   template<int F, int... PTs>
   void compute_quantity();

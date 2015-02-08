@@ -1,6 +1,6 @@
 QT += opengl
 
-TARGET = sim
+TARGET = sph
 
 SOURCES += \
   main.cpp \
@@ -63,22 +63,26 @@ CONFIG += c++11
 CONFIG += debug_and_release
 
 MACPORTS_INCLUDEPATH = /opt/local/include
+HOMEBREW_INCLUDEPATH = /usr/local/include
+
 macx {
   QMAKE_MAC_SDK = macosx10.10
   QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.10
-  INCLUDEPATH += $${MACPORTS_INCLUDEPATH}/eigen3
-  INCLUDEPATH += $${MACPORTS_INCLUDEPATH}
+  INCLUDEPATH += $${HOMEBREW_INCLUDEPATH}/eigen3
+  INCLUDEPATH += $${HOMEBREW_INCLUDEPATH}
 
 # Opne Asset Import Library include path
-  INCLUDEPATH += $${MACPORTS_INCLUDEPATH}/assimp
+#  INCLUDEPATH += $${HOMEBREW_INCLUDEPATH}/assimp
+
 # INCLUDEPATH += /Users/egor/proj/assimp/include
 # LIBS += -L/Users/egor/proj/assimp/lib
 
   LIBS += -L/opt/local/lib  # macports libs path
+  LIBS += -L/usr/local/lib  # homebrew libs path
 }
 
 LIBS += -lassimp            # 3D asset loading library
-LIBS += -ltbb               # concurrency library
+#LIBS += -ltbb               # concurrency library
 LIBS += -lboost_system-mt
 LIBS += -lconfig++          # lib to read config files
 
