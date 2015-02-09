@@ -47,10 +47,12 @@ void GLTextPainter::init()
   m_prog.addShaderFromSourceFile(QOpenGLShader::Fragment, ":/text.frag");
   m_prog.link();
 
-  int id = QFontDatabase::addApplicationFont(":/proggyclean.ttf");
+  // You can pick which font you like better
+  int id = QFontDatabase::addApplicationFont(":/inconsolata.otf");
+//  int id = QFontDatabase::addApplicationFont(":/proggyclean.ttf");
   QString family = QFontDatabase::applicationFontFamilies(id).at(0);
-  QFont font(family, 16);
-  font.setStyleHint(QFont::Monospace, QFont::NoAntialias);
+  QFont font(family, 28);
+  font.setStyleHint(QFont::Monospace, QFont::PreferAntialias);
   
   QFontMetrics metric(font);
   m_height = metric.height();

@@ -13,6 +13,7 @@
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
 #include <libconfig.h++>
+#include <wordexp.h>
 #include "glmesh.h"
 #include "glpointcloud.h"
 #include "materialmanager.h"
@@ -225,6 +226,16 @@ extractRoot( const std::string &path )
   return path.substr(start+1, end - start - 1);
 }
 
+std::string
+expand_path( const std::string &exp )
+{
+  wordexp_t p;
+  wordexp( exp.c_str(), &p, 0 );
+  std::string result(*p.we_wordv);
+  wordfree(&p);
+  return result;
+}
+
 // return false if nothing loaded, true otherwise
 bool
 loadScene( const std::string &filename,
@@ -249,6 +260,9 @@ loadScene( const std::string &filename,
     cfg.lookupValue("dynamics.substeps", global::dynset.substeps);
     cfg.lookupValue("dynamics.savedir", global::dynset.savedir);
     cfg.lookupValue("dynamics.init_steps", global::dynset.init_steps);
+
+    // process env variables
+    global::dynset.savedir = expand_path(global::dynset.savedir);
 
     global::dynset.gravity = Vector3f(0.0f,-9.81f,0.0f);
     try
@@ -294,7 +308,7 @@ loadScene( const std::string &filename,
     global::sceneset.normalize = true;
     cfg.lookupValue("scene.normalize", global::sceneset.normalize);
 
-    std::string geodir = cfg.lookup("scene.geodir");
+    std::string geodir = expand_path(cfg.lookup("scene.geodir"));
     libconfig::Setting& objset = cfg.lookup("scene.objects");
 
     int num = objset.getLength();

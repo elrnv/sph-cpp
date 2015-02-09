@@ -57,7 +57,7 @@ HEADERS += \
 RESOURCES += resources.qrc
 
 # directory containing scene configurations
-QMAKE_CXXFLAGS += -DCONFIGDIR=/Users/egor/proj/sph/data
+QMAKE_CXXFLAGS += -DCONFIGDIR=$$(PWD)/data
 
 # compile with latest c++ specs
 CONFIG += c++11
@@ -87,9 +87,6 @@ macx {
 
 # Opne Asset Import Library include path
 #  INCLUDEPATH += $${HOMEBREW_INCLUDEPATH}/assimp
-
-# INCLUDEPATH += /Users/egor/proj/assimp/include
-# LIBS += -L/Users/egor/proj/assimp/lib
 
   LIBS += -L/opt/local/lib  # macports libs path
   LIBS += -L/usr/local/lib  # homebrew libs path

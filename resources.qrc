@@ -15,6 +15,7 @@
         <file alias="text.frag">shaders/text.frag</file>
     </qresource>
     <qresource prefix="/">
+        <file alias="inconsolata.otf">fonts/Inconsolata.otf</file>
         <file alias="proggyclean.ttf">fonts/ProggyCleanSZ.ttf/ProggyCleanSZ.ttf</file>
     </qresource>
 </RCC>
