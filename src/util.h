@@ -403,6 +403,15 @@ void loadGLData(
   }
 }
 
+std::string
+get_configdir_path()
+{
+  return
+    Util::expand_path(
+          "$" + std::string(BOOST_PP_STRINGIZE(ROOT_ENV_NAME)) 
+        + "/" + std::string(BOOST_PP_STRINGIZE(CONFIGDIR)));
+}
+
 };
 
 #endif // UTIL_H

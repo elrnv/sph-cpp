@@ -57,7 +57,7 @@ HEADERS += \
 RESOURCES += resources.qrc
 
 # directory containing scene configurations
-QMAKE_CXXFLAGS += -DCONFIGDIR=$$(PWD)/data
+QMAKE_CXXFLAGS += -DROOT_ENV_NAME=SPH -DCONFIGDIR='data'
 
 # compile with latest c++ specs
 CONFIG += c++11

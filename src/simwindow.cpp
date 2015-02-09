@@ -69,8 +69,8 @@ SimWindow::load_model(int i)
   clear_dynamics();
   m_dynman.clear();
   m_geoman.clear();
-  std::string cfg_filename = 
-    std::string(BOOST_PP_STRINGIZE(CONFIGDIR)) + "/scene" + std::to_string(i) + ".cfg";
+  std::string cfg_filename = Util::get_configdir_path()
+                           + "/scene" + std::to_string(i) + ".cfg";
   bool loaded = Util::loadScene(cfg_filename, m_matman, m_geoman, m_dynman);
 
   if (!loaded) // nothing loaded, nothing to do
