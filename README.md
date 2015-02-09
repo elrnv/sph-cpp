@@ -4,6 +4,7 @@ Multi Material SPH Framework
 This framework is developed to promote research of Smoothed Particle Hydrodynamic
 (SPH) flows. It was originally a course project demonstrating two SPH
 implementations from:
+
   * "Particle-Based Fluid Simulation for Interactive Applications" by M. Muller, D. Charypar and M. Gross
   * "Weakly Compressible SPH for Free Surface Flows" by M. Becker, M. Teschner
 
@@ -36,11 +37,40 @@ Setup
 
 A small environment setup script is provided in ``.setup.sh`` for unix-like
 enviroments with a bash shell. Run 
-``
+````
 $ source .setup.sh
-``
+````
 to get a shortcut to built executable binaries as well as the ``bin/`` directory
 in your ``PATH``, and the environment variable ``SPH`` which tells the
 executable where to search for input and output files.
 If you don't have bash, you must define the SPH environment variable to
 point to the root project directory manually in order to run the program.
+
+
+Demo
+====
+
+A demo of what this application should look like can be seen on
+[youtube](http://youtu.be/zRr84SF6FZw).
+
+
+Build
+=====
+
+This project relies on ``qmake`` to generate unix-style Makefiles. The standard
+way to build and run the project is to run
+````
+$ qmake               # creates Makefiles for debug and release builds
+$ make                # compiles a default release build
+$ source .setup.sh    # sets the enviroment variable SPH
+$ sph                 # runs the binary
+````
+
+
+Supplementary Material
+======================
+Since this project was part of a course, I had to write a SIGGRAPH-style
+[report](http://egorlarionov.com/static/cs888/cs888proj.pdf),
+which may be helpful in guiding the interested reader through the fundamentals
+of SPH and the necessary background needed to understand how the code works.
+
