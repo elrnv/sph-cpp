@@ -47,13 +47,6 @@ If you don't have bash, you must define the SPH environment variable to
 point to the root project directory manually in order to run the program.
 
 
-Demo
-====
-
-A demo of what this application should look like can be seen on
-[youtube](http://youtu.be/zRr84SF6FZw).
-
-
 Build
 =====
 
@@ -67,8 +60,21 @@ $ sph                 # runs the binary
 ````
 
 
+Supported Platforms
+===================
+
+I only know the code builds on Mac OS X, probably Mavericks and Yosemite. The
+project uses Qt so it shouldn't be difficult to port onto other platforms. Let
+me know if you succeed.
+
+
 Supplementary Material
 ======================
+
+A demo of what this application should look like can be seen on
+[youtube](http://youtu.be/zRr84SF6FZw).
+
+
 Since this project was part of a course, I had to write a SIGGRAPH-style
 [report](http://egorlarionov.com/static/cs888/cs888proj.pdf),
 which may be helpful in guiding the interested reader through the fundamentals
