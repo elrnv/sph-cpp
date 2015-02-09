@@ -35,6 +35,12 @@ Setup
 =====
 
 A small environment setup script is provided in ``.setup.sh`` for unix-like
-enviroments with a bash shell. Simply run ``$ source .setup.sh`` to get a
-shortcut to built executable binaries as well as the ``bin/`` directory in your
-``PATH``.
+enviroments with a bash shell. Run 
+``
+$ source .setup.sh
+``
+to get a shortcut to built executable binaries as well as the ``bin/`` directory
+in your ``PATH``, and the environment variable ``SPH`` which tells the
+executable where to search for input and output files.
+If you don't have bash, you must define the SPH environment variable to
+point to the root project directory manually in order to run the program.
