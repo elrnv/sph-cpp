@@ -1,0 +1,9 @@
+fluid
+t mcg03
+d 1000
+v 9.0
+st 1.0
+cs 8.0
+vel 0 0 0
+angvel 0 0 0
+out 1

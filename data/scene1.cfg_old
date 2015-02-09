@@ -1,0 +1,18 @@
+# default config defining the runtime settings
+
+dynamics:
+{
+  frames = 100
+  fps = 60
+  substeps = 5
+  savedir = "output"
+}
+
+scene:
+{
+  objdir  = "data"
+  objects = ( { objfile = "sparseblock.obj"
+                dynfile = "mcgfluid.dyn"
+                creation_frame = 0 } )
+}
+

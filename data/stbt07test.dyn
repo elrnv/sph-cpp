@@ -1,0 +1,10 @@
+fluid
+t bt07
+d 900
+v 0.4
+st 0.1
+c 0.08
+ki 4
+vel 0 0 0
+angvel 0 0 0
+out 1

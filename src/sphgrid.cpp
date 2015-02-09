@@ -51,10 +51,10 @@ template<int PT, int PT2, int... PTs>
 inline void
 SPHGrid::update_particle_cell_positions()
 {
+#if 0
   Size nx = m_gridsize[0];
   Size ny = m_gridsize[1];
   Size nz = m_gridsize[2];
-#if 0
   for (Size i = 0; i < nx; ++i)
   {
     for (Size j = 0; j < ny; ++j)

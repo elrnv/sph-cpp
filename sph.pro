@@ -2,56 +2,59 @@ QT += opengl
 
 TARGET = sph
 
+SRCDIR = src
+INCLUDEDIR = src
+
 SOURCES += \
-  main.cpp \
-  gltext.cpp \
-  settings.cpp \
-  openglwindow.cpp \
-  sphgrid.cpp \
-  dynamicsmanager.cpp \
-  simwindow.cpp \
-  mesh.cpp \
-  pointcloud.cpp \
-  material.cpp \
-  uniformbuffer.cpp \
-  shadermanager.cpp \
-  fluid.cpp \
-  boundary.cpp \
-  particle.cpp \
-  glmesh.cpp \
-  glpointcloud.cpp \
-  types.cpp
+  $${SRCDIR}/main.cpp \
+  $${SRCDIR}/gltext.cpp \
+  $${SRCDIR}/settings.cpp \
+  $${SRCDIR}/openglwindow.cpp \
+  $${SRCDIR}/sphgrid.cpp \
+  $${SRCDIR}/dynamicsmanager.cpp \
+  $${SRCDIR}/simwindow.cpp \
+  $${SRCDIR}/mesh.cpp \
+  $${SRCDIR}/pointcloud.cpp \
+  $${SRCDIR}/material.cpp \
+  $${SRCDIR}/uniformbuffer.cpp \
+  $${SRCDIR}/shadermanager.cpp \
+  $${SRCDIR}/fluid.cpp \
+  $${SRCDIR}/boundary.cpp \
+  $${SRCDIR}/particle.cpp \
+  $${SRCDIR}/glmesh.cpp \
+  $${SRCDIR}/glpointcloud.cpp \
+  $${SRCDIR}/types.cpp
 
 HEADERS += \
-  gltext.h \
-  settings.h \
-  dynparams.h \
-  openglwindow.h \
-  simwindow.h \
-  mesh.h \
-  pointcloud.h \
-  geometrymanager.h \
-  primitive.h \
-  material.h \
-  materialmanager.h \
-  uniformbuffer.h \
-  shadermanager.h \
-  fluid.h \
-  fluiddata.h \
-  sphgrid.h \
-  boundary.h \
-  dynamicsmanager.h \
-  glmesh.h \
-  glpointcloud.h \
-  glprimitive.h \
-  particle.h \
-  eigen.h \
-  extramath.h \
-  util.h \
-  kernel.h \
-  types.h
+  $${INCLUDEDIR}/gltext.h \
+  $${INCLUDEDIR}/settings.h \
+  $${INCLUDEDIR}/dynparams.h \
+  $${INCLUDEDIR}/openglwindow.h \
+  $${INCLUDEDIR}/simwindow.h \
+  $${INCLUDEDIR}/mesh.h \
+  $${INCLUDEDIR}/pointcloud.h \
+  $${INCLUDEDIR}/geometrymanager.h \
+  $${INCLUDEDIR}/primitive.h \
+  $${INCLUDEDIR}/material.h \
+  $${INCLUDEDIR}/materialmanager.h \
+  $${INCLUDEDIR}/uniformbuffer.h \
+  $${INCLUDEDIR}/shadermanager.h \
+  $${INCLUDEDIR}/fluid.h \
+  $${INCLUDEDIR}/fluiddata.h \
+  $${INCLUDEDIR}/sphgrid.h \
+  $${INCLUDEDIR}/boundary.h \
+  $${INCLUDEDIR}/dynamicsmanager.h \
+  $${INCLUDEDIR}/glmesh.h \
+  $${INCLUDEDIR}/glpointcloud.h \
+  $${INCLUDEDIR}/glprimitive.h \
+  $${INCLUDEDIR}/particle.h \
+  $${INCLUDEDIR}/eigen.h \
+  $${INCLUDEDIR}/extramath.h \
+  $${INCLUDEDIR}/util.h \
+  $${INCLUDEDIR}/kernel.h \
+  $${INCLUDEDIR}/types.h
 
-DESTDIR = ../bin
+RESOURCES += resources.qrc
 
 # directory containing scene configurations
 QMAKE_CXXFLAGS += -DCONFIGDIR=/Users/egor/proj/sph/data
@@ -61,6 +64,17 @@ CONFIG += c++11
 
 # create a Debug and Release makefiles
 CONFIG += debug_and_release
+
+CONFIG(release, debug|release) {
+  DESTDIR = build/release
+} else {
+  DESTDIR = build/debug
+}
+
+OBJECTS_DIR = $${DESTDIR}/.obj
+MOC_DIR =     $${DESTDIR}/.moc
+RCC_DIR =     $${DESTDIR}/.qrc
+UI_DIR =      $${DESTDIR}/.ui
 
 MACPORTS_INCLUDEPATH = /opt/local/include
 HOMEBREW_INCLUDEPATH = /usr/local/include
@@ -81,6 +95,9 @@ macx {
   LIBS += -L/usr/local/lib  # homebrew libs path
 }
 
+# this is needed so eigen can find our eigen plugins
+INCLUDEPATH += $${SRCDIR}
+
 LIBS += -lassimp            # 3D asset loading library
 #LIBS += -ltbb               # concurrency library
 LIBS += -lboost_system-mt
@@ -99,9 +116,5 @@ LIBS += -lconfig++          # lib to read config files
 # use the following to boost performance
 #QMAKE_CXXFLAGS += -DREPORT_DENSITY_VARIATION
 
-# show warnings if a function is not defined when inlined
-QMAKE_CXXFLAGS += -stdlib=libc++ -Winline -Wno-unused-parameter
 QMAKE_CXXFLAGS_RELEASE -= -O2
 QMAKE_CXXFLAGS_RELEASE += -O3 -DNDEBUG -DBOOST_DISABLE_ASSERTS
-
-RESOURCES += resources.qrc

@@ -1,0 +1,23 @@
+dynamics:
+{
+  frames = 150
+  fps = 60
+  substeps = 30
+  gravity = ( 0.0, -9.81, 0.0 )
+  savedir = "output"
+}
+
+scene:
+{
+  padding  = { x = ( 0.4, 0.4 )
+               y = ( 0.4, 0.4 )
+               z = ( 0.4, 0.4 ) }
+
+  rotation = { x = 40.0
+               y = 40.0 }
+
+  objdir  = "data"
+  objects = ( { objfile = "densesphere.obj"
+                dynfile = "ics13fluid.dyn" } )
+}
+

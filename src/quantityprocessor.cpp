@@ -5,6 +5,8 @@
 #include "settings.h"
 
 #define BT07_BOUNDARY_PARTICLES
+// This file is not being used anymore, but it contains a partial implementation
+// of the IISPH method
 
 // utility
 

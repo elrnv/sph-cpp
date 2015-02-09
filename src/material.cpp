@@ -1,3 +1,4 @@
+#include <iostream>
 #include "material.h"
 
 // Material
@@ -25,18 +26,16 @@ Material::Material(const Material &orig)
 // material imported from assimp
 Material::Material(const aiMaterial &mat)
 {
-  aiColor3D ka, kd, ks;
-  if (AI_SUCCESS != mat.Get<aiColor3D>(AI_MATKEY_COLOR_AMBIENT, ka))
-    ka = aiColor3D(0.0f, 0.0f, 0.0f);
-  if (AI_SUCCESS != mat.Get<aiColor3D>(AI_MATKEY_COLOR_DIFFUSE, kd))
-    kd = aiColor3D(0.6f, 0.6f, 0.6f);
-  if (AI_SUCCESS != mat.Get<aiColor3D>(AI_MATKEY_COLOR_SPECULAR, ks))
-    ks = aiColor3D(0.0f, 0.0f, 0.0f);
-  if (AI_SUCCESS != mat.Get<float>(AI_MATKEY_SHININESS, m_shininess))
-    m_shininess = 0.f;
-
-  if (AI_SUCCESS != mat.Get<float>(AI_MATKEY_OPACITY, m_opacity))
-    m_opacity = 0.3f;
+  aiColor4D ka(0.0f, 0.0f, 0.0f, 1.0f);
+  aiColor4D kd(0.6f, 0.6f, 0.6f, 1.0f);
+  aiColor4D ks(0.0f, 0.0f, 0.0f, 1.0f);
+  aiGetMaterialColor(&mat, AI_MATKEY_COLOR_AMBIENT, &ka);
+  aiGetMaterialColor(&mat, AI_MATKEY_COLOR_DIFFUSE, &kd);
+  aiGetMaterialColor(&mat, AI_MATKEY_COLOR_DIFFUSE, &ks);
+  m_shininess = 0.0f;
+  aiGetMaterialFloat(&mat, AI_MATKEY_SHININESS, &m_shininess);
+  m_opacity = 0.3f; // default opacity
+  aiGetMaterialFloat(&mat, AI_MATKEY_OPACITY, &m_opacity);
 
   m_ka = Vector3f(ka.r, ka.g, ka.b);
   m_kd = Vector3f(kd.r, kd.g, kd.b);
