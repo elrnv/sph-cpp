@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <fstream>
 #include <iomanip> // for setfill and setw
+#include <mutex>
+#include <condition_variable>
 
 #include "types.h"
 #include "settings.h"

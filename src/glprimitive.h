@@ -5,6 +5,7 @@
 #include <QtGui/QOpenGLVertexArrayObject>
 #include <QtGui/QOpenGLShaderProgram>
 #include <thread>
+#include <mutex>
 #include "uniformbuffer.h"
 #include "shadermanager.h"
 #include "material.h"
