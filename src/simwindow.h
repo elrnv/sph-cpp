@@ -26,7 +26,7 @@ public:
   void init();
   void render();
 
-  void load_model(int i);
+  void load_model(int i, bool first_time);
   void init_bbox();
   void draw_wire_bbox();
 

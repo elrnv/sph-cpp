@@ -57,18 +57,22 @@ SimWindow::init()
   m_ubo.allocate( sizeof(m_udata) );
   m_ubo.bindToIndex();
 
-  load_model(6);
+  load_model(6, true);
 
   init_bbox();
   glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
 void 
-SimWindow::load_model(int i)
+SimWindow::load_model(int i, bool first_time = false)
 {
-  clear_dynamics();
-  m_dynman.clear();
-  m_geoman.clear();
+  if ( !first_time )
+  {
+    clear_dynamics();
+
+    m_dynman.clear();
+    m_geoman.clear();
+  }
   std::string cfg_filename = Util::get_configdir_path()
                            + "/scene" + std::to_string(i) + ".cfg";
   bool loaded = Util::loadScene(cfg_filename, m_matman, m_geoman, m_dynman);
