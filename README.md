@@ -76,7 +76,7 @@ A demo of what this application should look like can be seen on
 
 
 Since this project was part of a course, I had to write a SIGGRAPH-style
-[report](http://egorlarionov.com/static/cs888/cs888proj.pdf),
+[report](https://elrnv.com/static/cs888/cs888proj.pdf),
 which may be helpful in guiding the interested reader through the fundamentals
 of SPH and the necessary background needed to understand how the code works.
 
